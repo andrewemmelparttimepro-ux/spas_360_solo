@@ -1,14 +1,16 @@
 import { Search, Filter, Plus, Package, ArrowRightLeft } from 'lucide-react';
-
-const inventoryItems = [
-  { id: 'INV-001', sku: 'SUN-OPT-880-01', product: 'Sundance Optima 880', category: 'Hot Tub', status: 'In Stock', location: 'Minot', price: 14200 },
-  { id: 'INV-002', sku: 'CAL-UTO-02', product: 'Caldera Utopia', category: 'Hot Tub', status: 'Sold (Awaiting Delivery)', location: 'Bismarck', price: 16000 },
-  { id: 'INV-003', sku: 'JAC-J300-01', product: 'Jacuzzi J-300', category: 'Hot Tub', status: 'On Order', location: 'Minot', price: 9500 },
-  { id: 'INV-004', sku: 'CHM-CHL-50', product: 'Chlorine Granules 50lb', category: 'Chemicals', status: 'In Stock', location: 'Bismarck', price: 120 },
-  { id: 'INV-005', sku: 'ACC-CVR-8X8', product: 'Premium Cover 8x8', category: 'Accessories', status: 'In Transit', location: 'Minot', price: 450 },
-];
+import { useInventory } from '@/hooks/useInventory';
 
 export default function Inventory() {
+  const { items, totalInStock, awaitingDelivery, onOrder, lowStockAlerts } = useInventory();
+
+  const summaryCards = [
+    { label: 'Total Units in Stock', value: totalInStock, color: 'bg-blue-100 text-blue-600' },
+    { label: 'Sold (Awaiting Delivery)', value: awaitingDelivery, color: 'bg-amber-100 text-amber-600' },
+    { label: 'On Order', value: onOrder, color: 'bg-purple-100 text-purple-600' },
+    { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-100 text-red-600' },
+  ];
+
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between mb-6 shrink-0">
@@ -30,42 +32,17 @@ export default function Inventory() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 shrink-0">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-lg mr-4">
-            <Package className="w-6 h-6" />
+        {summaryCards.map((card) => (
+          <div key={card.label} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center">
+            <div className={`p-3 rounded-lg mr-4 ${card.color}`}>
+              <Package className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500">{card.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{card.value}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Total Units in Stock</p>
-            <p className="text-2xl font-bold text-slate-900">42</p>
-          </div>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center">
-          <div className="p-3 bg-amber-100 text-amber-600 rounded-lg mr-4">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Sold (Awaiting Delivery)</p>
-            <p className="text-2xl font-bold text-slate-900">14</p>
-          </div>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center">
-          <div className="p-3 bg-purple-100 text-purple-600 rounded-lg mr-4">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">On Order</p>
-            <p className="text-2xl font-bold text-slate-900">8</p>
-          </div>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center">
-          <div className="p-3 bg-red-100 text-red-600 rounded-lg mr-4">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Low Stock Alerts</p>
-            <p className="text-2xl font-bold text-slate-900">3</p>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Data Table */}
@@ -98,7 +75,7 @@ export default function Inventory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {inventoryItems.map((item) => (
+              {items.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                   <td className="p-4 text-sm font-medium text-slate-900">{item.sku}</td>
                   <td className="p-4 text-sm text-slate-700">{item.product}</td>

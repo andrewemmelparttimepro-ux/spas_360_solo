@@ -1,12 +1,20 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppLayout from './components/layout/AppLayout';
 
+const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CRM = lazy(() => import('./pages/CRM'));
 const Service = lazy(() => import('./pages/Service'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Communication = lazy(() => import('./pages/Communication'));
+const Contacts = lazy(() => import('./pages/Contacts'));
+const ContactDetail = lazy(() => import('./pages/ContactDetail'));
+const DealDetail = lazy(() => import('./pages/DealDetail'));
+const JobDetail = lazy(() => import('./pages/JobDetail'));
+const InventoryDetail = lazy(() => import('./pages/InventoryDetail'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function PageLoader() {
   return (
@@ -16,22 +24,57 @@ function PageLoader() {
   );
 }
 
+function AuthGate() {
+  const { session, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-slate-500">Loading SPAS 360...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Login />
+      </Suspense>
+    );
+  }
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="contacts" element={<Contacts />} />
+          <Route path="contacts/:id" element={<ContactDetail />} />
+          <Route path="crm" element={<CRM />} />
+          <Route path="crm/:id" element={<DealDetail />} />
+          <Route path="service" element={<Service />} />
+          <Route path="service/:id" element={<JobDetail />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="inventory/:id" element={<InventoryDetail />} />
+          <Route path="communication" element={<Communication />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
 export default function App() {
   return (
-    <Router>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="crm" element={<CRM />} />
-            <Route path="service" element={<Service />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="communication" element={<Communication />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Suspense>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AuthGate />
+      </Router>
+    </AuthProvider>
   );
 }

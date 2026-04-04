@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Wrench, Package, MessageSquare, Settings, Droplets } from 'lucide-react';
+import { LayoutDashboard, Users, Wrench, Package, MessageSquare, Settings, Droplets, Contact } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Contacts', path: '/contacts', icon: Contact },
   { name: 'Sales CRM', path: '/crm', icon: Users },
   { name: 'Service & Jobs', path: '/service', icon: Wrench },
   { name: 'Inventory', path: '/inventory', icon: Package },
@@ -42,10 +43,20 @@ export default function Sidebar() {
       </div>
 
       <div className="p-4 border-t border-slate-800">
-        <button className="flex items-center px-3 py-2.5 w-full rounded-lg text-sm font-medium hover:bg-slate-800 hover:text-white transition-colors">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            cn(
+              'flex items-center px-3 py-2.5 w-full rounded-lg text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-cyan-900/40 text-cyan-400'
+                : 'hover:bg-slate-800 hover:text-white'
+            )
+          }
+        >
           <Settings className="w-5 h-5 mr-3 flex-shrink-0" />
           Settings
-        </button>
+        </NavLink>
       </div>
     </div>
   );

@@ -1,11 +1,17 @@
 import { Calendar as CalendarIcon, Clock, MapPin, User, Plus, Filter } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useServiceJobs } from '@/hooks/useServiceJobs';
+import { useServiceJobs, statusColors } from '@/hooks/useServiceJobs';
+import type { JobStatus } from '@/types/database';
 
 export default function Service() {
-  const { unscheduledJobs, scheduledJobs, statusColors } = useServiceJobs();
+  const { unscheduledJobs, scheduledJobs, isLoading } = useServiceJobs();
   const todayDisplay = format(new Date(), 'MMMM d, yyyy');
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+  }
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
@@ -15,14 +21,8 @@ export default function Service() {
           <p className="text-sm text-slate-500 mt-1">Schedule and dispatch technicians</p>
         </div>
         <div className="flex space-x-3">
-          <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </button>
-          <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
-            <Plus className="w-4 h-4 mr-2" />
-            New Job
-          </button>
+          <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Filter className="w-4 h-4 mr-2" />Filter</button>
+          <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
         </div>
       </div>
 
@@ -31,20 +31,16 @@ export default function Service() {
         <div className="w-80 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
             <h2 className="font-semibold text-slate-800">Unscheduled Queue</h2>
-            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded-full">
-              {unscheduledJobs.length}
-            </span>
+            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded-full">{unscheduledJobs.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {unscheduledJobs.map(job => (
-              <div key={job.id} className={cn("p-3 rounded-r-lg border border-l-4 shadow-sm cursor-grab hover:shadow-md transition-all", statusColors[job.status])}>
+            {unscheduledJobs.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-8">No unscheduled jobs</p>
+            ) : unscheduledJobs.map(job => (
+              <Link key={job.id} to={`/service/${job.id}`} className={cn("block p-3 rounded-r-lg border border-l-4 shadow-sm hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
                 <div className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">{job.status}</div>
                 <h3 className="font-medium text-sm mb-2 leading-tight">{job.title}</h3>
-                <div className="flex items-center text-xs opacity-70">
-                  <MapPin className="w-3 h-3 mr-1" />
-                  {job.location}
-                </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -53,10 +49,7 @@ export default function Service() {
         <div className="flex-1 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
             <div className="flex items-center space-x-4">
-              <h2 className="font-semibold text-slate-800 flex items-center">
-                <CalendarIcon className="w-5 h-5 mr-2 text-slate-500" />
-                Today's Schedule
-              </h2>
+              <h2 className="font-semibold text-slate-800 flex items-center"><CalendarIcon className="w-5 h-5 mr-2 text-slate-500" />Today's Schedule</h2>
               <div className="text-sm text-slate-500">{todayDisplay}</div>
             </div>
             <div className="flex bg-slate-200 p-1 rounded-lg">
@@ -65,26 +58,18 @@ export default function Service() {
               <button className="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-800">Month</button>
             </div>
           </div>
-          
           <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
             <div className="space-y-4">
-              {scheduledJobs.map(job => (
-                <div key={job.id} className={cn("p-4 rounded-r-lg border border-l-4 shadow-sm flex items-center justify-between bg-white", statusColors[job.status])}>
-                  <div>
-                    <div className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">{job.status}</div>
-                    <h3 className="font-medium text-slate-900">{job.title}</h3>
-                    <div className="flex items-center space-x-4 mt-2 text-sm opacity-80">
-                      <span className="flex items-center"><Clock className="w-4 h-4 mr-1" /> {job.time}</span>
-                      <span className="flex items-center"><MapPin className="w-4 h-4 mr-1" /> {job.location}</span>
-                    </div>
+              {scheduledJobs.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-8">No jobs scheduled today</p>
+              ) : scheduledJobs.map(job => (
+                <Link key={job.id} to={`/service/${job.id}`} className={cn("block p-4 rounded-r-lg border border-l-4 shadow-sm bg-white hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
+                  <div className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">{job.status}</div>
+                  <h3 className="font-medium text-slate-900">{job.title}</h3>
+                  <div className="flex items-center space-x-4 mt-2 text-sm opacity-80">
+                    {job.scheduled_at && <span className="flex items-center"><Clock className="w-4 h-4 mr-1" />{new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                   </div>
-                  <div className="flex items-center">
-                    <div className="bg-white/50 px-3 py-1.5 rounded-lg border border-black/5 flex items-center text-sm font-medium">
-                      <User className="w-4 h-4 mr-2 opacity-70" />
-                      {job.tech}
-                    </div>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

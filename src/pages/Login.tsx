@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Droplets } from 'lucide-react';
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -28,15 +27,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0f1729 0%, #070b14 100%)' }}>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-cyan-500/10 rounded-2xl mb-4">
-            <Droplets className="w-8 h-8 text-cyan-400" />
-          </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">SPAS 360</h1>
-          <p className="text-slate-400 mt-1">Unified Spa & Hot Tub Business Platform</p>
+          <img src="/logo.png" alt="SPAS 360" className="h-28 mx-auto mb-4 object-contain" />
         </div>
 
         {/* Form Card */}
@@ -54,7 +49,7 @@ export default function Login() {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
                     required
                   />
                 </div>
@@ -64,7 +59,7 @@ export default function Login() {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
                     required
                   />
                 </div>
@@ -78,7 +73,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="matt@spas360.com"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
                 required
               />
             </div>
@@ -90,7 +85,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
                 required
                 minLength={6}
               />
@@ -105,7 +100,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-cyan-500/25"
+              className="w-full py-3 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-sky-500/25"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -121,7 +116,7 @@ export default function Login() {
           <div className="mt-6 text-center">
             <button
               onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-              className="text-sm text-slate-400 hover:text-cyan-400 transition-colors"
+              className="text-sm text-slate-400 hover:text-sky-400 transition-colors"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>

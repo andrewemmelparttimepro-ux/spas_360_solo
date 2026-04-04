@@ -28,7 +28,7 @@ export default function Settings() {
             <div>
               <p className="text-xs text-slate-400">Role</p>
               <p className="text-sm flex items-center">
-                <Shield className="w-3.5 h-3.5 mr-1 text-cyan-500" />
+                <Shield className="w-3.5 h-3.5 mr-1 text-sky-400" />
                 {roleLabels[profile.role] ?? profile.role}
               </p>
             </div>

@@ -14,7 +14,7 @@ export default function Communication() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   return (
@@ -32,7 +32,7 @@ export default function Communication() {
           <div className="p-4 border-b border-slate-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search messages..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" />
+              <input type="text" placeholder="Search messages..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none" />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -43,7 +43,7 @@ export default function Communication() {
                 key={thread.id}
                 onClick={() => setActiveThreadId(thread.id)}
                 className={cn("p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors",
-                  activeThread?.id === thread.id ? "bg-white border-l-4 border-l-cyan-500" : "border-l-4 border-l-transparent"
+                  activeThread?.id === thread.id ? "bg-white border-l-4 border-l-sky-400" : "border-l-4 border-l-transparent"
                 )}
               >
                 <div className="flex justify-between items-start mb-1">
@@ -74,7 +74,7 @@ export default function Communication() {
                     <div className={cn("max-w-[70%] rounded-2xl px-4 py-2.5 text-sm",
                       msg.sender_type === 'customer' ? "bg-white border border-slate-200 text-slate-800" :
                       msg.sender_type === 'system' ? "bg-slate-200 text-slate-700 text-xs italic" :
-                      "bg-cyan-600 text-white"
+                      "bg-sky-500 text-white"
                     )}>{msg.body}</div>
                     <span className="text-[10px] text-slate-400 mt-1 px-1">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -84,7 +84,7 @@ export default function Communication() {
               <div className="p-4 border-t border-slate-200 bg-white shrink-0">
                 <div className="flex items-end space-x-2">
                   <button className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors shrink-0"><Paperclip className="w-5 h-5" /></button>
-                  <div className="flex-1 bg-slate-100 rounded-xl border border-transparent focus-within:border-cyan-500 focus-within:bg-white focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
+                  <div className="flex-1 bg-slate-100 rounded-xl border border-transparent focus-within:border-sky-400 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-400 transition-all">
                     <textarea
                       rows={2}
                       value={draft}
@@ -94,7 +94,7 @@ export default function Communication() {
                       className="w-full bg-transparent border-none p-3 text-sm outline-none resize-none"
                     />
                   </div>
-                  <button onClick={handleSend} className="p-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl transition-colors shrink-0 shadow-sm"><Send className="w-5 h-5" /></button>
+                  <button onClick={handleSend} className="p-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl transition-colors shrink-0 shadow-sm"><Send className="w-5 h-5" /></button>
                 </div>
               </div>
             </>

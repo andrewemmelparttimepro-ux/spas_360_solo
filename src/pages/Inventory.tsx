@@ -13,7 +13,7 @@ export default function Inventory() {
   ];
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   return (
@@ -25,7 +25,7 @@ export default function Inventory() {
         </div>
         <div className="flex space-x-3">
           <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><ArrowRightLeft className="w-4 h-4 mr-2" />Transfer</button>
-          <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
+          <button className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
       </div>
 
@@ -42,7 +42,7 @@ export default function Inventory() {
         <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search SKU, product, category..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none" />
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search SKU, product, category..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none" />
           </div>
           <button className="flex items-center text-sm font-medium text-slate-600 hover:text-slate-900"><Filter className="w-4 h-4 mr-2" />More Filters</button>
         </div>
@@ -62,7 +62,7 @@ export default function Inventory() {
                 <tr><td colSpan={5} className="p-8 text-center text-slate-400">No inventory items found</td></tr>
               ) : items.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 text-sm font-medium"><Link to={`/inventory/${item.id}`} className="text-cyan-700 hover:text-cyan-900">{item.sku}</Link></td>
+                  <td className="p-4 text-sm font-medium"><Link to={`/inventory/${item.id}`} className="text-sky-600 hover:text-sky-900">{item.sku}</Link></td>
                   <td className="p-4 text-sm text-slate-700">{item.product}</td>
                   <td className="p-4 text-sm text-slate-500">{item.category}</td>
                   <td className="p-4">

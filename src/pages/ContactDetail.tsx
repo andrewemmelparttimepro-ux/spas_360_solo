@@ -17,7 +17,7 @@ export default function ContactDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" />
       </div>
     );
   }
@@ -26,7 +26,7 @@ export default function ContactDetail() {
     return (
       <div className="flex flex-col items-center justify-center h-full text-slate-400">
         <p className="text-lg">Contact not found</p>
-        <Link to="/contacts" className="text-cyan-600 text-sm mt-2 hover:underline">Back to Contacts</Link>
+        <Link to="/contacts" className="text-sky-500 text-sm mt-2 hover:underline">Back to Contacts</Link>
       </div>
     );
   }
@@ -99,9 +99,9 @@ export default function ContactDetail() {
                 onChange={(e) => setNewNote(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
                 placeholder="Add a note..."
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500"
+                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400"
               />
-              <button onClick={handleAddNote} className="px-4 py-2 bg-cyan-600 text-white text-sm rounded-lg font-medium hover:bg-cyan-700">
+              <button onClick={handleAddNote} className="px-4 py-2 bg-sky-500 text-white text-sm rounded-lg font-medium hover:bg-sky-600">
                 Add
               </button>
             </div>
@@ -121,7 +121,7 @@ export default function ContactDetail() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Tasks</h2>
-              <button onClick={() => setShowTaskForm(true)} className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center">
+              <button onClick={() => setShowTaskForm(true)} className="text-sm text-sky-500 hover:text-sky-600 flex items-center">
                 <Plus className="w-4 h-4 mr-1" /> Add Task
               </button>
             </div>
@@ -132,10 +132,10 @@ export default function ContactDetail() {
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                   placeholder="Task title..."
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500"
+                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400"
                   autoFocus
                 />
-                <button onClick={handleAddTask} className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button>
+                <button onClick={handleAddTask} className="px-3 py-2 bg-sky-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button>
                 <button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
               </div>
             )}
@@ -148,7 +148,7 @@ export default function ContactDetail() {
                     type="checkbox"
                     checked={t.status === 'Completed'}
                     onChange={() => t.status !== 'Completed' && completeTask(t.id)}
-                    className="w-4 h-4 rounded border-slate-300 text-cyan-600 mr-3"
+                    className="w-4 h-4 rounded border-slate-300 text-sky-500 mr-3"
                   />
                   <span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                     {t.title}

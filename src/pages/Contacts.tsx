@@ -31,7 +31,7 @@ export default function Contacts() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
+          className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Contact
@@ -45,23 +45,23 @@ export default function Contacts() {
             <h2 className="text-lg font-semibold text-slate-900 mb-4">New Contact</h2>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="First Name" value={newContact.first_name} onChange={e => setNewContact({...newContact, first_name: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" />
-                <input placeholder="Last Name" value={newContact.last_name} onChange={e => setNewContact({...newContact, last_name: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" />
+                <input placeholder="First Name" value={newContact.first_name} onChange={e => setNewContact({...newContact, first_name: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
+                <input placeholder="Last Name" value={newContact.last_name} onChange={e => setNewContact({...newContact, last_name: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
               </div>
-              <input placeholder="Phone" value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" />
-              <input placeholder="Email (optional)" value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" />
+              <input placeholder="Phone" value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
+              <input placeholder="Email (optional)" value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
               <div className="grid grid-cols-2 gap-3">
-                <select value={newContact.customer_type} onChange={e => setNewContact({...newContact, customer_type: e.target.value as 'Lead'})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500">
+                <select value={newContact.customer_type} onChange={e => setNewContact({...newContact, customer_type: e.target.value as 'Lead'})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
                   <option>Lead</option><option>Prospect</option><option>Customer</option><option>Past Customer</option>
                 </select>
-                <select value={newContact.lead_source} onChange={e => setNewContact({...newContact, lead_source: e.target.value as 'Walk-in'})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500">
+                <select value={newContact.lead_source} onChange={e => setNewContact({...newContact, lead_source: e.target.value as 'Walk-in'})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
                   <option>Walk-in</option><option>Website</option><option>Referral</option><option>Ad</option><option>Phone</option><option>Event</option><option>Other</option>
                 </select>
               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} disabled={!newContact.first_name || !newContact.phone} className="px-4 py-2 text-sm bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium disabled:opacity-50">Create Contact</button>
+              <button onClick={handleCreate} disabled={!newContact.first_name || !newContact.phone} className="px-4 py-2 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium disabled:opacity-50">Create Contact</button>
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function Contacts() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, phone, or email..."
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none"
             />
           </div>
           <button className="flex items-center text-sm font-medium text-slate-600 hover:text-slate-900">
@@ -88,7 +88,7 @@ export default function Contacts() {
 
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" />
           </div>
         ) : contacts.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
@@ -113,7 +113,7 @@ export default function Contacts() {
                 {contacts.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4">
-                      <Link to={`/contacts/${c.id}`} className="text-sm font-medium text-cyan-700 hover:text-cyan-900">
+                      <Link to={`/contacts/${c.id}`} className="text-sm font-medium text-sky-600 hover:text-sky-900">
                         {c.first_name} {c.last_name}
                       </Link>
                     </td>

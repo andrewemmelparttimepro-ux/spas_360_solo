@@ -17,14 +17,14 @@ export default function Dashboard() {
   const { stats, actions, revenueData, isLoading } = useDashboardStats();
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manager Dashboard</h1>
-        <select className="bg-white border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-cyan-500">
+        <select className="bg-white border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400">
           <option>This Week</option><option>This Month</option><option>Last Month</option>
         </select>
       </div>

@@ -37,7 +37,7 @@ export default function Header() {
           <input
             type="text"
             placeholder="Search customers, jobs, inventory..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-sky-400 focus:ring-2 focus:ring-sky-200 transition-all outline-none"
           />
         </div>
       </div>
@@ -57,7 +57,7 @@ export default function Header() {
             <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
               <button
                 onClick={() => { setActiveLocation(null); setLocOpen(false); }}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${!activeLocationId ? 'text-cyan-600 font-medium' : 'text-slate-700'}`}
+                className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${!activeLocationId ? 'text-sky-500 font-medium' : 'text-slate-700'}`}
               >
                 All Locations
               </button>
@@ -65,7 +65,7 @@ export default function Header() {
                 <button
                   key={loc.id}
                   onClick={() => { setActiveLocation(loc.id); setLocOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${activeLocationId === loc.id ? 'text-cyan-600 font-medium' : 'text-slate-700'}`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${activeLocationId === loc.id ? 'text-sky-500 font-medium' : 'text-slate-700'}`}
                 >
                   {loc.name} Store
                 </button>

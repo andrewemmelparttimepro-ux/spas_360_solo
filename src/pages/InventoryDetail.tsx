@@ -15,8 +15,8 @@ export default function InventoryDetail() {
       .then(({ data }) => { setItem(data as InventoryItem); setIsLoading(false); });
   }, [id]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
-  if (!item) return <div className="text-center text-slate-400"><p>Item not found</p><Link to="/inventory" className="text-cyan-600 text-sm mt-2 hover:underline">Back</Link></div>;
+  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
+  if (!item) return <div className="text-center text-slate-400"><p>Item not found</p><Link to="/inventory" className="text-sky-500 text-sm mt-2 hover:underline">Back</Link></div>;
 
   const loc = (item as Record<string, unknown>).locations as { name: string } | undefined;
   const statusColor: Record<string, string> = {

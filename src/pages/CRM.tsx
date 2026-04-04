@@ -9,7 +9,7 @@ export default function CRM() {
   const { stages, isLoading, getDealsForStage, moveDeal } = usePipeline();
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   return (
@@ -19,7 +19,7 @@ export default function CRM() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sales Pipeline</h1>
           <p className="text-sm text-slate-500 mt-1">Manage deals and follow-ups</p>
         </div>
-        <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
+        <button className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
           <Plus className="w-4 h-4 mr-2" />
           New Deal
         </button>
@@ -65,7 +65,7 @@ function DealCard({ deal, index }: { deal: Deal; index: number }) {
     <Draggable draggableId={deal.id} index={index}>
       {(provided, snapshot) => (
         <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-          className={cn("bg-white p-4 rounded-lg shadow-sm border border-slate-200 group hover:border-cyan-300 transition-all", snapshot.isDragging ? "shadow-lg ring-2 ring-cyan-500 ring-opacity-50" : "")}>
+          className={cn("bg-white p-4 rounded-lg shadow-sm border border-slate-200 group hover:border-sky-300 transition-all", snapshot.isDragging ? "shadow-lg ring-2 ring-sky-400 ring-opacity-50" : "")}>
           <div className="flex justify-between items-start mb-2">
             <Badge priority={deal.priority} />
             <Link to={`/crm/${deal.id}`} className="text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -73,7 +73,7 @@ function DealCard({ deal, index }: { deal: Deal; index: number }) {
             </Link>
           </div>
           <Link to={`/crm/${deal.id}`}>
-            <h4 className="font-medium text-slate-900 text-sm mb-1 hover:text-cyan-700">{deal.title}</h4>
+            <h4 className="font-medium text-slate-900 text-sm mb-1 hover:text-sky-600">{deal.title}</h4>
           </Link>
           <p className="text-lg font-bold text-slate-700 mb-3">${(deal.amount ?? 0).toLocaleString()}</p>
           <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-3">

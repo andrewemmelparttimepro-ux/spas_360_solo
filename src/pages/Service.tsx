@@ -10,7 +10,7 @@ export default function Service() {
   const todayDisplay = format(new Date(), 'MMMM d, yyyy');
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   return (
@@ -22,7 +22,7 @@ export default function Service() {
         </div>
         <div className="flex space-x-3">
           <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Filter className="w-4 h-4 mr-2" />Filter</button>
-          <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
+          <button className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
         </div>
       </div>
 

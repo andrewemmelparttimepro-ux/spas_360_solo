@@ -17,11 +17,11 @@ export default function JobDetail() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   }
 
   if (!job) {
-    return <div className="flex flex-col items-center justify-center h-full text-slate-400"><p>Job not found</p><Link to="/service" className="text-cyan-600 text-sm mt-2 hover:underline">Back to Service</Link></div>;
+    return <div className="flex flex-col items-center justify-center h-full text-slate-400"><p>Job not found</p><Link to="/service" className="text-sky-500 text-sm mt-2 hover:underline">Back to Service</Link></div>;
   }
 
   const contact = (job as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string } | undefined;
@@ -47,7 +47,7 @@ export default function JobDetail() {
         <Link to="/service" className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-slate-500" /></Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-slate-900">{job.title}</h1>
-          {contact && <Link to={`/contacts/${job.contact_id}`} className="text-sm text-cyan-600 hover:text-cyan-700">{contact.first_name} {contact.last_name}</Link>}
+          {contact && <Link to={`/contacts/${job.contact_id}`} className="text-sm text-sky-500 hover:text-sky-600">{contact.first_name} {contact.last_name}</Link>}
         </div>
         <span className={cn("px-3 py-1 rounded-lg text-sm font-bold border-l-4", statusColors[job.status as JobStatus] ?? 'bg-slate-100')}>{job.status}</span>
       </div>
@@ -71,8 +71,8 @@ export default function JobDetail() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Job Notes</h2>
             <div className="flex space-x-3 mb-4">
-              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddNote()} placeholder="Add a note..." className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" />
-              <button onClick={handleAddNote} className="px-4 py-2 bg-cyan-600 text-white text-sm rounded-lg font-medium hover:bg-cyan-700">Add</button>
+              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddNote()} placeholder="Add a note..." className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
+              <button onClick={handleAddNote} className="px-4 py-2 bg-sky-500 text-white text-sm rounded-lg font-medium hover:bg-sky-600">Add</button>
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {notes.length === 0 ? <p className="text-sm text-slate-400 text-center py-4">No notes yet</p> : notes.map(n => (
@@ -85,19 +85,19 @@ export default function JobDetail() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Tasks</h2>
-              <button onClick={() => setShowTaskForm(true)} className="text-sm text-cyan-600 hover:text-cyan-700 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
+              <button onClick={() => setShowTaskForm(true)} className="text-sm text-sky-500 hover:text-sky-600 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
             </div>
             {showTaskForm && (
               <div className="flex space-x-3 mb-4">
-                <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Task..." className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-500" autoFocus />
-                <button onClick={handleAddTask} className="px-3 py-2 bg-cyan-600 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button>
+                <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Task..." className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" autoFocus />
+                <button onClick={handleAddTask} className="px-3 py-2 bg-sky-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button>
                 <button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-slate-400"><X className="w-4 h-4" /></button>
               </div>
             )}
             <div className="space-y-2">
               {tasks.length === 0 ? <p className="text-sm text-slate-400 text-center py-4">No tasks</p> : tasks.map(t => (
                 <div key={t.id} className="flex items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-slate-300 text-cyan-600 mr-3" />
+                  <input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-slate-300 text-sky-500 mr-3" />
                   <span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{t.title}</span>
                 </div>
               ))}

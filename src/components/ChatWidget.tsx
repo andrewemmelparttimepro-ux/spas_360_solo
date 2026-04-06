@@ -48,11 +48,9 @@ export default function ChatWidget() {
     if (!activeThreadId) {
       const id = await createThread(tab);
       if (!id) return;
-      // Small delay for state to settle
-      setTimeout(() => {
-        if (tab === 'agent') sendMessage(msg);
-        else sendTeamMessage(msg);
-      }, 200);
+      // Pass thread ID directly to avoid stale closure
+      if (tab === 'agent') await sendMessage(msg, id);
+      else await sendTeamMessage(msg, id);
       return;
     }
 

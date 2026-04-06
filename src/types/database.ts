@@ -120,6 +120,19 @@ export interface Notification {
   created_at: string;
 }
 
+export interface AgentThread {
+  id: string; org_id: string; user_id: string;
+  thread_type: 'agent' | 'team'; title: string | null;
+  participants: string[]; last_message_at: string | null;
+  created_at: string;
+}
+
+export interface AgentMessage {
+  id: string; thread_id: string; role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string; tool_calls: unknown | null; tool_name: string | null;
+  sender_id: string | null; created_at: string;
+}
+
 // Simplified Database type for Supabase client generic
 // Using Record<string, unknown> for Insert/Update to avoid circular ref issues
 // The actual type safety comes from our Row interfaces above
@@ -129,7 +142,8 @@ export interface Database {
       [K in 'organizations' | 'locations' | 'profiles' | 'contacts' | 'properties' |
        'pipeline_stages' | 'deals' | 'jobs' | 'job_assignments' | 'parts' |
        'inventory_items' | 'communication_threads' | 'messages' | 'tasks' |
-       'notes' | 'time_entries' | 'notifications' | 'audit_log']: {
+       'notes' | 'time_entries' | 'notifications' | 'audit_log' |
+       'agent_threads' | 'agent_messages']: {
         Row: Record<string, unknown>;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

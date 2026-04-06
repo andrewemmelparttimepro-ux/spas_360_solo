@@ -42,9 +42,22 @@ CREATE TABLE profiles (
 CREATE INDEX idx_profiles_org ON profiles(org_id);
 
 -- Auto-create profile on signup
+-- Admin emails get owner_manager role; everyone else gets salesperson
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  _role TEXT;
 BEGIN
+  -- Auto-promote known admin emails to owner_manager
+  IF NEW.email IN (
+    'andrewemmelparttimepro@gmail.com',
+    'matt@spas360.com'
+  ) THEN
+    _role := 'owner_manager';
+  ELSE
+    _role := COALESCE(NEW.raw_user_meta_data->>'role', 'salesperson');
+  END IF;
+
   INSERT INTO public.profiles (id, org_id, email, first_name, last_name, role)
   VALUES (
     NEW.id,
@@ -52,7 +65,7 @@ BEGIN
     COALESCE(NEW.email, ''),
     COALESCE(NEW.raw_user_meta_data->>'first_name', 'New'),
     COALESCE(NEW.raw_user_meta_data->>'last_name', 'User'),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'salesperson')
+    _role
   );
   RETURN NEW;
 END;
@@ -336,6 +349,34 @@ CREATE TABLE audit_log (
 CREATE INDEX idx_audit_table ON audit_log(table_name, record_id);
 CREATE INDEX idx_audit_user ON audit_log(user_id);
 
+-- ─── Agent/Team Threads ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS agent_threads (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  thread_type TEXT NOT NULL DEFAULT 'agent' CHECK (thread_type IN ('agent', 'team')),
+  title TEXT,
+  participants UUID[] DEFAULT '{}',
+  last_message_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_threads_user ON agent_threads(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_threads_org ON agent_threads(org_id);
+
+-- ─── Agent/Team Messages ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS agent_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  thread_id UUID NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+  content TEXT NOT NULL,
+  tool_calls JSONB,
+  tool_name TEXT,
+  sender_id UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_thread ON agent_messages(thread_id);
+CREATE INDEX IF NOT EXISTS idx_agent_messages_created ON agent_messages(created_at);
+
 -- ─── Updated_at trigger ─────────────────────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
@@ -545,6 +586,24 @@ CREATE POLICY notif_insert ON notifications FOR INSERT WITH CHECK (TRUE);
 -- Audit log: admin only
 CREATE POLICY audit_read ON audit_log FOR SELECT USING (auth_role() = 'owner_manager');
 CREATE POLICY audit_insert ON audit_log FOR INSERT WITH CHECK (TRUE);
+
+-- Agent threads + messages RLS
+ALTER TABLE agent_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY at_read ON agent_threads FOR SELECT USING (
+  user_id = auth.uid()
+  OR (thread_type = 'team' AND auth.uid() = ANY(participants))
+  OR (org_id = auth_org() AND thread_type = 'team')
+);
+CREATE POLICY at_insert ON agent_threads FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY at_update ON agent_threads FOR UPDATE USING (user_id = auth.uid());
+
+CREATE POLICY am_read ON agent_messages FOR SELECT USING (
+  EXISTS (SELECT 1 FROM agent_threads t WHERE t.id = agent_messages.thread_id
+    AND (t.user_id = auth.uid() OR auth.uid() = ANY(t.participants) OR t.thread_type = 'team'))
+);
+CREATE POLICY am_insert ON agent_messages FOR INSERT WITH CHECK (TRUE);
 
 -- ═══════════════════════════════════════════════════════════
 -- SEED DATA

@@ -103,14 +103,19 @@ export function useAgentChat() {
       sender_id: user.id,
     });
 
-    // Build message history for LLM
-    const history = [
-      { role: 'system' as const, content: SALES_AGENT_PROMPT },
-      ...messages.filter(m => m.role !== 'tool').map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-      { role: 'user' as const, content },
+    // Build message history for LLM — include tool results so multi-turn context is preserved
+    const history: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[] = [
+      { role: 'system', content: SALES_AGENT_PROMPT },
+      ...messages.map(m => {
+        if (m.role === 'assistant' && m.tool_calls) {
+          return { role: 'assistant', content: m.content || '', tool_calls: m.tool_calls };
+        }
+        if (m.role === 'tool') {
+          return { role: 'tool', content: m.content, tool_call_id: m.id };
+        }
+        return { role: m.role, content: m.content };
+      }),
+      { role: 'user', content },
     ];
 
     try {

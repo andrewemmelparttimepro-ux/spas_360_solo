@@ -100,6 +100,16 @@ async function handleGemini(
 function convertMessagesToGemini(messages: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[]) {
   const contents: { role: string; parts: Record<string, unknown>[] }[] = [];
 
+  // Build a map of tool_call_id → function name from assistant messages
+  const toolCallNames: Record<string, string> = {};
+  for (const msg of messages) {
+    if (msg.role === 'assistant' && msg.tool_calls) {
+      for (const tc of msg.tool_calls as { id: string; function: { name: string; arguments: string } }[]) {
+        toolCallNames[tc.id] = tc.function.name;
+      }
+    }
+  }
+
   for (const msg of messages) {
     if (msg.role === 'system') continue; // Handled via systemInstruction
 
@@ -117,9 +127,11 @@ function convertMessagesToGemini(messages: { role: string; content: string; tool
       }
       if (parts.length > 0) contents.push({ role: 'model', parts });
     } else if (msg.role === 'tool') {
+      // Use the actual function name from the corresponding tool_call_id
+      const funcName = msg.tool_call_id ? toolCallNames[msg.tool_call_id] : undefined;
       contents.push({
         role: 'user',
-        parts: [{ functionResponse: { name: 'tool_result', response: { result: msg.content } } }],
+        parts: [{ functionResponse: { name: funcName || 'tool_result', response: { result: msg.content } } }],
       });
     }
   }

@@ -91,19 +91,20 @@ export function useAgentChat() {
   }, [user, profile, fetchThreads]);
 
   // Send message to agent
-  const sendMessage = useCallback(async (content: string) => {
-    if (!activeThreadId || !user || isSending) return;
+  const sendMessage = useCallback(async (content: string, overrideThreadId?: string) => {
+    const threadId = overrideThreadId || activeThreadId;
+    if (!threadId || !user || isSending) return;
     setIsSending(true);
 
     // Save user message
     await supabase.from('agent_messages').insert({
-      thread_id: activeThreadId,
+      thread_id: threadId,
       role: 'user',
       content,
       sender_id: user.id,
     });
 
-    // Build message history for LLM — include tool results so multi-turn context is preserved
+    // Build message history for LLM â include tool results so multi-turn context is preserved
     const history: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[] = [
       { role: 'system', content: SALES_AGENT_PROMPT },
       ...messages.map(m => {
@@ -146,7 +147,7 @@ export function useAgentChat() {
       if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
         // Save assistant's tool-calling message
         await supabase.from('agent_messages').insert({
-          thread_id: activeThreadId,
+          thread_id: threadId,
           role: 'assistant',
           content: assistantMessage.content || 'Using tools...',
           tool_calls: assistantMessage.tool_calls,
@@ -165,7 +166,7 @@ export function useAgentChat() {
 
           // Save tool result
           await supabase.from('agent_messages').insert({
-            thread_id: activeThreadId,
+            thread_id: threadId,
             role: 'tool',
             content: JSON.stringify(result),
             tool_name: tc.function.name,
@@ -198,7 +199,7 @@ export function useAgentChat() {
       // Save final assistant response
       if (assistantMessage?.content) {
         await supabase.from('agent_messages').insert({
-          thread_id: activeThreadId,
+          thread_id: threadId,
           role: 'assistant',
           content: assistantMessage.content,
         });
@@ -207,9 +208,9 @@ export function useAgentChat() {
       // Update thread title from first message
       if (messages.length === 0) {
         const title = content.length > 40 ? content.slice(0, 40) + '...' : content;
-        await supabase.from('agent_threads').update({ title, last_message_at: new Date().toISOString() }).eq('id', activeThreadId);
+        await supabase.from('agent_threads').update({ title, last_message_at: new Date().toISOString() }).eq('id', threadId);
       } else {
-        await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', activeThreadId);
+        await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
       }
 
       await fetchMessages();
@@ -217,7 +218,7 @@ export function useAgentChat() {
     } catch (err) {
       console.error('Agent error:', err);
       await supabase.from('agent_messages').insert({
-        thread_id: activeThreadId,
+        thread_id: threadId,
         role: 'assistant',
         content: `Sorry, I encountered an error. Please try again. (${(err as Error).message})`,
       });
@@ -228,15 +229,16 @@ export function useAgentChat() {
   }, [activeThreadId, user, messages, isSending, fetchMessages, fetchThreads]);
 
   // Send team message (no LLM, just persist)
-  const sendTeamMessage = useCallback(async (content: string) => {
-    if (!activeThreadId || !user) return;
+  const sendTeamMessage = useCallback(async (content: string, overrideThreadId?: string) => {
+    const threadId = overrideThreadId || activeThreadId;
+    if (!threadId || !user) return;
     await supabase.from('agent_messages').insert({
-      thread_id: activeThreadId,
+      thread_id: threadId,
       role: 'user',
       content,
       sender_id: user.id,
     });
-    await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', activeThreadId);
+    await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
   }, [activeThreadId, user]);
 
   const activeThread = threads.find(t => t.id === activeThreadId);

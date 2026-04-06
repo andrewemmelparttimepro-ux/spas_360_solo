@@ -1,19 +1,164 @@
-import { Search, Filter, Plus, Package, ArrowRightLeft, X } from 'lucide-react';
+import { Search, Filter, Plus, Package, ArrowRightLeft, X, Check, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
-import type { InventoryStatus } from '@/types/database';
+import type { InventoryItem, InventoryStatus } from '@/types/database';
+import { cn } from '@/lib/utils';
 
+// --------------- Inline editable cell ---------------
+function EditableCell({
+  value,
+  field,
+  itemId,
+  onSave,
+  type = 'text',
+  options,
+  prefix,
+  className,
+}: {
+  value: string | number | null;
+  field: string;
+  itemId: string;
+  onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
+  type?: 'text' | 'number' | 'select';
+  options?: string[];
+  prefix?: string;
+  className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value ?? ''));
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  // Sync external value changes (realtime updates)
+  useEffect(() => { if (!editing) setDraft(String(value ?? '')); }, [value, editing]);
+
+  const commit = async () => {
+    if (draft === String(value ?? '')) { setEditing(false); return; }
+    setSaving(true);
+    const parsed = type === 'number' ? (draft ? parseFloat(draft) : null) : draft;
+    await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const cancel = () => { setDraft(String(value ?? '')); setEditing(false); };
+
+  if (editing) {
+    return type === 'select' ? (
+      <select
+        ref={inputRef as React.RefObject<HTMLSelectElement>}
+        value={draft}
+        onChange={e => { setDraft(e.target.value); }}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Escape') cancel(); }}
+        disabled={saving}
+        className="px-2 py-1 border border-sky-400 rounded-lg text-xs outline-none bg-white min-w-[100px] focus:ring-2 focus:ring-sky-200"
+      >
+        {options?.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    ) : (
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type={type}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+        disabled={saving}
+        className={cn("px-2 py-1 border border-sky-400 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-200 w-full max-w-[160px]", type === 'number' && 'text-right max-w-[100px]')}
+      />
+    );
+  }
+
+  const display = value != null && value !== '' && value !== 0
+    ? (prefix ? `${prefix}${Number(value).toLocaleString()}` : String(value))
+    : (type === 'number' ? '$0' : 'â');
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className={cn(
+        "cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-sky-50 hover:ring-1 hover:ring-sky-200 group inline-flex items-center gap-1",
+        className
+      )}
+      title="Click to edit"
+    >
+      {display}
+      <Pencil className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </span>
+  );
+}
+
+// --------------- Status badge (editable) ---------------
+const STATUS_OPTIONS: InventoryStatus[] = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'];
+const STATUS_COLORS: Record<string, string> = {
+  'In Stock': 'bg-emerald-100 text-emerald-800',
+  'Sold': 'bg-amber-100 text-amber-800',
+  'On Order': 'bg-blue-100 text-blue-800',
+  'In Transit': 'bg-purple-100 text-purple-800',
+  'Delivered': 'bg-slate-100 text-slate-600',
+  'Returned': 'bg-red-100 text-red-800',
+};
+
+function EditableStatus({ value, itemId, onSave }: { value: string; itemId: string; onSave: (id: string, u: Partial<InventoryItem>) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const ref = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+
+  const commit = async (v: string) => {
+    if (v !== value) await onSave(itemId, { status: v as InventoryStatus });
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <select
+        ref={ref}
+        value={value}
+        onChange={e => commit(e.target.value)}
+        onBlur={() => setEditing(false)}
+        className="px-2 py-1 border border-sky-400 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-sky-200"
+      >
+        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    );
+  }
+
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:ring-2 hover:ring-sky-200 transition-all group gap-1",
+        STATUS_COLORS[value] ?? 'bg-slate-100 text-slate-800'
+      )}
+      title="Click to change status"
+    >
+      {value}
+      <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </span>
+  );
+}
+
+// --------------- Category options ---------------
+const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
+
+// =============== Main page component ===============
 export default function Inventory() {
-  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem } = useInventory();
+  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem } = useInventory();
   const { locations } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
   const [newItem, setNewItem] = useState({
     sku: '', product: '', brand: '', category: 'Hot Tubs',
     model: '', color_finish: '', status: 'In Stock' as InventoryStatus,
     cost: '', msrp: '', sale_price: '', location_id: '',
-    notes: '',
+ notes: '',
   });
 
   const handleCreate = async () => {
@@ -51,13 +196,14 @@ export default function Inventory() {
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Inventory Management</h1>
-          <p className="text-sm text-slate-500 mt-1">Track units, parts, and chemicals across locations</p>
+          <p className="text-sm text-slate-500 mt-1">Track units, parts, and chemicals across locations &mdash; click any cell to edit</p>
         </div>
         <div className="flex space-x-3">
           <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><ArrowRightLeft className="w-4 h-4 mr-2" />Transfer</button>
           <button onClick={() => setShowCreate(true)} className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
       </div>
+
       {/* Add Item Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -74,7 +220,7 @@ export default function Inventory() {
               <div className="grid grid-cols-2 gap-3">
                 <input placeholder="Brand" value={newItem.brand} onChange={e => setNewItem({...newItem, brand: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
                 <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
-                  <option>Hot Tubs</option><option>Swim Spas</option><option>Saunas</option><option>Chemicals</option><option>Parts</option><option>Accessories</option><option>Covers</option>
+                  {CATEGORY_OPTIONS.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -83,7 +229,7 @@ export default function Inventory() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <select value={newItem.status} onChange={e => setNewItem({...newItem, status: e.target.value as InventoryStatus})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
-                  <option>In Stock</option><option>On Order</option><option>In Transit</option><option>Sold</option>
+                  {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
                 </select>
                 <select value={newItem.location_id} onChange={e => setNewItem({...newItem, location_id: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
                   <option value="">Location *</option>
@@ -137,19 +283,22 @@ export default function Inventory() {
               {items.length === 0 ? (
                 <tr><td colSpan={5} className="p-8 text-center text-slate-400">No inventory items found</td></tr>
               ) : items.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 text-sm font-medium"><Link to={`/inventory/${item.id}`} className="text-sky-600 hover:text-sky-900">{item.sku}</Link></td>
-                  <td className="p-4 text-sm text-slate-700">{item.product}</td>
-                  <td className="p-4 text-sm text-slate-500">{item.category}</td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      item.status === 'In Stock' ? 'bg-emerald-100 text-emerald-800' :
-                      item.status === 'Sold' ? 'bg-amber-100 text-amber-800' :
-                      item.status === 'On Order' ? 'bg-blue-100 text-blue-800' :
-                      'bg-slate-100 text-slate-800'
-                    }`}>{item.status}</span>
+                <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="p-4 text-sm font-medium">
+                    <Link to={`/inventory/${item.id}`} className="text-sky-600 hover:text-sky-900 hover:underline">{item.sku}</Link>
                   </td>
-                  <td className="p-4 text-sm font-medium text-slate-900 text-right">${(item.sale_price ?? item.msrp ?? 0).toLocaleString()}</td>
+                  <td className="p-4 text-sm text-slate-700">
+                    <EditableCell value={item.product} field="product" itemId={item.id} onSave={updateItem} />
+                  </td>
+                  <td className="p-4 text-sm text-slate-500">
+                    <EditableCell value={item.category} field="category" itemId={item.id} onSave={updateItem} type="select" options={CATEGORY_OPTIONS} />
+                  </td>
+                  <td className="p-4">
+                    <EditableStatus value={item.status} itemId={item.id} onSave={updateItem} />
+                  </td>
+                  <td className="p-4 text-sm font-medium text-slate-900 text-right">
+                    <EditableCell value={item.sale_price ?? item.msrp ?? 0} field="sale_price" itemId={item.id} onSave={updateItem} type="number" prefix="$" className="justify-end" />
+                  </td>
                 </tr>
               ))}
             </tbody>

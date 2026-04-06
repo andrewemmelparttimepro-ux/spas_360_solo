@@ -13,6 +13,9 @@ export const statusColors: Record<JobStatus, string> = {
   'Cancelled': 'border-l-slate-300 bg-slate-50 text-slate-400 opacity-60',
 };
 
+export const JOB_STATUS_OPTIONS: JobStatus[] = ['In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
+export const JOB_TYPE_OPTIONS = ['Delivery', 'Repair', 'Installation', 'Warranty', 'Maintenance', 'Pickup'];
+
 export function useServiceJobs() {
   const { profile, activeLocationId } = useAuth();
   const [jobs, setJobs] = useState<(Job & { assigned_techs?: string[] })[]>([]);
@@ -95,20 +98,43 @@ export function useJob(id: string | undefined) {
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchJob = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
-    supabase
+    const { data, error } = await supabase
       .from('jobs')
       .select('*, contacts:contact_id(first_name, last_name, phone), properties:property_id(address), locations:location_id(name)')
       .eq('id', id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) console.error('Error fetching job:', error);
-        setJob(data as Job);
-        setIsLoading(false);
-      });
+      .single();
+    if (error) console.error('Error fetching job:', error);
+    setJob(data as Job);
+    setIsLoading(false);
   }, [id]);
 
-  return { job, isLoading };
+  useEffect(() => { fetchJob(); }, [fetchJob]);
+
+  // Real-time: re-fetch when this job changes
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`job-detail-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'jobs',
+        filter: `id=eq.${id}`,
+      }, () => fetchJob())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, fetchJob]);
+
+  const updateJob = useCallback(async (updates: Partial<Job>) => {
+    if (!id) return false;
+    const { error } = await supabase.from('jobs').update(updates).eq('id', id);
+    if (error) { console.error('Error updating job:', error); return false; }
+    await fetchJob();
+    return true;
+  }, [id, fetchJob]);
+
+  return { job, isLoading, updateJob };
 }

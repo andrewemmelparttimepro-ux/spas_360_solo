@@ -35,6 +35,22 @@ export function useInventory() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
+  // Real-time subscription â any INSERT/UPDATE/DELETE on inventory_items refreshes everywhere
+  useEffect(() => {
+    if (!profile) return;
+    const channel = supabase
+      .channel('inventory-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_items',
+      }, () => {
+        fetchItems();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile, fetchItems]);
+
   const totalInStock = items.filter(i => i.status === 'In Stock').length;
   const awaitingDelivery = items.filter(i => i.status === 'Sold').length;
   const onOrder = items.filter(i => i.status === 'On Order').length;

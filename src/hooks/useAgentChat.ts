@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { SALES_AGENT_PROMPT } from '@/agent/system-prompt';

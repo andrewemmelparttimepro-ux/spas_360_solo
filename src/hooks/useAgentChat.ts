@@ -1,4 +1,4 @@
- import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { SALES_AGENT_PROMPT } from '@/agent/system-prompt';
@@ -28,13 +28,18 @@ export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const activeThreadRef = useRef<string | null>(null);
 
-  // Fetch threads
+  // Keep ref in sync so sendMessage always has the latest
+  useEffect(() => { activeThreadRef.current = activeThreadId; }, [activeThreadId]);
+
+  // Fetch agent threads only
   const fetchThreads = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('agent_threads')
       .select('*')
+      .eq('thread_type', 'agent')
       .order('last_message_at', { ascending: false, nullsFirst: false });
     setThreads(data ?? []);
   }, [user]);
@@ -71,7 +76,7 @@ export function useAgentChat() {
     return () => { supabase.removeChannel(channel); };
   }, [activeThreadId, fetchMessages]);
 
-  // Create new thread
+  // Create new agent thread
   const createThread = useCallback(async (type: 'agent' | 'team' = 'agent', title?: string) => {
     if (!user || !profile) return null;
     const { data, error } = await supabase
@@ -80,19 +85,20 @@ export function useAgentChat() {
         org_id: profile.org_id,
         user_id: user.id,
         thread_type: type,
-        title: title || (type === 'agent' ? 'New conversation' : 'Team chat'),
+        title: title || 'New conversation',
       })
       .select()
       .single();
     if (error) { console.error('Error creating thread:', error); return null; }
     await fetchThreads();
     setActiveThreadId(data.id);
+    activeThreadRef.current = data.id;
     return data.id;
   }, [user, profile, fetchThreads]);
 
-  // Send message to agent
-  const sendMessage = useCallback(async (content: string, overrideThreadId?: string) => {
-    const threadId = overrideThreadId || activeThreadId;
+  // Send message to AI agent
+  const sendMessage = useCallback(async (content: string) => {
+    const threadId = activeThreadRef.current;
     if (!threadId || !user || isSending) return;
     setIsSending(true);
 
@@ -104,19 +110,14 @@ export function useAgentChat() {
       sender_id: user.id,
     });
 
-    // Build message history for LLM â include tool results so multi-turn context is preserved
-    const history: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[] = [
-      { role: 'system', content: SALES_AGENT_PROMPT },
-      ...messages.map(m => {
-        if (m.role === 'assistant' && m.tool_calls) {
-          return { role: 'assistant', content: m.content || '', tool_calls: m.tool_calls };
-        }
-        if (m.role === 'tool') {
-          return { role: 'tool', content: m.content, tool_call_id: m.id };
-        }
-        return { role: m.role, content: m.content };
-      }),
-      { role: 'user', content },
+    // Build message history for LLM
+    const history = [
+      { role: 'system' as const, content: SALES_AGENT_PROMPT },
+      ...messages.filter(m => m.role !== 'tool').map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user' as const, content },
     ];
 
     try {
@@ -145,7 +146,6 @@ export function useAgentChat() {
 
       // Handle tool calls
       if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
-        // Save assistant's tool-calling message
         await supabase.from('agent_messages').insert({
           thread_id: threadId,
           role: 'assistant',
@@ -153,7 +153,6 @@ export function useAgentChat() {
           tool_calls: assistantMessage.tool_calls,
         });
 
-        // Execute each tool
         const toolResults = [];
         for (const tc of assistantMessage.tool_calls) {
           const args = JSON.parse(tc.function.arguments);
@@ -164,7 +163,6 @@ export function useAgentChat() {
             content: JSON.stringify(result),
           });
 
-          // Save tool result
           await supabase.from('agent_messages').insert({
             thread_id: threadId,
             role: 'tool',
@@ -181,11 +179,7 @@ export function useAgentChat() {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            messages: [
-              ...history,
-              assistantMessage,
-              ...toolResults,
-            ],
+            messages: [...history, assistantMessage, ...toolResults],
             tools: getOpenAITools(),
           }),
         });
@@ -205,7 +199,7 @@ export function useAgentChat() {
         });
       }
 
-      // Update thread title from first message
+      // Update thread title + timestamp
       if (messages.length === 0) {
         const title = content.length > 40 ? content.slice(0, 40) + '...' : content;
         await supabase.from('agent_threads').update({ title, last_message_at: new Date().toISOString() }).eq('id', threadId);
@@ -226,20 +220,7 @@ export function useAgentChat() {
     } finally {
       setIsSending(false);
     }
-  }, [activeThreadId, user, messages, isSending, fetchMessages, fetchThreads]);
-
-  // Send team message (no LLM, just persist)
-  const sendTeamMessage = useCallback(async (content: string, overrideThreadId?: string) => {
-    const threadId = overrideThreadId || activeThreadId;
-    if (!threadId || !user) return;
-    await supabase.from('agent_messages').insert({
-      thread_id: threadId,
-      role: 'user',
-      content,
-      sender_id: user.id,
-    });
-    await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
-  }, [activeThreadId, user]);
+  }, [user, messages, isSending, fetchMessages, fetchThreads]);
 
   const activeThread = threads.find(t => t.id === activeThreadId);
 
@@ -253,7 +234,6 @@ export function useAgentChat() {
     isSending,
     createThread,
     sendMessage,
-    sendTeamMessage,
     refresh: fetchThreads,
   };
 }

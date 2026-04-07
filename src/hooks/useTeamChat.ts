@@ -1,101 +1,122 @@
-// fiximport { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Profile } from '@/types/database';
-
-export interface TeamThread {
-  id: string;
-  org_id: string;
-  user_id: string;
-  thread_type: 'agent' | 'team';
-  title: string | null;
-  participants: string[];
-  last_message_at: string | null;
-  created_at: string;
-}
-
-export interface TeamMessage {
-  id: string;
-  thread_id: string;
-  role: 'user' | 'assistant' | 'system' | 'tool';
-  content: string;
-  sender_id: string | null;
-  created_at: string;
-}
 
 export interface TeamMember {
   id: string;
   first_name: string;
   last_name: string;
   role: string;
-  email: string;
   avatar_url: string | null;
+  email: string;
 }
+
+export interface TeamThread {
+  id: string;
+  title: string | null;
+  thread_type: 'team';
+  participants: string[];
+  last_message_at: string | null;
+  created_at: string;
+  is_main: boolean;
+  dm_partner?: TeamMember;
+}
+
+export interface TeamMessage {
+  id: string;
+  thread_id: string;
+  role: string;
+  content: string;
+  sender_id: string | null;
+  created_at: string;
+  sender_name?: string;
+}
+
+const MAIN_TITLE = 'Main';
 
 export function useTeamChat() {
   const { user, profile } = useAuth();
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [threads, setThreads] = useState<TeamThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [senderMap, setSenderMap] = useState<Record<string, TeamMember>>({});
+  const [isSending, setIsSending] = useState(false);
+  const senderMapRef = useRef<Record<string, string>>({});
 
-  // Fetch all team members in the org
-  const fetchTeamMembers = useCallback(async () => {
-    if (!profile) return;
-    const { data, error } = await supabase
+  // ─── Fetch team members ────────────────────────────────
+  const fetchMembers = useCallback(async () => {
+    if (!profile?.org_id) return;
+    const { data } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, role, email, avatar_url')
+      .select('id, first_name, last_name, role, avatar_url, email')
       .eq('org_id', profile.org_id)
       .order('first_name');
-    if (error) { console.error('Error fetching team:', error); return; }
-    const members = (data ?? []) as TeamMember[];
-    setTeamMembers(members);
-    const map: Record<string, TeamMember> = {};
-    members.forEach(m => { map[m.id] = m; });
-    setSenderMap(map);
-  }, [profile]);
+    if (data) {
+      setMembers(data);
+      const map: Record<string, string> = {};
+      for (const m of data) map[m.id] = m.first_name;
+      senderMapRef.current = map;
+    }
+  }, [profile?.org_id]);
 
-  // Fetch team threads (thread_type = 'team')
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+
+  // ─── Fetch team threads ────────────────────────────────
   const fetchThreads = useCallback(async () => {
-    if (!profile || !user) return;
-    setIsLoading(true);
-    const { data, error } = await supabase
+    if (!user || !profile?.org_id) return;
+    const { data } = await supabase
       .from('agent_threads')
       .select('*')
-      .eq('org_id', profile.org_id)
       .eq('thread_type', 'team')
+      .eq('org_id', profile.org_id)
       .order('last_message_at', { ascending: false, nullsFirst: false });
-    if (error) { console.error('Error fetching team threads:', error); setIsLoading(false); return; }
 
-    // Only show threads where user is a participant (or created by user)
-    const myThreads = (data ?? []).filter((t: TeamThread) =>
-      t.user_id === user.id ||
-      (t.participants && t.participants.includes(user.id))
-    );
-    setThreads(myThreads);
-    setIsLoading(false);
-  }, [profile, user]);
+    if (!data) { setThreads([]); return; }
 
-  useEffect(() => { fetchTeamMembers(); }, [fetchTeamMembers]);
+    const enriched: TeamThread[] = data.map(t => {
+      const isMain = t.title === MAIN_TITLE;
+      let dmPartner: TeamMember | undefined;
+      if (!isMain && t.participants?.length === 2) {
+        const partnerId = t.participants.find((p: string) => p !== user.id);
+        if (partnerId) dmPartner = members.find(m => m.id === partnerId);
+      }
+      return { ...t, thread_type: 'team' as const, is_main: isMain, dm_partner: dmPartner };
+    });
+
+    // Sort: Main first, then by last_message_at
+    enriched.sort((a, b) => {
+      if (a.is_main) return -1;
+      if (b.is_main) return 1;
+      const at = a.last_message_at ?? a.created_at;
+      const bt = b.last_message_at ?? b.created_at;
+      return bt.localeCompare(at);
+    });
+
+    setThreads(enriched);
+  }, [user, profile?.org_id, members]);
+
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
-  // Fetch messages for active thread
+  // ─── Fetch messages for active thread ──────────────────
   const fetchMessages = useCallback(async () => {
     if (!activeThreadId) { setMessages([]); return; }
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('agent_messages')
       .select('*')
       .eq('thread_id', activeThreadId)
       .order('created_at', { ascending: true });
-    if (error) console.error('Error fetching messages:', error);
-    setMessages((data ?? []) as TeamMessage[]);
+
+    if (data) {
+      setMessages(data.map(m => ({
+        ...m,
+        sender_name: m.sender_id ? senderMapRef.current[m.sender_id] ?? 'Unknown' : undefined,
+      })));
+    }
   }, [activeThreadId]);
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
-  // Real-time subscriptions for messages and threads
+  // ─── Real-time subscription ────────────────────────────
   useEffect(() => {
     if (!activeThreadId) return;
     const channel = supabase
@@ -110,129 +131,108 @@ export function useTeamChat() {
     return () => { supabase.removeChannel(channel); };
   }, [activeThreadId, fetchMessages]);
 
-  useEffect(() => {
-    if (!profile) return;
-    const channel = supabase
-      .channel('team-threads-rt')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'agent_threads',
-      }, () => fetchThreads())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [profile, fetchThreads]);
+  // ─── Find or create Main thread ────────────────────────
+  const openMain = useCallback(async () => {
+    if (!user || !profile?.org_id) return null;
 
-  // Send a team message (no AI — just persist)
-  const sendMessage = useCallback(async (content: string) => {
-    if (!activeThreadId || !user) return;
-    await supabase.from('agent_messages').insert({
-      thread_id: activeThreadId,
-      role: 'user',
-      content,
-      sender_id: user.id,
-    });
-    await supabase
-      .from('agent_threads')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', activeThreadId);
-    await fetchMessages();
-    await fetchThreads();
-  }, [activeThreadId, user, fetchMessages, fetchThreads]);
-
-  // Create a new team thread (group or DM)
-  const createThread = useCallback(async (participantIds: string[], title?: string) => {
-    if (!user || !profile) return null;
-
-    // Check if a DM thread already exists between exactly these two users
-    if (participantIds.length === 1) {
-      const existing = threads.find(t => {
-        const parts = t.participants || [];
-        return parts.length === 2 &&
-          parts.includes(user.id) &&
-          parts.includes(participantIds[0]);
-      });
-      if (existing) {
-        setActiveThreadId(existing.id);
-        return existing.id;
-      }
+    // Check if Main already exists
+    const existing = threads.find(t => t.is_main);
+    if (existing) {
+      setActiveThreadId(existing.id);
+      return existing.id;
     }
 
-    const allParticipants = [user.id, ...participantIds.filter(id => id !== user.id)];
-    const dmTarget = participantIds.length === 1 ? senderMap[participantIds[0]] : null;
-    const threadTitle = title || (dmTarget
-      ? `${dmTarget.first_name} ${dmTarget.last_name}`
-      : `Team Chat`);
-
+    // Create Main thread with all org members
+    const allIds = members.map(m => m.id);
     const { data, error } = await supabase
       .from('agent_threads')
       .insert({
         org_id: profile.org_id,
         user_id: user.id,
         thread_type: 'team',
-        title: threadTitle,
-        participants: allParticipants,
-        last_message_at: new Date().toISOString(),
+        title: MAIN_TITLE,
+        participants: allIds,
       })
       .select()
       .single();
 
-    if (error) { console.error('Error creating thread:', error); return null; }
+    if (error) { console.error('Error creating Main thread:', error); return null; }
     await fetchThreads();
     setActiveThreadId(data.id);
     return data.id;
-  }, [user, profile, threads, senderMap, fetchThreads]);
+  }, [user, profile?.org_id, threads, members, fetchThreads]);
 
-  // Create a group thread with all team members
-  const createGroupThread = useCallback(async (title: string) => {
-    if (!user || !profile) return null;
-    const allIds = teamMembers.map(m => m.id);
-    return createThread(allIds, title);
-  }, [user, profile, teamMembers, createThread]);
+  // ─── Find or create DM thread ──────────────────────────
+  const openDM = useCallback(async (partnerId: string) => {
+    if (!user || !profile?.org_id) return null;
 
-  const activeThread = threads.find(t => t.id === activeThreadId) ?? null;
+    // Look for existing DM between these two users
+    const existing = threads.find(t =>
+      !t.is_main &&
+      t.participants?.length === 2 &&
+      t.participants.includes(user.id) &&
+      t.participants.includes(partnerId)
+    );
+    if (existing) {
+      setActiveThreadId(existing.id);
+      return existing.id;
+    }
 
-  // Get display name for a sender
-  const getSenderName = useCallback((senderId: string | null) => {
-    if (!senderId) return 'System';
-    if (senderId === user?.id) return 'You';
-    const member = senderMap[senderId];
-    return member ? `${member.first_name} ${member.last_name}` : 'Unknown';
-  }, [user, senderMap]);
+    const partner = members.find(m => m.id === partnerId);
+    const { data, error } = await supabase
+      .from('agent_threads')
+      .insert({
+        org_id: profile.org_id,
+        user_id: user.id,
+        thread_type: 'team',
+        title: partner ? `${partner.first_name} ${partner.last_name}` : 'Direct Message',
+        participants: [user.id, partnerId],
+      })
+      .select()
+      .single();
 
-  // Get initials for avatar
-  const getSenderInitials = useCallback((senderId: string | null) => {
-    if (!senderId) return '?';
-    const member = senderMap[senderId];
-    if (!member) return '?';
-    return `${member.first_name[0]}${member.last_name[0]}`.toUpperCase();
-  }, [senderMap]);
+    if (error) { console.error('Error creating DM thread:', error); return null; }
+    await fetchThreads();
+    setActiveThreadId(data.id);
+    return data.id;
+  }, [user, profile?.org_id, threads, members, fetchThreads]);
 
-  // Get other participants' names for thread display
-  const getThreadDisplayName = useCallback((thread: TeamThread) => {
-    if (thread.title) return thread.title;
-    const others = (thread.participants || []).filter(id => id !== user?.id);
-    return others.map(id => {
-      const m = senderMap[id];
-      return m ? `${m.first_name} ${m.last_name}` : 'Unknown';
-    }).join(', ') || 'Team Chat';
-  }, [user, senderMap]);
+  // ─── Send message ──────────────────────────────────────
+  const sendMessage = useCallback(async (content: string, threadId?: string) => {
+    const tid = threadId || activeThreadId;
+    if (!tid || !user || isSending) return;
+    setIsSending(true);
+    try {
+      await supabase.from('agent_messages').insert({
+        thread_id: tid,
+        role: 'user',
+        content,
+        sender_id: user.id,
+      });
+      await supabase.from('agent_threads')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', tid);
+      await fetchThreads();
+    } catch (err) {
+      console.error('Send team message error:', err);
+    } finally {
+      setIsSending(false);
+    }
+  }, [activeThreadId, user, isSending, fetchThreads]);
+
+  const activeThread = threads.find(t => t.id === activeThreadId);
 
   return {
+    members,
     threads,
     activeThread,
     activeThreadId,
     setActiveThreadId,
     messages,
-    teamMembers,
-    isLoading,
+    isSending,
+    openMain,
+    openDM,
     sendMessage,
-    createThread,
-    createGroupThread,
-    getSenderName,
-    getSenderInitials,
-    getThreadDisplayName,
-    senderMap,
     refresh: fetchThreads,
   };
 }

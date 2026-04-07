@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+ import { useState, useRef, useEffect } from 'react';// modified
 import { MessageSquare, X, Plus, ArrowLeft, Send, Bot, Users, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgentChat } from '@/hooks/useAgentChat';

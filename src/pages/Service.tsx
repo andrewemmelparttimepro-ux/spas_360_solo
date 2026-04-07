@@ -1,13 +1,15 @@
-import { Calendar as CalendarIcon, Clock, MapPin, User, Plus, Filter, X, Pencil } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, User, Plus, Filter, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
-import { format } from 'date-fns';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useServiceJobs, statusColors, JOB_STATUS_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
 import { useAuth } from '@/contexts/AuthContext';
-import type { JobStatus, JobType } from '@/types/database';
+import type { Job, JobStatus, JobType } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
+
+type ViewMode = 'day' | 'week' | 'month';
 
 // --------------- Inline editable job status badge ---------------
 function EditableJobStatus({ value, jobId, onSave }: { value: JobStatus; jobId: string; onSave: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
@@ -48,18 +50,98 @@ function EditableJobStatus({ value, jobId, onSave }: { value: JobStatus; jobId: 
   );
 }
 
+// --------------- Job Card ---------------
+function JobCard({ job, saveJobStatus }: { job: Job & { assigned_techs?: string[] }; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
+  return (
+    <div className={cn("block p-4 rounded-r-lg border border-l-4 shadow-sm bg-white hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
+      <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
+      <Link to={`/service/${job.id}`} className="block">
+        <h3 className="font-medium text-slate-900 hover:text-sky-700">{job.title}</h3>
+        <div className="flex items-center space-x-4 mt-2 text-sm opacity-80">
+          {job.scheduled_at && <span className="flex items-center"><Clock className="w-4 h-4 mr-1" />{new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+        </div>
+      </Link>
+    </div>
+  );
+}
+
 export default function Service() {
   const { unscheduledJobs, scheduledJobs, isLoading, createJob, updateJob } = useServiceJobs();
   const { contacts } = useContacts();
   const { locations } = useAuth();
   const { toast } = useToast();
-  const todayDisplay = format(new Date(), 'MMMM d, yyyy');
+
+  // ─── View state ────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const saveJobStatus = async (id: string, u: { status: JobStatus }) => {
     const ok = await updateJob(id, u);
-    toast(ok ? `Status Ã¢ÂÂ ${u.status}` : 'Failed to update', ok ? 'success' : 'error');
+    toast(ok ? `Status → ${u.status}` : 'Failed to update', ok ? 'success' : 'error');
     return ok;
   };
+
+  // ─── Navigation ────────────────────────────────────────
+  const goBack = () => {
+    if (viewMode === 'day') setCurrentDate(d => subDays(d, 1));
+    else if (viewMode === 'week') setCurrentDate(d => subWeeks(d, 1));
+    else setCurrentDate(d => subMonths(d, 1));
+  };
+  const goForward = () => {
+    if (viewMode === 'day') setCurrentDate(d => addDays(d, 1));
+    else if (viewMode === 'week') setCurrentDate(d => addWeeks(d, 1));
+    else setCurrentDate(d => addMonths(d, 1));
+  };
+  const goToday = () => setCurrentDate(new Date());
+
+  // ─── Date range for current view ───────────────────────
+  const { rangeStart, rangeEnd, dateLabel } = useMemo(() => {
+    if (viewMode === 'day') {
+      const d = currentDate;
+      return {
+        rangeStart: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0),
+        rangeEnd: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59),
+        dateLabel: format(d, 'MMMM d, yyyy'),
+      };
+    } else if (viewMode === 'week') {
+      const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const we = endOfWeek(currentDate, { weekStartsOn: 0 });
+      return {
+        rangeStart: ws,
+        rangeEnd: we,
+        dateLabel: `${format(ws, 'MMM d')} – ${format(we, 'MMM d, yyyy')}`,
+      };
+    } else {
+      const ms = startOfMonth(currentDate);
+      const me = endOfMonth(currentDate);
+      return { rangeStart: ms, rangeEnd: me, dateLabel: format(currentDate, 'MMMM yyyy') };
+    }
+  }, [viewMode, currentDate]);
+
+  // ─── Filter jobs to current range ──────────────────────
+  const filteredJobs = useMemo(() => {
+    return scheduledJobs.filter(j => {
+      if (!j.scheduled_at) return false;
+      const d = new Date(j.scheduled_at);
+      return isWithinInterval(d, { start: rangeStart, end: rangeEnd });
+    });
+  }, [scheduledJobs, rangeStart, rangeEnd]);
+
+  // ─── Group jobs by day (for week/month views) ──────────
+  const jobsByDay = useMemo(() => {
+    if (viewMode === 'day') return null;
+    const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+    const groups: { date: Date; jobs: typeof filteredJobs }[] = [];
+    for (const day of days) {
+      const dayJobs = filteredJobs.filter(j => j.scheduled_at && isSameDay(new Date(j.scheduled_at), day));
+      if (viewMode === 'week' || dayJobs.length > 0) {
+        groups.push({ date: day, jobs: dayJobs });
+      }
+    }
+    return groups;
+  }, [viewMode, filteredJobs, rangeStart, rangeEnd]);
+
+  // ─── Create job modal state ────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
@@ -102,6 +184,7 @@ export default function Service() {
           <button onClick={() => setShowCreate(true)} className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
         </div>
       </div>
+
       {/* Create Job Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -114,7 +197,7 @@ export default function Service() {
               <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
               <select value={newJob.contact_id} onChange={e => setNewJob({...newJob, contact_id: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
                 <option value="">Select Customer *</option>
-                {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} \u2014 {c.phone}</option>)}
+                {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} — {c.phone}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-3">
                 <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
@@ -170,33 +253,154 @@ export default function Service() {
 
         {/* Schedule Board */}
         <div className="flex-1 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* Schedule Header */}
           <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-            <div className="flex items-center space-x-4">
-              <h2 className="font-semibold text-slate-800 flex items-center"><CalendarIcon className="w-5 h-5 mr-2 text-slate-500" />Today's Schedule</h2>
-              <div className="text-sm text-slate-500">{todayDisplay}</div>
+            <div className="flex items-center space-x-3">
+              <h2 className="font-semibold text-slate-800 flex items-center">
+                <CalendarIcon className="w-5 h-5 mr-2 text-slate-500" />
+                {viewMode === 'day' ? "Today's Schedule" : viewMode === 'week' ? 'Week View' : 'Month View'}
+              </h2>
+              <div className="flex items-center gap-1">
+                <button onClick={goBack} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
+                <button onClick={goToday} className="px-2 py-0.5 text-xs font-medium text-sky-600 hover:bg-sky-50 rounded transition-colors">Today</button>
+                <button onClick={goForward} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+              </div>
+              <div className="text-sm text-slate-500">{dateLabel}</div>
             </div>
             <div className="flex bg-slate-200 p-1 rounded-lg">
-              <button className="px-3 py-1 text-sm font-medium bg-white shadow-sm rounded-md text-slate-800">Day</button>
-              <button className="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-800">Week</button>
-              <button className="px-3 py-1 text-sm font-medium text-slate-600 hover:text-slate-800">Month</button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-            <div className="space-y-4">
-              {scheduledJobs.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">No jobs scheduled today</p>
-              ) : scheduledJobs.map(job => (
-                <div key={job.id} className={cn("block p-4 rounded-r-lg border border-l-4 shadow-sm bg-white hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
-                  <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
-                  <Link to={`/service/${job.id}`} className="block">
-                    <h3 className="font-medium text-slate-900 hover:text-sky-700">{job.title}</h3>
-                    <div className="flex items-center space-x-4 mt-2 text-sm opacity-80">
-                      {job.scheduled_at && <span className="flex items-center"><Clock className="w-4 h-4 mr-1" />{new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-                    </div>
-                  </Link>
-                </div>
+              {(['day', 'week', 'month'] as ViewMode[]).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "px-3 py-1 text-sm font-medium rounded-md transition-all capitalize",
+                    viewMode === mode
+                      ? "bg-white shadow-sm text-slate-800"
+                      : "text-slate-600 hover:text-slate-800"
+                  )}
+                >
+                  {mode}
+                </button>
               ))}
             </div>
+          </div>
+
+          {/* Schedule Content */}
+          <div className="flex-1 overflow-y-auto bg-slate-50/50">
+            {/* ─── DAY VIEW ─── */}
+            {viewMode === 'day' && (
+              <div className="p-6 space-y-4">
+                {filteredJobs.length === 0 ? (
+                  <div className="text-center py-16">
+                    <CalendarIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm text-slate-400">No jobs scheduled for {format(currentDate, 'MMMM d')}</p>
+                  </div>
+                ) : filteredJobs.map(job => (
+                  <JobCard key={job.id} job={job} saveJobStatus={saveJobStatus} />
+                ))}
+              </div>
+            )}
+
+            {/* ─── WEEK VIEW ─── */}
+            {viewMode === 'week' && jobsByDay && (
+              <div className="divide-y divide-slate-200">
+                {jobsByDay.map(({ date, jobs: dayJobs }) => {
+                  const isToday = isSameDay(date, new Date());
+                  return (
+                    <div key={date.toISOString()} className={cn("p-4", isToday && "bg-sky-50/40")}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-lg flex flex-col items-center justify-center text-center shrink-0",
+                          isToday ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-600"
+                        )}>
+                          <span className="text-[10px] font-semibold uppercase leading-none">{format(date, 'EEE')}</span>
+                          <span className="text-sm font-bold leading-tight">{format(date, 'd')}</span>
+                        </div>
+                        <div>
+                          <h3 className={cn("text-sm font-semibold", isToday ? "text-sky-700" : "text-slate-700")}>
+                            {format(date, 'EEEE, MMMM d')}
+                            {isToday && <span className="ml-2 text-[10px] bg-sky-500 text-white px-1.5 py-0.5 rounded-full font-bold">TODAY</span>}
+                          </h3>
+                          <p className="text-xs text-slate-400">{dayJobs.length} job{dayJobs.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      {dayJobs.length === 0 ? (
+                        <p className="text-xs text-slate-400 ml-[52px]">No jobs scheduled</p>
+                      ) : (
+                        <div className="ml-[52px] space-y-2">
+                          {dayJobs.map(job => (
+                            <JobCard key={job.id} job={job} saveJobStatus={saveJobStatus} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ─── MONTH VIEW ─── */}
+            {viewMode === 'month' && jobsByDay && (
+              <div>
+                {/* Day-of-week headers */}
+                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                    <div key={d} className="py-2 text-center text-[11px] font-semibold text-slate-500 uppercase">{d}</div>
+                  ))}
+                </div>
+                {/* Calendar grid */}
+                <div className="grid grid-cols-7">
+                  {(() => {
+                    const ms = startOfMonth(currentDate);
+                    const me = endOfMonth(currentDate);
+                    const gridStart = startOfWeek(ms, { weekStartsOn: 0 });
+                    const gridEnd = endOfWeek(me, { weekStartsOn: 0 });
+                    const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
+
+                    return allDays.map(day => {
+                      const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                      const isToday = isSameDay(day, new Date());
+                      const dayJobs = filteredJobs.filter(j => j.scheduled_at && isSameDay(new Date(j.scheduled_at), day));
+
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          onClick={() => { setCurrentDate(day); setViewMode('day'); }}
+                          className={cn(
+                            "min-h-[90px] border-b border-r border-slate-100 p-1.5 cursor-pointer hover:bg-sky-50/40 transition-colors",
+                            !isCurrentMonth && "bg-slate-50/60 opacity-50",
+                          )}
+                        >
+                          <div className={cn(
+                            "text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full",
+                            isToday ? "bg-sky-500 text-white" : "text-slate-600"
+                          )}>
+                            {format(day, 'd')}
+                          </div>
+                          <div className="space-y-0.5">
+                            {dayJobs.slice(0, 3).map(job => (
+                              <div
+                                key={job.id}
+                                className={cn(
+                                  "text-[10px] px-1 py-0.5 rounded truncate font-medium",
+                                  statusColors[job.status as JobStatus]?.replace('border-l-4', '').replace('border-l-', 'border-l-2 border-l-') ?? 'bg-slate-100'
+                                )}
+                                title={`${job.title} — ${job.scheduled_at ? new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`}
+                              >
+                                {job.title}
+                              </div>
+                            ))}
+                            {dayJobs.length > 3 && (
+                              <div className="text-[9px] text-slate-400 font-medium px-1">+{dayJobs.length - 3} more</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

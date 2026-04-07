@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; 
 import { ArrowUpRight, ArrowDownRight, DollarSign, Users, Wrench, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats } from '@/hooks/useDashboard';

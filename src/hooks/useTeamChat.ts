@@ -13,12 +13,14 @@ export interface TeamMember {
 
 export interface TeamThread {
   id: string;
+  org_id: string;
+  user_id: string;
   title: string | null;
-  thread_type: 'team';
+  thread_type: 'agent' | 'team';
   participants: string[];
   last_message_at: string | null;
   created_at: string;
-  is_main: boolean;
+  is_main?: boolean;
   dm_partner?: TeamMember;
 }
 
@@ -41,7 +43,8 @@ export function useTeamChat() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const senderMapRef = useRef<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const senderMapRef = useRef<Record<string, TeamMember>>({});
 
   // ─── Fetch team members ────────────────────────────────
   const fetchMembers = useCallback(async () => {
@@ -53,8 +56,8 @@ export function useTeamChat() {
       .order('first_name');
     if (data) {
       setMembers(data);
-      const map: Record<string, string> = {};
-      for (const m of data) map[m.id] = m.first_name;
+      const map: Record<string, TeamMember> = {};
+      for (const m of data) map[m.id] = m;
       senderMapRef.current = map;
     }
   }, [profile?.org_id]);
@@ -64,6 +67,7 @@ export function useTeamChat() {
   // ─── Fetch team threads ────────────────────────────────
   const fetchThreads = useCallback(async () => {
     if (!user || !profile?.org_id) return;
+    setIsLoading(true);
     const { data } = await supabase
       .from('agent_threads')
       .select('*')
@@ -71,14 +75,19 @@ export function useTeamChat() {
       .eq('org_id', profile.org_id)
       .order('last_message_at', { ascending: false, nullsFirst: false });
 
-    if (!data) { setThreads([]); return; }
+    if (!data) { setThreads([]); setIsLoading(false); return; }
 
-    const enriched: TeamThread[] = data.map(t => {
+    // Only show threads where user is a participant or creator
+    const myThreads = data.filter((t: TeamThread) =>
+      t.user_id === user.id || (t.participants && t.participants.includes(user.id))
+    );
+
+    const enriched: TeamThread[] = myThreads.map(t => {
       const isMain = t.title === MAIN_TITLE;
       let dmPartner: TeamMember | undefined;
       if (!isMain && t.participants?.length === 2) {
         const partnerId = t.participants.find((p: string) => p !== user.id);
-        if (partnerId) dmPartner = members.find(m => m.id === partnerId);
+        if (partnerId) dmPartner = senderMapRef.current[partnerId];
       }
       return { ...t, thread_type: 'team' as const, is_main: isMain, dm_partner: dmPartner };
     });
@@ -93,6 +102,7 @@ export function useTeamChat() {
     });
 
     setThreads(enriched);
+    setIsLoading(false);
   }, [user, profile?.org_id, members]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
@@ -109,7 +119,7 @@ export function useTeamChat() {
     if (data) {
       setMessages(data.map(m => ({
         ...m,
-        sender_name: m.sender_id ? senderMapRef.current[m.sender_id] ?? 'Unknown' : undefined,
+        sender_name: m.sender_id ? (senderMapRef.current[m.sender_id]?.first_name ?? 'Unknown') : undefined,
       })));
     }
   }, [activeThreadId]);
@@ -131,18 +141,26 @@ export function useTeamChat() {
     return () => { supabase.removeChannel(channel); };
   }, [activeThreadId, fetchMessages]);
 
-  // ─── Find or create Main thread ────────────────────────
+  // Real-time thread updates
+  useEffect(() => {
+    if (!profile) return;
+    const channel = supabase
+      .channel('team-threads-rt')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'agent_threads',
+      }, () => fetchThreads())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile, fetchThreads]);
+
+  // ─── Find or create Main thread (ChatWidget) ──────────
   const openMain = useCallback(async () => {
     if (!user || !profile?.org_id) return null;
-
-    // Check if Main already exists
     const existing = threads.find(t => t.is_main);
-    if (existing) {
-      setActiveThreadId(existing.id);
-      return existing.id;
-    }
+    if (existing) { setActiveThreadId(existing.id); return existing.id; }
 
-    // Create Main thread with all org members
     const allIds = members.map(m => m.id);
     const { data, error } = await supabase
       .from('agent_threads')
@@ -162,23 +180,18 @@ export function useTeamChat() {
     return data.id;
   }, [user, profile?.org_id, threads, members, fetchThreads]);
 
-  // ─── Find or create DM thread ──────────────────────────
+  // ─── Find or create DM thread (ChatWidget) ────────────
   const openDM = useCallback(async (partnerId: string) => {
     if (!user || !profile?.org_id) return null;
-
-    // Look for existing DM between these two users
     const existing = threads.find(t =>
       !t.is_main &&
       t.participants?.length === 2 &&
       t.participants.includes(user.id) &&
       t.participants.includes(partnerId)
     );
-    if (existing) {
-      setActiveThreadId(existing.id);
-      return existing.id;
-    }
+    if (existing) { setActiveThreadId(existing.id); return existing.id; }
 
-    const partner = members.find(m => m.id === partnerId);
+    const partner = senderMapRef.current[partnerId];
     const { data, error } = await supabase
       .from('agent_threads')
       .insert({
@@ -195,7 +208,50 @@ export function useTeamChat() {
     await fetchThreads();
     setActiveThreadId(data.id);
     return data.id;
-  }, [user, profile?.org_id, threads, members, fetchThreads]);
+  }, [user, profile?.org_id, threads, fetchThreads]);
+
+  // ─── Create thread (Communication page API) ────────────
+  const createThread = useCallback(async (participantIds: string[], title?: string) => {
+    if (!user || !profile) return null;
+
+    // Check for existing DM
+    if (participantIds.length === 1) {
+      const existing = threads.find(t => {
+        const parts = t.participants || [];
+        return parts.length === 2 && parts.includes(user.id) && parts.includes(participantIds[0]);
+      });
+      if (existing) { setActiveThreadId(existing.id); return existing.id; }
+    }
+
+    const allParticipants = [user.id, ...participantIds.filter(id => id !== user.id)];
+    const dmTarget = participantIds.length === 1 ? senderMapRef.current[participantIds[0]] : null;
+    const threadTitle = title || (dmTarget ? `${dmTarget.first_name} ${dmTarget.last_name}` : 'Team Chat');
+
+    const { data, error } = await supabase
+      .from('agent_threads')
+      .insert({
+        org_id: profile.org_id,
+        user_id: user.id,
+        thread_type: 'team',
+        title: threadTitle,
+        participants: allParticipants,
+        last_message_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) { console.error('Error creating thread:', error); return null; }
+    await fetchThreads();
+    setActiveThreadId(data.id);
+    return data.id;
+  }, [user, profile, threads, fetchThreads]);
+
+  // ─── Create group thread (Communication page API) ──────
+  const createGroupThread = useCallback(async (title: string) => {
+    if (!user || !profile) return null;
+    const allIds = members.map(m => m.id);
+    return createThread(allIds, title);
+  }, [user, profile, members, createThread]);
 
   // ─── Send message ──────────────────────────────────────
   const sendMessage = useCallback(async (content: string, threadId?: string) => {
@@ -212,27 +268,65 @@ export function useTeamChat() {
       await supabase.from('agent_threads')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', tid);
+      await fetchMessages();
       await fetchThreads();
     } catch (err) {
       console.error('Send team message error:', err);
     } finally {
       setIsSending(false);
     }
-  }, [activeThreadId, user, isSending, fetchThreads]);
+  }, [activeThreadId, user, isSending, fetchMessages, fetchThreads]);
 
-  const activeThread = threads.find(t => t.id === activeThreadId);
+  // ─── Helper functions (Communication page) ─────────────
+  const getSenderName = useCallback((senderId: string | null) => {
+    if (!senderId) return 'System';
+    if (senderId === user?.id) return 'You';
+    const member = senderMapRef.current[senderId];
+    return member ? `${member.first_name} ${member.last_name}` : 'Unknown';
+  }, [user]);
+
+  const getSenderInitials = useCallback((senderId: string | null) => {
+    if (!senderId) return '?';
+    const member = senderMapRef.current[senderId];
+    if (!member) return '?';
+    return `${member.first_name[0]}${member.last_name[0]}`.toUpperCase();
+  }, []);
+
+  const getThreadDisplayName = useCallback((thread: TeamThread) => {
+    if (thread.title) return thread.title;
+    const others = (thread.participants || []).filter(id => id !== user?.id);
+    return others.map(id => {
+      const m = senderMapRef.current[id];
+      return m ? `${m.first_name} ${m.last_name}` : 'Unknown';
+    }).join(', ') || 'Team Chat';
+  }, [user]);
+
+  const activeThread = threads.find(t => t.id === activeThreadId) ?? null;
 
   return {
-    members,
+    // Shared
     threads,
     activeThread,
     activeThreadId,
     setActiveThreadId,
     messages,
     isSending,
-    openMain,
-    openDM,
+    isLoading,
     sendMessage,
     refresh: fetchThreads,
+
+    // ChatWidget API
+    members,
+    openMain,
+    openDM,
+
+    // Communication page API
+    teamMembers: members,
+    senderMap: senderMapRef.current,
+    createThread,
+    createGroupThread,
+    getSenderName,
+    getSenderInitials,
+    getThreadDisplayName,
   };
 }

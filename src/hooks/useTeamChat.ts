@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { createNotification } from '@/hooks/useNotifications';
 
 export interface TeamMember {
   id: string;
@@ -268,6 +269,20 @@ export function useTeamChat() {
       await supabase.from('agent_threads')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', tid);
+
+      // Notify the other participants so their bell lights up in realtime
+      const thread = threads.find(t => t.id === tid);
+      const senderName = profile ? `${profile.first_name} ${profile.last_name}` : 'A teammate';
+      const channelLabel = thread?.title || 'Team Chat';
+      const recipients = (thread?.participants ?? []).filter(id => id && id !== user.id);
+      const preview = content.length > 80 ? content.slice(0, 80) + '…' : content;
+      await Promise.all(recipients.map(rid => createNotification(rid, {
+        type: 'message',
+        title: `${senderName} · ${channelLabel}`,
+        body: preview,
+        link: '/communication',
+      })));
+
       await fetchMessages();
       await fetchThreads();
     } catch (err) {
@@ -275,7 +290,7 @@ export function useTeamChat() {
     } finally {
       setIsSending(false);
     }
-  }, [activeThreadId, user, isSending, fetchMessages, fetchThreads]);
+  }, [activeThreadId, user, profile, threads, isSending, fetchMessages, fetchThreads]);
 
   // ─── Helper functions (Communication page) ─────────────
   const getSenderName = useCallback((senderId: string | null) => {

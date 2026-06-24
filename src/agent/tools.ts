@@ -7,6 +7,20 @@ export interface ToolDefinition {
   execute: (args: Record<string, string>) => Promise<unknown>;
 }
 
+/** Resolve the signed-in user's id + org/location — the safe, RLS-correct scope for writes. */
+async function currentProfile() {
+  const { data: user } = await supabase.auth.getUser();
+  const userId = user?.user?.id;
+  if (!userId) return null;
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, org_id, location_id')
+    .eq('id', userId)
+    .single();
+  if (!profile?.org_id) return null;
+  return { userId, org_id: profile.org_id as string, location_id: (profile.location_id as string) ?? null };
+}
+
 export const agentTools: ToolDefinition[] = [
   {
     name: 'search_contacts',
@@ -42,10 +56,12 @@ export const agentTools: ToolDefinition[] = [
       required: ['first_name', 'last_name', 'phone'],
     },
     execute: async (args) => {
-      const { data: profile } = await supabase.from('profiles').select('org_id').limit(1).single();
+      const { data: user } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user?.user?.id).single();
+      if (!profile?.org_id) return { error: 'Could not resolve your organization. Are you signed in?' };
       const { data, error } = await supabase
         .from('contacts')
-        .insert({ ...args, org_id: profile?.org_id, customer_type: 'Lead' })
+        .insert({ ...args, org_id: profile.org_id, customer_type: 'Lead' })
         .select()
         .single();
       if (error) return { error: error.message };
@@ -213,6 +229,125 @@ export const agentTools: ToolDefinition[] = [
     execute: async ({ customer_name, context, tone }) => {
       // This tool just returns the context — the LLM itself generates the message
       return { customer_name, context, tone: tone || 'warm', instruction: 'Generate a short, personalized follow-up SMS based on this context.' };
+    },
+  },
+  {
+    name: 'create_deal',
+    description: 'Create a new sales deal/opportunity for an existing contact. The deal starts in the first pipeline stage. Always confirm the contact and amount with the user before calling.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contact_id: { type: 'string', description: 'UUID of the contact this deal belongs to' },
+        title: { type: 'string', description: 'Short deal title, e.g. "Bullfrog A7L + cover"' },
+        amount: { type: 'string', description: 'Deal value in dollars, numbers only' },
+        priority: { type: 'string', enum: ['High', 'Medium', 'Low'] },
+        lead_source: { type: 'string', enum: ['Walk-in', 'Website', 'Referral', 'Ad', 'Phone', 'Event', 'Other'] },
+        expected_close_date: { type: 'string', description: 'Optional YYYY-MM-DD' },
+      },
+      required: ['contact_id', 'title'],
+    },
+    execute: async (args) => {
+      const me = await currentProfile();
+      if (!me) return { error: 'Could not resolve your organization. Are you signed in?' };
+      // Deal must start in a real stage — use the org's first stage by position.
+      const { data: stage } = await supabase
+        .from('pipeline_stages')
+        .select('id')
+        .eq('org_id', me.org_id)
+        .order('position')
+        .limit(1)
+        .single();
+      if (!stage?.id) return { error: 'No pipeline stages configured for this organization.' };
+      const { data, error } = await supabase
+        .from('deals')
+        .insert({
+          org_id: me.org_id,
+          contact_id: args.contact_id,
+          stage_id: stage.id,
+          title: args.title,
+          amount: args.amount ? Number(args.amount) : null,
+          priority: args.priority || 'Medium',
+          lead_source: args.lead_source || 'Walk-in',
+          expected_close_date: args.expected_close_date || null,
+          assigned_to: me.userId,
+          location_id: me.location_id,
+        })
+        .select('id, title, amount')
+        .single();
+      if (error) return { error: error.message };
+      return { success: true, deal: data };
+    },
+  },
+  {
+    name: 'update_deal_stage',
+    description: 'Move a deal to a different pipeline stage (e.g. "Closed - Won", "Negotiation"). Confirm with the user before moving a deal to a closed stage.',
+    parameters: {
+      type: 'object',
+      properties: {
+        deal_id: { type: 'string', description: 'UUID of the deal to move' },
+        stage_name: { type: 'string', description: 'Target stage name, e.g. "Negotiation" or "Closed - Won"' },
+      },
+      required: ['deal_id', 'stage_name'],
+    },
+    execute: async ({ deal_id, stage_name }) => {
+      // Resolve org from the deal itself so we match the right org's stages.
+      const { data: deal } = await supabase.from('deals').select('org_id').eq('id', deal_id).single();
+      if (!deal?.org_id) return { error: 'Deal not found.' };
+      const { data: stage } = await supabase
+        .from('pipeline_stages')
+        .select('id, name')
+        .eq('org_id', deal.org_id)
+        .ilike('name', stage_name)
+        .limit(1)
+        .single();
+      if (!stage?.id) return { error: `No stage named "${stage_name}" found. Use the exact stage name.` };
+      const { error } = await supabase
+        .from('deals')
+        .update({ stage_id: stage.id, updated_at: new Date().toISOString() })
+        .eq('id', deal_id);
+      if (error) return { error: error.message };
+      return { success: true, moved_to: stage.name };
+    },
+  },
+  {
+    name: 'get_overdue_tasks',
+    description: 'Get the current user\'s tasks that are overdue or pending and past due. Use when the user asks what they owe or what is falling behind.',
+    parameters: { type: 'object', properties: {} },
+    execute: async () => {
+      const me = await currentProfile();
+      if (!me) return { error: 'Could not resolve your account.' };
+      const nowIso = new Date().toISOString();
+      const { data } = await supabase
+        .from('tasks')
+        .select('id, title, due_at, priority, status, contact_id, deal_id')
+        .eq('assigned_to', me.userId)
+        .in('status', ['Pending', 'Overdue'])
+        .lt('due_at', nowIso)
+        .order('due_at');
+      return data ?? [];
+    },
+  },
+  {
+    name: 'schedule_job',
+    description: 'Schedule (or reschedule) an existing service/delivery job by setting its date/time. Confirm the job and time with the user first.',
+    parameters: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string', description: 'UUID of the job to schedule' },
+        scheduled_at: { type: 'string', description: 'ISO datetime or YYYY-MM-DD (defaults to 9:00 AM if no time given)' },
+      },
+      required: ['job_id', 'scheduled_at'],
+    },
+    execute: async ({ job_id, scheduled_at }) => {
+      const when = scheduled_at.includes('T') ? scheduled_at : `${scheduled_at}T09:00:00`;
+      const { data, error } = await supabase
+        .from('jobs')
+        .update({ scheduled_at: when, updated_at: new Date().toISOString() })
+        .eq('id', job_id)
+        .select('id, title, scheduled_at')
+        .single();
+      if (error) return { error: error.message };
+      return { success: true, job: data };
     },
   },
 ];

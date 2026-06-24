@@ -131,9 +131,9 @@ export default function JobDetail() {
     return <div className="flex flex-col items-center justify-center h-full text-slate-400"><p>Job not found</p><Link to="/service" className="text-sky-500 text-sm mt-2 hover:underline">Back to Service</Link></div>;
   }
 
-  const contact = (job as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string } | undefined;
-  const property = (job as Record<string, unknown>).properties as { address: string } | undefined;
-  const location = (job as Record<string, unknown>).locations as { name: string } | undefined;
+  const contact = (job as unknown as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string } | undefined;
+  const property = (job as unknown as Record<string, unknown>).properties as { address: string } | undefined;
+  const location = (job as unknown as Record<string, unknown>).locations as { name: string } | undefined;
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;

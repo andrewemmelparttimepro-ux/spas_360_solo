@@ -143,9 +143,15 @@ export function useAgentChat() {
 
       const data = await response.json();
       let assistantMessage = data.choices?.[0]?.message;
+      let conversation = [...history];
 
-      // Handle tool calls
-      if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
+      // Tool-calling loop: keep executing tools until the model returns a plain answer.
+      // Capped to avoid runaway loops. Supports multi-step chains (e.g. find contact → create deal → move stage).
+      let guard = 0;
+      while ((assistantMessage?.tool_calls?.length ?? 0) > 0 && guard < 5) {
+        guard++;
+
+        // Persist the assistant turn that requested tools
         await supabase.from('agent_messages').insert({
           thread_id: threadId,
           role: 'assistant',
@@ -153,16 +159,16 @@ export function useAgentChat() {
           tool_calls: assistantMessage.tool_calls,
         });
 
+        // Execute each requested tool and collect results
         const toolResults = [];
         for (const tc of assistantMessage.tool_calls) {
-          const args = JSON.parse(tc.function.arguments);
+          const args = JSON.parse(tc.function.arguments || '{}');
           const result = await executeTool(tc.function.name, args);
           toolResults.push({
             role: 'tool' as const,
             tool_call_id: tc.id,
             content: JSON.stringify(result),
           });
-
           await supabase.from('agent_messages').insert({
             thread_id: threadId,
             role: 'tool',
@@ -171,23 +177,17 @@ export function useAgentChat() {
           });
         }
 
-        // Second LLM call with tool results
-        const followUp = await fetch('/api/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messages: [...history, assistantMessage, ...toolResults],
-            tools: getOpenAITools(),
-          }),
-        });
+        conversation = [...conversation, assistantMessage, ...toolResults];
 
-        if (followUp.ok) {
-          const followUpData = await followUp.json();
-          assistantMessage = followUpData.choices?.[0]?.message;
-        }
+        // Ask the model again, now with the tool results in context
+        const next = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ messages: conversation, tools: getOpenAITools() }),
+        });
+        if (!next.ok) throw new Error(await next.text());
+        const nextData = await next.json();
+        assistantMessage = nextData.choices?.[0]?.message;
       }
 
       // Save final assistant response
@@ -196,6 +196,12 @@ export function useAgentChat() {
           thread_id: threadId,
           role: 'assistant',
           content: assistantMessage.content,
+        });
+      } else if (guard >= 5) {
+        await supabase.from('agent_messages').insert({
+          thread_id: threadId,
+          role: 'assistant',
+          content: "I went through several steps but couldn't wrap that up cleanly. Want me to try again?",
         });
       }
 

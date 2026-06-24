@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, DollarSign, Users, Wrench, AlertCircle } from 'lucide-react';
+import { DollarSign, Users, Wrench, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useDashboardStats } from '@/hooks/useDashboard';
+import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-100', format: (v: number) => `$${v.toLocaleString()}`, link: '/crm' },
@@ -16,7 +17,8 @@ const actionDotColors: Record<ActionType, string> = { task: 'bg-amber-500', part
 const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/crm', lead: '/crm' };
 
 export default function Dashboard() {
-  const { stats, actions, revenueData, isLoading } = useDashboardStats();
+  const [period, setPeriod] = useState<DashboardPeriod>('week');
+  const { stats, actions, revenueData, isLoading } = useDashboardStats(period);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
@@ -26,8 +28,14 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manager Dashboard</h1>
-        <select className="bg-white border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400">
-          <option>This Week</option><option>This Month</option><option>Last Month</option>
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
+          className="bg-white border border-slate-200 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-400"
+        >
+          {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
+            <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
+          ))}
         </select>
       </div>
 
@@ -50,7 +58,10 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-6">Revenue Overview</h2>
+          <div className="flex items-baseline justify-between mb-6">
+            <h2 className="text-lg font-semibold text-slate-900">Revenue Overview</h2>
+            <span className="text-xs font-medium text-slate-400">{PERIOD_LABELS[period]} · Closed-Won</span>
+          </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueData}>

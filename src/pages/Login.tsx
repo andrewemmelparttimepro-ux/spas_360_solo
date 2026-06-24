@@ -126,6 +126,9 @@ export default function Login() {
         <p className="text-center text-xs text-slate-600 mt-6">
           Minot & Bismarck, North Dakota
         </p>
+        <p className="text-center text-[11px] text-slate-700 mt-1.5">
+          Powered by <span className="text-slate-400 font-medium">NDAI</span>
+        </p>
       </div>
     </div>
   );

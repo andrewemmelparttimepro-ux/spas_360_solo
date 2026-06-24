@@ -10,6 +10,7 @@ const CRM = lazy(() => import('./pages/CRM'));
 const Service = lazy(() => import('./pages/Service'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Communication = lazy(() => import('./pages/Communication'));
+const Reports = lazy(() => import('./pages/Reports'));
 const Contacts = lazy(() => import('./pages/Contacts'));
 const ContactDetail = lazy(() => import('./pages/ContactDetail'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
@@ -79,6 +80,7 @@ function AuthGate() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="inventory/:id" element={<InventoryDetail />} />
           <Route path="communication" element={<Communication />} />
+          <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

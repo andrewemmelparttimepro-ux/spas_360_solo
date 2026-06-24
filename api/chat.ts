@@ -1,9 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Provider-agnostic: supports Gemini (default) or OpenAI
+// Provider-agnostic: supports Gemini (default, keyed today), Anthropic Claude, or OpenAI.
+// The frontend always speaks the OpenAI message/tool shape; each handler translates
+// to/from its provider so the client never has to change.
+// Switch to Claude by setting AI_PROVIDER=anthropic (+ ANTHROPIC_API_KEY).
 const PROVIDER = process.env.AI_PROVIDER || 'gemini';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
@@ -16,7 +21,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { messages, tools } = req.body;
 
-    if (PROVIDER === 'gemini') {
+    if (PROVIDER === 'anthropic') {
+      return await handleClaude(messages, tools, res);
+    } else if (PROVIDER === 'gemini') {
       return await handleGemini(messages, tools, res);
     } else {
       return await handleOpenAI(messages, tools, res);
@@ -24,6 +31,109 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     return res.status(500).json({ error: (err as Error).message });
   }
+}
+
+// ─── Anthropic Claude (default) ─────────────────────────────
+type OAIMessage = {
+  role: string;
+  content: string | null;
+  tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+  tool_call_id?: string;
+};
+type OAITool = { type: string; function: { name: string; description: string; parameters: Record<string, unknown> } };
+
+async function handleClaude(messages: OAIMessage[], tools: OAITool[], res: VercelResponse) {
+  if (!ANTHROPIC_API_KEY) {
+    // Fail loudly — never silently degrade (reliability-first).
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured. Set it in your environment or switch AI_PROVIDER.' });
+  }
+
+  const system = messages.find(m => m.role === 'system')?.content || undefined;
+  const anthropicMessages = convertMessagesToAnthropic(messages);
+  const anthropicTools = tools?.length > 0
+    ? tools.map(t => ({ name: t.function.name, description: t.function.description, input_schema: t.function.parameters }))
+    : undefined;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 1024,
+      temperature: 0.7,
+      system,
+      messages: anthropicMessages,
+      tools: anthropicTools,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    return res.status(response.status).json({ error: err });
+  }
+
+  const data = await response.json();
+  const blocks: { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[] = data.content || [];
+
+  const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('\n') || null;
+  const toolUses = blocks.filter(b => b.type === 'tool_use');
+
+  // Convert Anthropic response → OpenAI shape the frontend expects.
+  // Preserve Anthropic's native tool_use ids so they round-trip on the follow-up call.
+  return res.status(200).json({
+    choices: [{
+      message: {
+        role: 'assistant',
+        content: text,
+        tool_calls: toolUses.length > 0
+          ? toolUses.map(b => ({
+              id: b.id,
+              type: 'function',
+              function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) },
+            }))
+          : undefined,
+      },
+    }],
+  });
+}
+
+function convertMessagesToAnthropic(messages: OAIMessage[]) {
+  const out: { role: 'user' | 'assistant'; content: unknown[] }[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') continue; // handled via top-level `system`
+
+    if (msg.role === 'user') {
+      out.push({ role: 'user', content: [{ type: 'text', text: msg.content ?? '' }] });
+    } else if (msg.role === 'assistant') {
+      const content: unknown[] = [];
+      if (msg.content) content.push({ type: 'text', text: msg.content });
+      for (const tc of msg.tool_calls ?? []) {
+        content.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input: safeParse(tc.function.arguments) });
+      }
+      if (content.length > 0) out.push({ role: 'assistant', content });
+    } else if (msg.role === 'tool') {
+      // Anthropic requires tool_result blocks inside a user message, immediately after the
+      // matching assistant tool_use. Merge consecutive tool results into one user message.
+      const block = { type: 'tool_result', tool_use_id: msg.tool_call_id, content: msg.content ?? '' };
+      const last = out[out.length - 1];
+      if (last && last.role === 'user' && (last.content[0] as { type?: string })?.type === 'tool_result') {
+        last.content.push(block);
+      } else {
+        out.push({ role: 'user', content: [block] });
+      }
+    }
+  }
+
+  return out;
+}
+
+function safeParse(s: string): Record<string, unknown> {
+  try { return JSON.parse(s); } catch { return {}; }
 }
 
 // ─── Gemini ─────────────────────────────────────────────────

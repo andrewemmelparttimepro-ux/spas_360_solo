@@ -136,7 +136,7 @@ export default function InventoryDetail() {
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
   if (!item) return <div className="text-center text-slate-400"><p>Item not found</p><Link to="/inventory" className="text-sky-500 text-sm mt-2 hover:underline">Back</Link></div>;
 
-  const loc = (item as Record<string, unknown>).locations as { name: string } | undefined;
+  const loc = (item as unknown as Record<string, unknown>).locations as { name: string } | undefined;
 
   // Editable status badge
   const StatusBadge = () => {

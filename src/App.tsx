@@ -27,9 +27,9 @@ function PageLoader() {
 
   if (timedOut) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+      <div className="flex flex-col items-center justify-center h-full text-ink-500 gap-3">
         <p className="text-lg font-medium">Taking longer than expected...</p>
-        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-sky-500 text-white text-sm rounded-lg hover:bg-sky-600">
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-brand-500 text-white text-sm rounded-lg hover:bg-brand-600">
           Reload Page
         </button>
       </div>
@@ -38,7 +38,7 @@ function PageLoader() {
 
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="w-8 h-8 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" />
     </div>
   );
 }
@@ -48,10 +48,10 @@ function AuthGate() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
+      <div className="flex items-center justify-center h-screen bg-ink-950">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-slate-500">Loading SPAS 360...</p>
+          <div className="w-10 h-10 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-ink-400">Loading SPAS 360...</p>
         </div>
       </div>
     );

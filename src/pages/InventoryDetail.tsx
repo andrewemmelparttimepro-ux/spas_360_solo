@@ -8,9 +8,9 @@ import type { InventoryItem, InventoryStatus } from '@/types/database';
 
 const STATUS_OPTIONS: InventoryStatus[] = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'];
 const STATUS_COLORS: Record<string, string> = {
-  'In Stock': 'bg-emerald-100 text-emerald-800', 'Sold': 'bg-amber-100 text-amber-800',
-  'On Order': 'bg-blue-100 text-blue-800', 'In Transit': 'bg-purple-100 text-purple-800',
-  'Delivered': 'bg-slate-100 text-slate-600', 'Returned': 'bg-red-100 text-red-800',
+  'In Stock': 'bg-emerald-500/15 text-emerald-300', 'Sold': 'bg-amber-500/15 text-amber-300',
+  'On Order': 'bg-brand-500/15 text-brand-300', 'In Transit': 'bg-purple-500/15 text-purple-300',
+  'Delivered': 'bg-ink-950 text-ink-300', 'Returned': 'bg-red-500/15 text-red-300',
 };
 const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
 
@@ -49,7 +49,7 @@ function EditableField({
 
   return (
     <div>
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      <p className="text-xs text-ink-500 mb-1">{label}</p>
       {editing ? (
         type === 'select' ? (
           <select
@@ -57,7 +57,7 @@ function EditableField({
             value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
             onKeyDown={e => { if (e.key === 'Escape') cancel(); }}
             disabled={saving}
-            className="px-2 py-1 border border-sky-400 rounded-lg text-sm outline-none bg-white focus:ring-2 focus:ring-sky-200 w-full"
+            className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 w-full"
           >
             {options?.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
@@ -67,7 +67,7 @@ function EditableField({
             value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
             onKeyDown={e => { if (e.key === 'Escape') cancel(); }}
             disabled={saving} rows={3}
-            className="px-2 py-1 border border-sky-400 rounded-lg text-sm outline-none bg-white focus:ring-2 focus:ring-sky-200 w-full resize-none"
+            className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 w-full resize-none"
           />
         ) : (
           <input
@@ -75,20 +75,20 @@ function EditableField({
             type={type} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit}
             onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
             disabled={saving}
-            className="px-2 py-1 border border-sky-400 rounded-lg text-sm outline-none bg-white focus:ring-2 focus:ring-sky-200 w-full"
+            className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 w-full"
           />
         )
       ) : (
         <p
           onClick={() => setEditing(true)}
           className={cn(
-            "text-sm cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 hover:bg-sky-50 hover:ring-1 hover:ring-sky-200 transition-colors group inline-flex items-center gap-1",
+            "text-sm cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group inline-flex items-center gap-1",
             bold && 'font-bold', color
           )}
           title="Click to edit"
         >
           {display}
-          <Pencil className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+          <Pencil className="w-3 h-3 text-ink-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
         </p>
       )}
     </div>
@@ -133,8 +133,8 @@ export default function InventoryDetail() {
     return true;
   }, [fetchItem]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
-  if (!item) return <div className="text-center text-slate-400"><p>Item not found</p><Link to="/inventory" className="text-sky-500 text-sm mt-2 hover:underline">Back</Link></div>;
+  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+  if (!item) return <div className="text-center text-ink-500"><p>Item not found</p><Link to="/inventory" className="text-brand-400 text-sm mt-2 hover:underline">Back</Link></div>;
 
   const loc = (item as unknown as Record<string, unknown>).locations as { name: string } | undefined;
 
@@ -150,7 +150,7 @@ export default function InventoryDetail() {
           ref={ref} value={item.status}
           onChange={async e => { await handleSave(item.id, { status: e.target.value as InventoryStatus }); setEditing(false); }}
           onBlur={() => setEditing(false)}
-          className="px-2 py-1 border border-sky-400 rounded-lg text-sm outline-none bg-white focus:ring-2 focus:ring-sky-200"
+          className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30"
         >
           {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -159,7 +159,7 @@ export default function InventoryDetail() {
     return (
       <span
         onClick={() => setEditing(true)}
-        className={cn("px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-sky-200 transition-all group inline-flex items-center gap-1", STATUS_COLORS[item.status] ?? 'bg-slate-100')}
+        className={cn("px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", STATUS_COLORS[item.status] ?? 'bg-ink-950')}
         title="Click to change status"
       >
         {item.status}
@@ -171,18 +171,18 @@ export default function InventoryDetail() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to="/inventory" className="p-2 hover:bg-slate-100 rounded-lg"><ArrowLeft className="w-5 h-5 text-slate-500" /></Link>
+        <Link to="/inventory" className="p-2 hover:bg-ink-800 rounded-lg"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-900">{item.product}</h1>
-          <p className="text-sm text-slate-500">SKU: {item.sku}</p>
+          <h1 className="text-2xl font-bold text-ink-100">{item.product}</h1>
+          <p className="text-sm text-ink-400">SKU: {item.sku}</p>
         </div>
         <StatusBadge />
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Details</h2>
-          <span className="text-[10px] text-slate-400">Click any value to edit</span>
+          <h2 className="text-sm font-semibold text-ink-300 uppercase tracking-wider">Details</h2>
+          <span className="text-[10px] text-ink-500">Click any value to edit</span>
         </div>
         <div className="grid grid-cols-2 gap-6">
           <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} />
@@ -193,17 +193,17 @@ export default function InventoryDetail() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4">Pricing</h2>
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-ink-300 uppercase tracking-wider mb-4">Pricing</h2>
         <div className="grid grid-cols-3 gap-6">
           <EditableField label="Cost" value={item.cost} field="cost" itemId={item.id} onSave={handleSave} type="number" prefix="$" />
           <EditableField label="MSRP" value={item.msrp} field="msrp" itemId={item.id} onSave={handleSave} type="number" prefix="$" />
-          <EditableField label="Sale Price" value={item.sale_price} field="sale_price" itemId={item.id} onSave={handleSave} type="number" prefix="$" bold color="text-emerald-700" />
+          <EditableField label="Sale Price" value={item.sale_price} field="sale_price" itemId={item.id} onSave={handleSave} type="number" prefix="$" bold color="text-emerald-300" />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-4">Additional Info</h2>
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-ink-300 uppercase tracking-wider mb-4">Additional Info</h2>
         <div className="grid grid-cols-1 gap-6">
           <EditableField label="Warranty" value={item.warranty_info} field="warranty_info" itemId={item.id} onSave={handleSave} multiline />
           <EditableField label="Notes" value={item.notes} field="notes" itemId={item.id} onSave={handleSave} multiline />

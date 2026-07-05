@@ -13,54 +13,54 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Settings</h1>
+      <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Settings</h1>
 
       {/* Profile */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center">
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4 flex items-center">
           <User className="w-4 h-4 mr-2" /> Profile
         </h2>
         {profile ? (
           <div className="grid grid-cols-2 gap-4">
-            <div><p className="text-xs text-slate-400">Name</p><p className="text-sm font-medium">{profile.first_name} {profile.last_name}</p></div>
-            <div><p className="text-xs text-slate-400">Email</p><p className="text-sm">{profile.email}</p></div>
-            <div><p className="text-xs text-slate-400">Phone</p><p className="text-sm">{profile.phone ?? '—'}</p></div>
+            <div><p className="text-xs text-ink-500">Name</p><p className="text-sm font-medium">{profile.first_name} {profile.last_name}</p></div>
+            <div><p className="text-xs text-ink-500">Email</p><p className="text-sm">{profile.email}</p></div>
+            <div><p className="text-xs text-ink-500">Phone</p><p className="text-sm">{profile.phone ?? '—'}</p></div>
             <div>
-              <p className="text-xs text-slate-400">Role</p>
+              <p className="text-xs text-ink-500">Role</p>
               <p className="text-sm flex items-center">
-                <Shield className="w-3.5 h-3.5 mr-1 text-sky-400" />
+                <Shield className="w-3.5 h-3.5 mr-1 text-brand-400" />
                 {roleLabels[profile.role] ?? profile.role}
               </p>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-400">Loading...</p>
+          <p className="text-sm text-ink-500">Loading...</p>
         )}
       </div>
 
       {/* Locations */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center">
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4 flex items-center">
           <MapPin className="w-4 h-4 mr-2" /> Locations
         </h2>
         <div className="space-y-3">
           {locations.map(loc => (
-            <div key={loc.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div key={loc.id} className="flex items-center justify-between p-3 bg-ink-950 rounded-lg">
               <div>
-                <p className="text-sm font-medium text-slate-900">{loc.name}</p>
-                {loc.address && <p className="text-xs text-slate-500">{loc.address}</p>}
+                <p className="text-sm font-medium text-ink-100">{loc.name}</p>
+                {loc.address && <p className="text-xs text-ink-400">{loc.address}</p>}
               </div>
-              {loc.phone && <span className="text-xs text-slate-400">{loc.phone}</span>}
+              {loc.phone && <span className="text-xs text-ink-500">{loc.phone}</span>}
             </div>
           ))}
         </div>
       </div>
 
       {/* Sign Out */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
         <button
           onClick={signOut}
-          className="flex items-center text-red-600 hover:text-red-700 text-sm font-medium"
+          className="flex items-center text-red-400 hover:text-red-300 text-sm font-medium"
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sign Out

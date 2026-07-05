@@ -31,7 +31,7 @@ function EditableJobStatus({ value, jobId, onSave }: { value: JobStatus; jobId: 
         onChange={e => commit(e.target.value)}
         onBlur={() => setEditing(false)}
         onClick={e => e.preventDefault()}
-        className="px-2 py-1 border border-sky-400 rounded-lg text-xs outline-none bg-white focus:ring-2 focus:ring-sky-200 relative z-10"
+        className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 relative z-10"
       >
         {JOB_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -53,10 +53,10 @@ function EditableJobStatus({ value, jobId, onSave }: { value: JobStatus; jobId: 
 // --------------- Job Card ---------------
 function JobCard({ job, saveJobStatus }: { job: Job & { assigned_techs?: string[] }; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
   return (
-    <div className={cn("block p-4 rounded-r-lg border border-l-4 shadow-sm bg-white hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
+    <div className={cn("block p-4 rounded-r-lg border border-l-4 shadow-sm bg-ink-900 hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-ink-950')}>
       <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
       <Link to={`/service/${job.id}`} className="block">
-        <h3 className="font-medium text-slate-900 hover:text-sky-700">{job.title}</h3>
+        <h3 className="font-medium text-ink-100 hover:text-brand-300">{job.title}</h3>
         <div className="flex items-center space-x-4 mt-2 text-sm opacity-80">
           {job.scheduled_at && <span className="flex items-center"><Clock className="w-4 h-4 mr-1" />{new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
         </div>
@@ -169,62 +169,62 @@ export default function Service() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-slate-200 border-t-sky-400 rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Service & Jobs</h1>
-          <p className="text-sm text-slate-500 mt-1">Schedule and dispatch technicians &mdash; click any status to change it</p>
+          <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Service & Jobs</h1>
+          <p className="text-sm text-ink-400 mt-1">Schedule and dispatch technicians &mdash; click any status to change it</p>
         </div>
         <div className="flex space-x-3">
-          <button className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Filter className="w-4 h-4 mr-2" />Filter</button>
-          <button onClick={() => setShowCreate(true)} className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
+          <button className="bg-ink-900 border border-ink-700 text-ink-300 hover:bg-ink-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Filter className="w-4 h-4 mr-2" />Filter</button>
+          <button onClick={() => setShowCreate(true)} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />New Job</button>
         </div>
       </div>
 
       {/* Create Job Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4">
+          <div className="bg-ink-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">New Job</h2>
-              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <h2 className="text-lg font-semibold text-ink-100">New Job</h2>
+              <button onClick={() => setShowCreate(false)} className="text-ink-500 hover:text-ink-300"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
-              <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
-              <select value={newJob.contact_id} onChange={e => setNewJob({...newJob, contact_id: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
+              <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+              <select value={newJob.contact_id} onChange={e => setNewJob({...newJob, contact_id: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                 <option value="">Select Customer *</option>
                 {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} — {c.phone}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-3">
-                <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
+                <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option>Delivery</option><option>Repair</option><option>Installation</option><option>Warranty</option><option>Maintenance</option><option>Pickup</option>
                 </select>
-                <select value={newJob.status} onChange={e => setNewJob({...newJob, status: e.target.value as JobStatus})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
+                <select value={newJob.status} onChange={e => setNewJob({...newJob, status: e.target.value as JobStatus})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option>In Progress</option><option>Delivery</option><option>Parts on Order</option><option>Warranty</option><option>Ready for Pickup</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <select value={newJob.location_id} onChange={e => setNewJob({...newJob, location_id: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
+                <select value={newJob.location_id} onChange={e => setNewJob({...newJob, location_id: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option value="">Location *</option>
                   {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
-                <select value={newJob.priority} onChange={e => setNewJob({...newJob, priority: e.target.value as 'High' | 'Medium' | 'Low'})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400">
+                <select value={newJob.priority} onChange={e => setNewJob({...newJob, priority: e.target.value as 'High' | 'Medium' | 'Low'})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option value="High">High Priority</option>
                   <option value="Medium">Medium Priority</option>
                   <option value="Low">Low Priority</option>
                 </select>
               </div>
-              <input type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
-              <input placeholder="Amount to Collect ($)" type="number" value={newJob.amount_to_collect} onChange={e => setNewJob({...newJob, amount_to_collect: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400" />
-              <textarea placeholder="Description / Notes" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-sky-400 resize-none" />
+              <input type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+              <input placeholder="Amount to Collect ($)" type="number" value={newJob.amount_to_collect} onChange={e => setNewJob({...newJob, amount_to_collect: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+              <textarea placeholder="Description / Notes" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} rows={3} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-none" />
             </div>
             <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} disabled={!newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium disabled:opacity-50">Create Job</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 rounded-lg">Cancel</button>
+              <button onClick={handleCreate} disabled={!newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">Create Job</button>
             </div>
           </div>
         </div>
@@ -232,19 +232,19 @@ export default function Service() {
 
       <div className="flex flex-1 overflow-hidden gap-6">
         {/* Unscheduled Queue */}
-        <div className="w-80 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden shrink-0">
-          <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-            <h2 className="font-semibold text-slate-800">Unscheduled Queue</h2>
-            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2 py-1 rounded-full">{unscheduledJobs.length}</span>
+        <div className="w-80 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden shrink-0">
+          <div className="p-4 border-b border-ink-700 bg-ink-950 flex justify-between items-center">
+            <h2 className="font-semibold text-ink-100">Unscheduled Queue</h2>
+            <span className="bg-ink-700 text-ink-300 text-xs font-bold px-2 py-1 rounded-full">{unscheduledJobs.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {unscheduledJobs.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-8">No unscheduled jobs</p>
+              <p className="text-sm text-ink-500 text-center py-8">No unscheduled jobs</p>
             ) : unscheduledJobs.map(job => (
-              <div key={job.id} className={cn("block p-3 rounded-r-lg border border-l-4 shadow-sm hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-slate-50')}>
+              <div key={job.id} className={cn("block p-3 rounded-r-lg border border-l-4 shadow-sm hover:shadow-md transition-all", statusColors[job.status as JobStatus] ?? 'bg-ink-950')}>
                 <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
                 <Link to={`/service/${job.id}`} className="block">
-                  <h3 className="font-medium text-sm mb-2 leading-tight hover:text-sky-700">{job.title}</h3>
+                  <h3 className="font-medium text-sm mb-2 leading-tight hover:text-brand-300">{job.title}</h3>
                 </Link>
               </div>
             ))}
@@ -252,22 +252,22 @@ export default function Service() {
         </div>
 
         {/* Schedule Board */}
-        <div className="flex-1 flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex-1 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden">
           {/* Schedule Header */}
-          <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div className="p-4 border-b border-ink-700 flex justify-between items-center bg-ink-950">
             <div className="flex items-center space-x-3">
-              <h2 className="font-semibold text-slate-800 flex items-center">
-                <CalendarIcon className="w-5 h-5 mr-2 text-slate-500" />
+              <h2 className="font-semibold text-ink-100 flex items-center">
+                <CalendarIcon className="w-5 h-5 mr-2 text-ink-400" />
                 {viewMode === 'day' ? "Today's Schedule" : viewMode === 'week' ? 'Week View' : 'Month View'}
               </h2>
               <div className="flex items-center gap-1">
-                <button onClick={goBack} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronLeft className="w-4 h-4 text-slate-600" /></button>
-                <button onClick={goToday} className="px-2 py-0.5 text-xs font-medium text-sky-600 hover:bg-sky-50 rounded transition-colors">Today</button>
-                <button onClick={goForward} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronRight className="w-4 h-4 text-slate-600" /></button>
+                <button onClick={goBack} className="p-1 hover:bg-ink-700 rounded transition-colors"><ChevronLeft className="w-4 h-4 text-ink-300" /></button>
+                <button onClick={goToday} className="px-2 py-0.5 text-xs font-medium text-brand-400 hover:bg-brand-500/10 rounded transition-colors">Today</button>
+                <button onClick={goForward} className="p-1 hover:bg-ink-700 rounded transition-colors"><ChevronRight className="w-4 h-4 text-ink-300" /></button>
               </div>
-              <div className="text-sm text-slate-500">{dateLabel}</div>
+              <div className="text-sm text-ink-400">{dateLabel}</div>
             </div>
-            <div className="flex bg-slate-200 p-1 rounded-lg">
+            <div className="flex bg-ink-700 p-1 rounded-lg">
               {(['day', 'week', 'month'] as ViewMode[]).map(mode => (
                 <button
                   key={mode}
@@ -275,8 +275,8 @@ export default function Service() {
                   className={cn(
                     "px-3 py-1 text-sm font-medium rounded-md transition-all capitalize",
                     viewMode === mode
-                      ? "bg-white shadow-sm text-slate-800"
-                      : "text-slate-600 hover:text-slate-800"
+                      ? "bg-ink-900 shadow-sm text-ink-100"
+                      : "text-ink-300 hover:text-ink-100"
                   )}
                 >
                   {mode}
@@ -286,14 +286,14 @@ export default function Service() {
           </div>
 
           {/* Schedule Content */}
-          <div className="flex-1 overflow-y-auto bg-slate-50/50">
+          <div className="flex-1 overflow-y-auto bg-ink-950/50">
             {/* ─── DAY VIEW ─── */}
             {viewMode === 'day' && (
               <div className="p-6 space-y-4">
                 {filteredJobs.length === 0 ? (
                   <div className="text-center py-16">
-                    <CalendarIcon className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm text-slate-400">No jobs scheduled for {format(currentDate, 'MMMM d')}</p>
+                    <CalendarIcon className="w-10 h-10 text-ink-300 mx-auto mb-3" />
+                    <p className="text-sm text-ink-500">No jobs scheduled for {format(currentDate, 'MMMM d')}</p>
                   </div>
                 ) : filteredJobs.map(job => (
                   <JobCard key={job.id} job={job} saveJobStatus={saveJobStatus} />
@@ -303,29 +303,29 @@ export default function Service() {
 
             {/* ─── WEEK VIEW ─── */}
             {viewMode === 'week' && jobsByDay && (
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-ink-700">
                 {jobsByDay.map(({ date, jobs: dayJobs }) => {
                   const isToday = isSameDay(date, new Date());
                   return (
-                    <div key={date.toISOString()} className={cn("p-4", isToday && "bg-sky-50/40")}>
+                    <div key={date.toISOString()} className={cn("p-4", isToday && "bg-brand-500/10")}>
                       <div className="flex items-center gap-3 mb-3">
                         <div className={cn(
                           "w-10 h-10 rounded-lg flex flex-col items-center justify-center text-center shrink-0",
-                          isToday ? "bg-sky-500 text-white" : "bg-slate-100 text-slate-600"
+                          isToday ? "bg-brand-500 text-white" : "bg-ink-950 text-ink-300"
                         )}>
                           <span className="text-[10px] font-semibold uppercase leading-none">{format(date, 'EEE')}</span>
                           <span className="text-sm font-bold leading-tight">{format(date, 'd')}</span>
                         </div>
                         <div>
-                          <h3 className={cn("text-sm font-semibold", isToday ? "text-sky-700" : "text-slate-700")}>
+                          <h3 className={cn("text-sm font-semibold", isToday ? "text-brand-300" : "text-ink-300")}>
                             {format(date, 'EEEE, MMMM d')}
-                            {isToday && <span className="ml-2 text-[10px] bg-sky-500 text-white px-1.5 py-0.5 rounded-full font-bold">TODAY</span>}
+                            {isToday && <span className="ml-2 text-[10px] bg-brand-500 text-white px-1.5 py-0.5 rounded-full font-bold">TODAY</span>}
                           </h3>
-                          <p className="text-xs text-slate-400">{dayJobs.length} job{dayJobs.length !== 1 ? 's' : ''}</p>
+                          <p className="text-xs text-ink-500">{dayJobs.length} job{dayJobs.length !== 1 ? 's' : ''}</p>
                         </div>
                       </div>
                       {dayJobs.length === 0 ? (
-                        <p className="text-xs text-slate-400 ml-[52px]">No jobs scheduled</p>
+                        <p className="text-xs text-ink-500 ml-[52px]">No jobs scheduled</p>
                       ) : (
                         <div className="ml-[52px] space-y-2">
                           {dayJobs.map(job => (
@@ -343,9 +343,9 @@ export default function Service() {
             {viewMode === 'month' && jobsByDay && (
               <div>
                 {/* Day-of-week headers */}
-                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100">
+                <div className="grid grid-cols-7 border-b border-ink-700 bg-ink-950">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <div key={d} className="py-2 text-center text-[11px] font-semibold text-slate-500 uppercase">{d}</div>
+                    <div key={d} className="py-2 text-center text-[11px] font-semibold text-ink-400 uppercase">{d}</div>
                   ))}
                 </div>
                 {/* Calendar grid */}
@@ -367,13 +367,13 @@ export default function Service() {
                           key={day.toISOString()}
                           onClick={() => { setCurrentDate(day); setViewMode('day'); }}
                           className={cn(
-                            "min-h-[90px] border-b border-r border-slate-100 p-1.5 cursor-pointer hover:bg-sky-50/40 transition-colors",
-                            !isCurrentMonth && "bg-slate-50/60 opacity-50",
+                            "min-h-[90px] border-b border-r border-ink-800 p-1.5 cursor-pointer hover:bg-brand-500/10 transition-colors",
+                            !isCurrentMonth && "bg-ink-950/60 opacity-50",
                           )}
                         >
                           <div className={cn(
                             "text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full",
-                            isToday ? "bg-sky-500 text-white" : "text-slate-600"
+                            isToday ? "bg-brand-500 text-white" : "text-ink-300"
                           )}>
                             {format(day, 'd')}
                           </div>
@@ -383,7 +383,7 @@ export default function Service() {
                                 key={job.id}
                                 className={cn(
                                   "text-[10px] px-1 py-0.5 rounded truncate font-medium",
-                                  statusColors[job.status as JobStatus]?.replace('border-l-4', '').replace('border-l-', 'border-l-2 border-l-') ?? 'bg-slate-100'
+                                  statusColors[job.status as JobStatus]?.replace('border-l-4', '').replace('border-l-', 'border-l-2 border-l-') ?? 'bg-ink-950'
                                 )}
                                 title={`${job.title} — ${job.scheduled_at ? new Date(job.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`}
                               >
@@ -391,7 +391,7 @@ export default function Service() {
                               </div>
                             ))}
                             {dayJobs.length > 3 && (
-                              <div className="text-[9px] text-slate-400 font-medium px-1">+{dayJobs.length - 3} more</div>
+                              <div className="text-[9px] text-ink-500 font-medium px-1">+{dayJobs.length - 3} more</div>
                             )}
                           </div>
                         </div>

@@ -4,18 +4,17 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import ChatWidget from '../ChatWidget';
 
+/** OMP-style shell: single dark topbar with nav pills; mobile gets a drawer. */
 export default function AppLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Outlet />
-        </main>
-      </div>
+    <div className="flex flex-col h-screen bg-ink-950 text-ink-100 font-sans">
+      <Header onMenuClick={() => setDrawerOpen(true)} />
+      <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <main className="flex-1 overflow-y-auto p-4 sm:p-5">
+        <Outlet />
+      </main>
       <ChatWidget />
     </div>
   );

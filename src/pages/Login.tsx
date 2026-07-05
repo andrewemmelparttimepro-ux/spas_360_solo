@@ -27,7 +27,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0f1729 0%, #070b14 100%)' }}>
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0b2036 0%, #06080d 100%)' }}>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -44,22 +44,22 @@ export default function Login() {
             {isSignUp && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-ink-300 mb-1">First Name</label>
                   <input
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-ink-300 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                     required
                   />
                 </div>
@@ -67,25 +67,25 @@ export default function Login() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+              <label className="block text-sm font-medium text-ink-300 mb-1">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="matt@spas360.com"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+              <label className="block text-sm font-medium text-ink-300 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-sky-400 focus:ring-1 focus:ring-sky-400 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                 required
                 minLength={6}
               />
@@ -100,7 +100,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-sky-500/25"
+              className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-brand-500/25"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -116,18 +116,18 @@ export default function Login() {
           <div className="mt-6 text-center">
             <button
               onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-              className="text-sm text-slate-400 hover:text-sky-400 transition-colors"
+              className="text-sm text-ink-500 hover:text-brand-400 transition-colors"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-6">
+        <p className="text-center text-xs text-ink-300 mt-6">
           Minot & Bismarck, North Dakota
         </p>
-        <p className="text-center text-[11px] text-slate-700 mt-1.5">
-          Powered by <span className="text-slate-400 font-medium">NDAI</span>
+        <p className="text-center text-[11px] text-ink-300 mt-1.5">
+          Powered by <span className="text-ink-500 font-medium">NDAI</span>
         </p>
       </div>
     </div>

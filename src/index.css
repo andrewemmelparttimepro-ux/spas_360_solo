@@ -1,1 +1,57 @@
+/* SPAS 360 — Design System (modeled on SandPro OMP, accent = Magic City Home Leisure blue) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Ink ramp — OMP dark neutrals (accent-1 → accent-10) */
+  --color-ink-950: #0a0a0f; /* page background */
+  --color-ink-900: #111116; /* surface / cards */
+  --color-ink-850: #16161B; /* surface raised */
+  --color-ink-800: #1E1E24; /* hover */
+  --color-ink-700: #2A2A32; /* border */
+  --color-ink-600: #3A3A42; /* border strong */
+  --color-ink-500: #6B7280; /* muted-2 */
+  --color-ink-400: #9CA3AF; /* muted */
+  --color-ink-300: #D4D4D8; /* soft text */
+  --color-ink-100: #F0F0F0; /* text */
+
+  /* Brand — Magic City Home Leisure blue */
+  --color-brand-300: #6db3e6;
+  --color-brand-400: #34a0ff;
+  --color-brand-500: #1075b8;
+  --color-brand-600: #0d629b;
+  --color-brand-700: #0a4f7e;
+  --color-brand-900: #002e56;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* OMP-style dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-ink-500); }
+
+/* Native form controls on dark */
+select, input, textarea {
+  color-scheme: dark;
+}

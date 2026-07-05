@@ -174,10 +174,10 @@ export default function Service() {
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between mb-6 shrink-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Service & Jobs</h1>
-          <p className="text-sm text-ink-400 mt-1">Schedule and dispatch technicians &mdash; click any status to change it</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Service & Jobs</h1>
+          <p className="hidden sm:block text-sm text-ink-400 mt-1">Schedule and dispatch technicians &mdash; click any status to change it</p>
         </div>
         <div className="flex space-x-3">
           <button className="bg-ink-900 border border-ink-700 text-ink-300 hover:bg-ink-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Filter className="w-4 h-4 mr-2" />Filter</button>

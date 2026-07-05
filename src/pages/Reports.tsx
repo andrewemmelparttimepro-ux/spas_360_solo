@@ -30,7 +30,7 @@ export default function Reports() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Reports</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Reports</h1>
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
@@ -45,13 +45,13 @@ export default function Reports() {
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((k) => (
-          <Card key={k.title} className="flex items-start justify-between">
-            <div>
-              <p className="text-sm font-medium text-ink-400 mb-1">{k.title}</p>
-              <h3 className="text-2xl font-bold text-ink-100">{k.value}</h3>
-              <p className="text-xs text-ink-500 mt-1">{k.sub}</p>
+          <Card key={k.title} className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-1.5">{k.title}</p>
+              <h3 className="text-[22px] leading-none font-bold text-ink-100">{k.value}</h3>
+              <p className="text-xs text-ink-500 mt-1.5">{k.sub}</p>
             </div>
-            <div className={`p-3 rounded-lg ${k.bg}`}><k.icon className={`w-6 h-6 ${k.color}`} /></div>
+            <div className={`p-2.5 rounded-[10px] shrink-0 ${k.bg}`}><k.icon className={`w-5 h-5 ${k.color}`} /></div>
           </Card>
         ))}
       </div>

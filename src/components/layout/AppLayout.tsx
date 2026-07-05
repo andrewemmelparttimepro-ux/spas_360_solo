@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import ChatWidget from '../ChatWidget';
+import WidgetBoundary from '../ui/WidgetBoundary';
 
 /** OMP-style shell: single dark topbar with nav pills; mobile gets a drawer. */
 export default function AppLayout() {
@@ -15,7 +16,9 @@ export default function AppLayout() {
       <main className="flex-1 overflow-y-auto p-4 sm:p-5">
         <Outlet />
       </main>
-      <ChatWidget />
+      <WidgetBoundary>
+        <ChatWidget />
+      </WidgetBoundary>
     </div>
   );
 }

@@ -50,8 +50,9 @@ function AuthGate() {
     return (
       <div className="flex items-center justify-center h-screen bg-ink-950">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-ink-400">Loading SPAS 360...</p>
+          <img src="/logo-mark.png" alt="" className="h-16 mx-auto mb-5 brand-breathe drop-shadow-[0_0_20px_rgba(52,160,255,0.25)]" />
+          <div className="w-8 h-8 border-[3px] border-ink-700 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-xs font-medium tracking-[0.25em] uppercase text-ink-500">Loading SPAS 360</p>
         </div>
       </div>
     );

@@ -46,6 +46,9 @@ export function useTeamChat() {
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const senderMapRef = useRef<Record<string, TeamMember>>({});
+  // Unique per hook instance: ChatWidget + Communication page both mount this hook,
+  // and supabase-js reuses channels by topic — a second .on() after subscribe() throws.
+  const instanceId = useRef(Math.random().toString(36).slice(2));
 
   // ─── Fetch team members ────────────────────────────────
   const fetchMembers = useCallback(async () => {
@@ -131,7 +134,7 @@ export function useTeamChat() {
   useEffect(() => {
     if (!activeThreadId) return;
     const channel = supabase
-      .channel(`team-msg-${activeThreadId}`)
+      .channel(`team-msg-${activeThreadId}-${instanceId.current}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -146,7 +149,7 @@ export function useTeamChat() {
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel('team-threads-rt')
+      .channel(`team-threads-rt-${instanceId.current}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

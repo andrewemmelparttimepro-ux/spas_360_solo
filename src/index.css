@@ -55,3 +55,23 @@ body {
 select, input, textarea {
   color-scheme: dark;
 }
+
+/* Accessible, on-brand keyboard focus */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Brand-tinted text selection */
+::selection {
+  background: rgba(16, 117, 184, 0.4);
+  color: #fff;
+}
+
+/* Branded pulse for loading screens */
+@keyframes brand-breathe {
+  0%, 100% { opacity: 0.65; transform: scale(0.985); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.brand-breathe { animation: brand-breathe 2.2s ease-in-out infinite; }

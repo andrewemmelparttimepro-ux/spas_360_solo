@@ -13,7 +13,7 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Settings</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Settings</h1>
 
       {/* Profile */}
       <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">

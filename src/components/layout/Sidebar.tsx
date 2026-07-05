@@ -26,7 +26,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         )}
       >
         <div className="h-14 flex items-center px-4 border-b border-ink-700">
-          <img src="/logo.png" alt="SPAS 360" className="h-8 mr-2.5 object-contain rounded" />
+          <img src="/logo-mark.png" alt="SPAS 360" className="h-7 mr-2.5 object-contain" />
           <span className="text-[15px] font-bold text-ink-100 tracking-tight">SPAS <span className="text-brand-400">360</span></span>
           <button onClick={onClose} className="ml-auto p-1 text-ink-500 hover:text-ink-100" aria-label="Close menu">
             <X className="w-5 h-5" />

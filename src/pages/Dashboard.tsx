@@ -27,7 +27,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
@@ -43,13 +43,13 @@ export default function Dashboard() {
         {statMeta.map((meta) => {
           const value = stats[meta.key];
           return (
-            <Link key={meta.key} to={meta.link} className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6 flex items-start justify-between hover:shadow-md hover:border-brand-500/30 transition-all">
-              <div>
-                <p className="text-sm font-medium text-ink-400 mb-1">{meta.title}</p>
-                <h3 className="text-2xl font-bold text-ink-100">{meta.format(value)}</h3>
+            <Link key={meta.key} to={meta.link} className="bg-ink-900 rounded-xl border border-ink-700 p-5 flex items-start justify-between gap-3 hover:border-brand-500/40 hover:bg-ink-850 transition-all group">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-1.5">{meta.title}</p>
+                <h3 className="text-[22px] leading-none font-bold text-ink-100 group-hover:text-brand-300 transition-colors">{meta.format(value)}</h3>
               </div>
-              <div className={`p-3 rounded-lg ${meta.bg}`}>
-                <meta.icon className={`w-6 h-6 ${meta.color}`} />
+              <div className={`p-2.5 rounded-[10px] shrink-0 ${meta.bg}`}>
+                <meta.icon className={`w-5 h-5 ${meta.color}`} />
               </div>
             </Link>
           );
@@ -58,20 +58,27 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-          <div className="flex items-baseline justify-between mb-6">
-            <h2 className="text-lg font-semibold text-ink-100">Revenue Overview</h2>
-            <span className="text-xs font-medium text-ink-500">{PERIOD_LABELS[period]} · Closed-Won</span>
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between mb-6">
+            <h2 className="text-lg font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
+            <span className="text-xs font-medium text-ink-500 whitespace-nowrap">{PERIOD_LABELS[period]} · Closed-Won</span>
           </div>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2A32" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF' }} dx={-10} tickFormatter={(val) => `$${val}`} />
-                <Tooltip cursor={{ fill: '#1E1E24' }} contentStyle={{ borderRadius: '8px', border: '1px solid #2A2A32', background: '#16161B', color: '#F0F0F0', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
-                <Bar dataKey="revenue" fill="#1075b8" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {revenueData.every((d) => d.revenue === 0) ? (
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <p className="text-sm font-medium text-ink-400">No closed revenue {PERIOD_LABELS[period].toLowerCase()}</p>
+                <p className="text-xs text-ink-500 mt-1">Won deals will chart here as they close</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2A32" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} dx={-10} tickFormatter={(val) => `$${val}`} />
+                  <Tooltip cursor={{ fill: '#1E1E24' }} contentStyle={{ borderRadius: '8px', border: '1px solid #2A2A32', background: '#16161B', color: '#F0F0F0', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
+                  <Bar dataKey="revenue" fill="#1075b8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 

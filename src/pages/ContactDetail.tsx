@@ -84,7 +84,7 @@ export default function ContactDetail() {
       <div className="flex items-center space-x-4">
         <Link to="/contacts" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-ink-100">{contact.first_name} {contact.last_name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{contact.first_name} {contact.last_name}</h1>
           <div className="flex items-center space-x-4 mt-1 text-sm text-ink-400">
             <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{contact.phone}</span>
             {contact.email && <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{contact.email}</span>}

@@ -61,7 +61,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Brand */}
       <NavLink to="/dashboard" className="flex items-center gap-2 shrink-0" aria-label="Go to Dashboard">
-        <img src="/logo.png" alt="SPAS 360" className="h-8 w-auto object-contain rounded" />
+        <img src="/logo-mark.png" alt="SPAS 360" className="h-7 w-auto object-contain" />
         <span className="text-[15px] font-bold text-ink-100 tracking-tight hidden md:block">
           SPAS <span className="text-brand-400">360</span>
         </span>

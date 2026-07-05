@@ -81,7 +81,7 @@ function TeamChatPanel() {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Sidebar: Threads + Team */}
-      <div className="w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
+      <div className="w-full md:w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
         <div className="p-3 border-b border-ink-700 flex items-center gap-2">
           <button
             onClick={() => setShowNewDM(!showNewDM)}
@@ -293,7 +293,7 @@ function CustomerPanel() {
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Thread List */}
-      <div className="w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
+      <div className="w-full md:w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
         <div className="p-4 border-b border-ink-700">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
@@ -380,7 +380,7 @@ export default function Communication() {
       {/* Header + Tabs */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Communication</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Communication</h1>
           <p className="text-sm text-ink-400 mt-1">Team messaging and customer conversations</p>
         </div>
       </div>

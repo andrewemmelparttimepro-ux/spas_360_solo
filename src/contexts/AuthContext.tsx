@@ -18,12 +18,34 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+// Dev-only UI preview: stubs auth so page chrome can be reviewed without signing in.
+// Guarded by import.meta.env.DEV — dead-code-eliminated from production builds.
+const UI_PREVIEW = import.meta.env.DEV && import.meta.env.VITE_UI_PREVIEW === '1';
+const PREVIEW_PROFILE = {
+  id: '00000000-0000-0000-0000-00000000dead',
+  org_id: '00000000-0000-0000-0000-000000000001',
+  location_id: null,
+  role: 'owner_manager',
+  first_name: 'Preview',
+  last_name: 'User',
+  email: 'preview@spas360.dev',
+  phone: null,
+  avatar_url: null,
+  created_at: new Date().toISOString(),
+} as unknown as Profile;
+const PREVIEW_LOCATIONS = [
+  { id: 'loc-minot', org_id: PREVIEW_PROFILE.org_id, name: 'Minot', address: null, phone: null, created_at: '' },
+  { id: 'loc-bis', org_id: PREVIEW_PROFILE.org_id, name: 'Bismarck', address: null, phone: null, created_at: '' },
+] as unknown as Location[];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [session, setSession] = useState<Session | null>(
+    UI_PREVIEW ? ({ user: { id: PREVIEW_PROFILE.id } } as unknown as Session) : null
+  );
+  const [profile, setProfile] = useState<Profile | null>(UI_PREVIEW ? PREVIEW_PROFILE : null);
+  const [locations, setLocations] = useState<Location[]>(UI_PREVIEW ? PREVIEW_LOCATIONS : []);
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!UI_PREVIEW);
 
   // Fetch profile + locations for authenticated user
   const fetchProfile = useCallback(async (userId: string) => {
@@ -42,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (UI_PREVIEW) return; // dev preview: keep the stubbed session
     // Get initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);

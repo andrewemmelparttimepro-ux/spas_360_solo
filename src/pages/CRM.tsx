@@ -45,9 +45,9 @@ export default function CRM() {
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between mb-6 shrink-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-ink-100 tracking-tight">Sales Pipeline</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Sales Pipeline</h1>
           <p className="text-sm text-ink-400 mt-1">Manage deals and follow-ups</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">

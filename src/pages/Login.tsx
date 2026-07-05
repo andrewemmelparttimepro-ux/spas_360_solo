@@ -27,15 +27,19 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at center, #0b2036 0%, #06080d 100%)' }}>
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4" style={{ background: 'radial-gradient(120% 90% at 50% 0%, #0b2036 0%, #06080d 62%)' }}>
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <img src="/logo.png" alt="SPAS 360" className="h-28 mx-auto mb-4 object-contain" />
+        {/* Brand lockup — transparent mark + crisp HTML wordmark */}
+        <div className="text-center mb-9">
+          <img src="/logo-mark.png" alt="" aria-hidden="true" className="h-[76px] mx-auto mb-4 object-contain drop-shadow-[0_0_24px_rgba(52,160,255,0.28)]" />
+          <h1 className="text-[26px] font-extrabold tracking-[0.14em] text-white leading-none">
+            SPAS <span className="text-brand-400">360</span>
+          </h1>
+          <p className="text-[11px] font-medium tracking-[0.32em] uppercase text-ink-500 mt-2.5">Dealership Command Center</p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl shadow-black/40">
           <h2 className="text-xl font-semibold text-white mb-6">
             {isSignUp ? 'Create your account' : 'Sign in to your account'}
           </h2>
@@ -100,7 +104,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-brand-500/25"
+              className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shadow-lg shadow-brand-500/25"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -123,11 +127,11 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-ink-300 mt-6">
+        <p className="text-center text-xs text-ink-500 mt-6">
           Minot & Bismarck, North Dakota
         </p>
-        <p className="text-center text-[11px] text-ink-300 mt-1.5">
-          Powered by <span className="text-ink-500 font-medium">NDAI</span>
+        <p className="text-center text-[11px] text-ink-500 mt-1.5">
+          Powered by <span className="text-ink-300 font-medium">NDAI</span>
         </p>
       </div>
     </div>

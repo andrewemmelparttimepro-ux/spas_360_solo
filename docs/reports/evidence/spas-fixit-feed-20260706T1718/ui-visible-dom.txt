@@ -1,0 +1,24 @@
+<a node_id=1 aria-label="Go to Dashboard" href="/dashboard">SPAS 360</a>
+<a node_id=2 href="/dashboard">Dashboard</a>
+<a node_id=3 href="/deals">Deals</a>
+<a node_id=4 href="/inventory">Inventory</a>
+<a node_id=5 href="/service">Schedule</a>
+<a node_id=6 href="/communication">Comms</a>
+<a node_id=7 href="/reports">Reports</a>
+<button node_id=8 aria-label="Search everything">Search ⌘K</button>
+<button node_id=9>All Locations</button>
+<select node_id=10>This Week This Month Last Month</select>
+<button node_id=11>New</button>
+<a node_id=12 href="/deals">Total Revenue $0</a>
+<a node_id=13 href="/deals">Active Deals 0</a>
+<a node_id=14 href="/service">Unscheduled Jobs 0</a>
+<a node_id=15 href="/inventory">Parts Overdue 0</a>
+<button node_id=16 aria-label="Collapse admin panel" />
+<button node_id=17 type="button">Contacts</button>
+<button node_id=18 type="button">Feed</button>
+<button node_id=19 type="button">Active 0</button>
+<button node_id=20 type="button">Archive 0</button>
+<textarea node_id=21 placeholder="Flag something to fix or clarify..." />
+<button node_id=22 type="button">Files</button>
+<button node_id=23 type="button">Post</button>
+<button node_id=24 />

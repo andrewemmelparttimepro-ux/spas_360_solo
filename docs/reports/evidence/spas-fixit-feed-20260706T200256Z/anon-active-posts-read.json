@@ -1,0 +1,8 @@
+{
+  "projectHost": "kxyqgkimcdxvfkceoixs.supabase.co",
+  "usedKey": "anon",
+  "active_count": 0,
+  "posts": [],
+  "error": null,
+  "note": "Unauthenticated anon client is subject to RLS and may return zero rows when active rows exist."
+}

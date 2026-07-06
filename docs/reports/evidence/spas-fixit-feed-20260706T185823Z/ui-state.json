@@ -1,0 +1,191 @@
+{
+  "buttons": [
+    {
+      "aria": "Open menu",
+      "i": 0,
+      "rect": {
+        "h": 0,
+        "w": 0,
+        "x": 0,
+        "y": 0
+      },
+      "text": "",
+      "title": null
+    },
+    {
+      "aria": "Search everything",
+      "i": 1,
+      "rect": {
+        "h": 33.5,
+        "w": 121.1640625,
+        "x": 973.6640625,
+        "y": 10.75
+      },
+      "text": "Search\n⌘K",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 2,
+      "rect": {
+        "h": 33.5,
+        "w": 143.8203125,
+        "x": 1110.828125,
+        "y": 10.75
+      },
+      "text": "All Locations",
+      "title": null
+    },
+    {
+      "aria": "Notifications",
+      "i": 3,
+      "rect": {
+        "h": 36,
+        "w": 36,
+        "x": 1270.6484375,
+        "y": 9.5
+      },
+      "text": "",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 4,
+      "rect": {
+        "h": 38,
+        "w": 141.203125,
+        "x": 1322.6484375,
+        "y": 8.5
+      },
+      "text": "Preview User\nManager",
+      "title": null
+    },
+    {
+      "aria": "Close menu",
+      "i": 5,
+      "rect": {
+        "h": 0,
+        "w": 0,
+        "x": 0,
+        "y": 0
+      },
+      "text": "",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 6,
+      "rect": {
+        "h": 36,
+        "w": 86.1875,
+        "x": 742.8125,
+        "y": 76.5
+      },
+      "text": "New",
+      "title": null
+    },
+    {
+      "aria": "Collapse admin panel",
+      "i": 7,
+      "rect": {
+        "h": 24,
+        "w": 24,
+        "x": 1233,
+        "y": 67.5
+      },
+      "text": "",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 8,
+      "rect": {
+        "h": 30,
+        "w": 199.5,
+        "x": 858,
+        "y": 112
+      },
+      "text": "Contacts",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 9,
+      "rect": {
+        "h": 30,
+        "w": 199.5,
+        "x": 1061.5,
+        "y": 112
+      },
+      "text": "Feed",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 10,
+      "rect": {
+        "h": 31,
+        "w": 191.5,
+        "x": 866,
+        "y": 163
+      },
+      "text": "Active\n0",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 11,
+      "rect": {
+        "h": 31,
+        "w": 191.5,
+        "x": 1061.5,
+        "y": 163
+      },
+      "text": "Archive\n0",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 12,
+      "rect": {
+        "h": 30,
+        "w": 67.03125,
+        "x": 873,
+        "y": 303
+      },
+      "text": "Files",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 13,
+      "rect": {
+        "h": 30,
+        "w": 69.7890625,
+        "x": 1176.2109375,
+        "y": 303
+      },
+      "text": "Post",
+      "title": null
+    },
+    {
+      "aria": null,
+      "i": 14,
+      "rect": {
+        "h": 56,
+        "w": 56,
+        "x": 1189,
+        "y": 629
+      },
+      "text": "",
+      "title": null
+    }
+  ],
+  "hasActiveZero": false,
+  "hasArchiveZero": false,
+  "hasEmptyState": true,
+  "hasFixItFeed": true,
+  "text": "SPAS 360\nDashboard\nSALES\nDeals\nInventory\nSERVICE\nSchedule\nComms\nReports\nSearch\n⌘K\nAll Locations\nPreview User\nManager\nManager Dashboard\nThis Week\nThis Month\nLast Month\nNew\n\nTOTAL REVENUE\n\n$0\n\nACTIVE DEALS\n\n0\n\nUNSCHEDULED JOBS\n\n0\n\nPARTS OVERDUE\n\n0\nRevenue Overview\nThis Week · Closed-Won\n\nNo closed revenue this week\n\nWon deals will chart here as they close\n\nRequires Attention\n\nAll caught up!\n\nFix-It Feed\nADMIN\nContacts\nFeed\nActive\n0\nArchive\n0\nFiles\nPost\n\nNothing active has been flagged yet.",
+  "title": "SPAS 360 | Spa Dealership Management",
+  "url": "http://127.0.0.1:3017/dashboard"
+}

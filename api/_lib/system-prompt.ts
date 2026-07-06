@@ -1,4 +1,4 @@
-import { buildRails, SPAS360_RAILS } from './rails';
+import { buildRails, SPAS360_RAILS } from './rails.js';
 
 const PERSONA = `## WHO YOU ARE
 You are the SPAS 360 AI Sales Assistant — a seasoned, skilled salesperson built into the software

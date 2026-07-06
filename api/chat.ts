@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { SALES_AGENT_PROMPT } from './_lib/system-prompt';
+import { SALES_AGENT_PROMPT } from './_lib/system-prompt.js';
 
 // Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, or GLM via Z.AI.
 // The frontend always speaks the OpenAI message/tool shape; each handler translates

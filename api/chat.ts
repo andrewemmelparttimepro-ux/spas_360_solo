@@ -1,16 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Provider-agnostic: supports Gemini (default, keyed today), Anthropic Claude, or OpenAI.
+// Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, or GLM via Z.AI.
 // The frontend always speaks the OpenAI message/tool shape; each handler translates
 // to/from its provider so the client never has to change.
-// Switch to Claude by setting AI_PROVIDER=anthropic (+ ANTHROPIC_API_KEY).
+// Switch providers with AI_PROVIDER.
 const PROVIDER = process.env.AI_PROVIDER || 'gemini';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GLM_API_KEY = process.env.GLM_API_KEY || process.env.ZAI_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const GLM_MODEL = process.env.GLM_MODEL || 'glm-5.2';
+const GLM_BASE_URL = process.env.GLM_BASE_URL || 'https://api.z.ai/api/paas/v4';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -25,6 +28,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await handleClaude(messages, tools, res);
     } else if (PROVIDER === 'gemini') {
       return await handleGemini(messages, tools, res);
+    } else if (PROVIDER === 'glm' || PROVIDER === 'zai') {
+      return await handleOpenAICompatible({
+        providerName: 'GLM',
+        apiKey: GLM_API_KEY,
+        model: GLM_MODEL,
+        baseUrl: GLM_BASE_URL,
+        messages,
+        tools,
+        res,
+      });
     } else {
       return await handleOpenAI(messages, tools, res);
     }
@@ -257,14 +270,45 @@ async function handleOpenAI(
 ) {
   if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  return handleOpenAICompatible({
+    providerName: 'OpenAI',
+    apiKey: OPENAI_API_KEY,
+    model: OPENAI_MODEL,
+    baseUrl: 'https://api.openai.com/v1',
+    messages,
+    tools,
+    res,
+  });
+}
+
+async function handleOpenAICompatible({
+  providerName,
+  apiKey,
+  model,
+  baseUrl,
+  messages,
+  tools,
+  res,
+}: {
+  providerName: string;
+  apiKey?: string;
+  model: string;
+  baseUrl: string;
+  messages: unknown[];
+  tools: unknown[];
+  res: VercelResponse;
+}) {
+  if (!apiKey) return res.status(500).json({ error: `${providerName} API key not configured` });
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
+      'Accept-Language': 'en-US,en',
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model,
       messages,
       tools: tools?.length > 0 ? tools : undefined,
       tool_choice: tools?.length > 0 ? 'auto' : undefined,

@@ -46,7 +46,7 @@ React 19 + TypeScript + Vite 6 + Tailwind v4 (CSS `@theme` tokens) + React Route
 
 ```
 api/
-  chat.ts          AI assistant proxy — provider-agnostic (gemini default; anthropic + openai handlers
+  chat.ts          AI assistant proxy — provider-agnostic (gemini, glm, anthropic, openai handlers
                    built in; frontend always speaks OpenAI message shape). Switch via AI_PROVIDER env.
   sms.ts           Outbound SMS: verifies caller's Supabase JWT, sends via Twilio REST from TWILIO_FROM.
   sms-inbound.ts   Twilio webhook: HMAC signature check → match contact by phone (or create Unknown
@@ -159,9 +159,10 @@ the salesperson. This is Brandon's "Wyant – Sundance – delivery" ritual, aut
 
 ## 7. Vercel environment (Production)
 
-Set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (dedicated project), `GEMINI_API_KEY`.
-Documented in `.env.example`. AI assistant currently runs Gemini; set `AI_PROVIDER=anthropic` +
-`ANTHROPIC_API_KEY` to switch to Claude (handler already deployed).
+Set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (dedicated project), `AI_PROVIDER=glm`,
+`GLM_API_KEY`, `GLM_MODEL=glm-5.2`, and `GLM_BASE_URL=https://api.z.ai/api/paas/v4`.
+Documented in `.env.example`. Gemini, Anthropic, and OpenAI remain available fallback providers
+through `AI_PROVIDER`.
 
 ## 8. Blocked on Andrew (in priority order)
 

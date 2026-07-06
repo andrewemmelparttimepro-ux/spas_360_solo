@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import type { DropResult } from '@hello-pangea/dnd';
 import type { Deal, PipelineStage } from '@/types/database';
 
@@ -13,6 +14,7 @@ export type PipelineDeal = Deal & { contacts?: { first_name: string; last_name: 
 
 export function usePipeline() {
   const { profile, activeLocationId } = useAuth();
+  const { toast } = useToast();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
   const [dealsWithTasks, setDealsWithTasks] = useState<Set<string>>(new Set());
@@ -73,10 +75,70 @@ export function usePipeline() {
     return deals.filter(d => d.stage_id === stageId);
   }, [deals]);
 
+  // ─── Sales → Service bridge ─────────────────────────────
+  // A won deal becomes a Delivery job in the unscheduled queue ("Wyant – Hot Tub – Delivery"),
+  // the contact is promoted to Customer, and service managers get notified.
+  const handleDealWon = useCallback(async (deal: PipelineDeal) => {
+    if (!profile) return;
+
+    // Guard: don't stack delivery jobs if one is already open for this contact
+    const { data: existing } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('contact_id', deal.contact_id)
+      .eq('job_type', 'Delivery')
+      .not('status', 'in', '("Completed","Cancelled")')
+      .limit(1);
+
+    if (!existing || existing.length === 0) {
+      // Jobs require a location — deal's, then the user's, then the org's first
+      let locationId = deal.location_id ?? profile.location_id ?? null;
+      if (!locationId) {
+        const { data: loc } = await supabase.from('locations').select('id').eq('org_id', profile.org_id).limit(1).single();
+        locationId = loc?.id ?? null;
+      }
+      if (locationId) {
+        await supabase.from('jobs').insert({
+          org_id: profile.org_id,
+          contact_id: deal.contact_id,
+          location_id: locationId,
+          title: `${deal.title} – Delivery`,
+          job_type: 'Delivery',
+          status: 'Delivery',
+          priority: deal.priority,
+          amount_to_collect: deal.amount,
+          description: `Auto-created when the deal was won. Confirm delivery time with the customer, then drag onto the schedule.`,
+          created_by: profile.id,
+        });
+      }
+    }
+
+    // Lead becomes a Customer
+    await supabase.from('contacts').update({ customer_type: 'Customer' }).eq('id', deal.contact_id);
+
+    // Tell the service side a delivery just landed in their queue
+    const { data: managers } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('org_id', profile.org_id)
+      .in('role', ['service_manager', 'owner_manager']);
+    await Promise.all((managers ?? []).filter(m => m.id !== profile.id).map(m =>
+      supabase.from('notifications').insert({
+        user_id: m.id,
+        type: 'job',
+        title: `Deal won: ${deal.title}`,
+        body: 'A delivery job was added to the unscheduled queue.',
+        link: '/service',
+      })
+    ));
+  }, [profile]);
+
   const moveDeal = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    const movedDeal = deals.find(d => d.id === draggableId);
 
     // Optimistic update
     setDeals(prev => {
@@ -96,8 +158,16 @@ export function usePipeline() {
     if (error) {
       console.error('Error moving deal:', error);
       fetchPipeline(); // Revert on error
+      return;
     }
-  }, [fetchPipeline]);
+
+    // Crossing into Closed-Won triggers the sales → service handoff
+    const wonStage = stages.find(s => s.name === 'Closed - Won');
+    if (movedDeal && wonStage && destination.droppableId === wonStage.id && source.droppableId !== wonStage.id) {
+      await handleDealWon(movedDeal);
+      toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
+    }
+  }, [deals, stages, fetchPipeline, handleDealWon, toast]);
 
   const createDeal = useCallback(async (deal: Partial<Deal>) => {
     if (!profile) return null;

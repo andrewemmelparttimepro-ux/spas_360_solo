@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Contact, ChevronLeft, ChevronRight, Search, Plus, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useContacts } from '@/hooks/useContacts';
+import { useAuth } from '@/contexts/AuthContext';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 
 const typeColors: Record<string, string> = {
@@ -19,8 +20,12 @@ const typeColors: Record<string, string> = {
 export default function AdminRail() {
   const [open, setOpen] = useState(() => localStorage.getItem('spas360.adminRail') === 'open');
   const [showWizard, setShowWizard] = useState(false);
+  const { profile } = useAuth();
   const { contacts, searchQuery, setSearchQuery, refresh } = useContacts();
   const navigate = useNavigate();
+
+  // Techs live in the schedule — no admin chrome for them
+  if (profile?.role === 'technician') return null;
 
   const toggle = () => {
     setOpen(o => {

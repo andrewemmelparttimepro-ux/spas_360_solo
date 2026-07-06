@@ -43,6 +43,16 @@ function PageLoader() {
   );
 }
 
+// Land each role where their day starts: techs on the schedule,
+// salespeople on the pipeline, managers on the dashboard.
+function RoleLanding() {
+  const { profile } = useAuth();
+  const home = profile?.role === 'technician' ? '/service'
+    : profile?.role === 'salesperson' ? '/deals'
+    : '/dashboard';
+  return <Navigate to={home} replace />;
+}
+
 function AuthGate() {
   const { session, isLoading } = useAuth();
 
@@ -70,7 +80,7 @@ function AuthGate() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<AppLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RoleLanding />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="contacts/:id" element={<ContactDetail />} />

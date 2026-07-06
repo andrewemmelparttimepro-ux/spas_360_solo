@@ -27,6 +27,7 @@ interface ActionItem {
   desc: string;
   time: string;
   type: 'task' | 'part' | 'invoice' | 'lead';
+  link?: string;
 }
 
 interface RevenuePoint {
@@ -96,7 +97,7 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
     const [dealsRes, jobsRes, partsRes, tasksRes] = await Promise.all([
       supabase.from('deals').select('amount, updated_at, stage_id, pipeline_stages!inner(name)').eq('org_id', profile.org_id),
       supabase.from('jobs').select('id, status, scheduled_at').eq('org_id', profile.org_id),
-      supabase.from('parts').select('id, status, expected_arrival').in('status', ['Ordered', 'Backordered']),
+      supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']),
       supabase.from('tasks').select('id, title, status, due_at, deal_id').eq('assigned_to', profile.id).in('status', ['Pending', 'Overdue']).order('due_at').limit(10),
     ]);
 
@@ -139,14 +140,39 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
 
     setStats({ totalRevenue, activeDeals, unscheduledJobs, overduePartsCount: overdueParts });
 
-    // Action items from overdue/pending tasks
-    setActions(tasks.map((t: Record<string, unknown>) => ({
+    // Action items: overdue/pending tasks + parts sitting too long
+    const taskActions: ActionItem[] = tasks.map((t: Record<string, unknown>) => ({
       id: t.id as string,
       title: t.title as string,
       desc: t.deal_id ? 'Follow-up task' : 'General task',
       time: t.due_at ? formatRelativeTime(new Date(t.due_at as string)) : '',
       type: 'task' as const,
-    })));
+    }));
+
+    const STAGNANT_DAYS = 14;
+    const partActions: ActionItem[] = parts
+      .filter((p: Record<string, unknown>) => {
+        const arrival = p.expected_arrival ? new Date(p.expected_arrival as string) : null;
+        const ordered = p.order_date ? new Date(p.order_date as string) : null;
+        const overdue = arrival !== null && arrival < now;
+        const stagnant = !arrival && ordered !== null && (now.getTime() - ordered.getTime()) > STAGNANT_DAYS * 86400000;
+        return overdue || stagnant;
+      })
+      .slice(0, 5)
+      .map((p: Record<string, unknown>) => {
+        const arrival = p.expected_arrival ? new Date(p.expected_arrival as string) : null;
+        const overdue = arrival !== null && arrival < now;
+        return {
+          id: p.id as string,
+          title: `Part ${p.part_number} ${overdue ? 'overdue' : `stagnant ${Math.floor((now.getTime() - new Date(p.order_date as string).getTime()) / 86400000)}d`}${p.status === 'Backordered' ? ' (backordered)' : ''}`,
+          desc: (p.description as string) || 'Chase the supplier',
+          time: arrival ? formatRelativeTime(arrival) : '',
+          type: 'part' as const,
+          link: p.job_id ? `/service/${p.job_id}` : '/service',
+        };
+      });
+
+    setActions([...partActions, ...taskActions].slice(0, 10));
 
     // Real revenue chart from closed-won deals
     setRevenueData(bucketRevenue(closedDeals, period, range));

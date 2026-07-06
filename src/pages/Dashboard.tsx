@@ -88,7 +88,7 @@ export default function Dashboard() {
             {actions.length === 0 ? (
               <p className="text-sm text-ink-500 text-center py-6">All caught up!</p>
             ) : actions.map((action) => (
-              <Link key={action.id} to={actionLinks[action.type] ?? '/service'} className="flex items-start p-3 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-brand-500/20 group">
+              <Link key={action.id} to={action.link ?? actionLinks[action.type] ?? '/service'} className="flex items-start p-3 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-brand-500/20 group">
                 <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${actionDotColors[action.type]}`} />
                 <div className="ml-3 flex-1">
                   <p className="text-sm font-medium text-ink-100 group-hover:text-brand-300">{action.title}</p>

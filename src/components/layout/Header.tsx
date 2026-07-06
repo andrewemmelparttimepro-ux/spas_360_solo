@@ -1,10 +1,11 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3 } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import SearchPalette from '@/components/SearchPalette';
 
 // Nav is organized around the two sides of the business: Sales and Service.
 // Contacts lives in the right-hand admin rail, not the top nav.
@@ -34,6 +35,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [locOpen, setLocOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const locRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -47,6 +49,18 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     salesperson: 'Salesperson',
     technician: 'Technician',
   };
+
+  // Global ⌘K / Ctrl+K
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(o => !o);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -109,6 +123,18 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </nav>
 
       <div className="flex-1" />
+
+      {/* Global search */}
+      <button
+        onClick={() => setSearchOpen(true)}
+        className="flex items-center gap-2 text-[13px] text-ink-500 bg-ink-950 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors shrink-0"
+        aria-label="Search everything"
+      >
+        <Search className="w-3.5 h-3.5" />
+        <span className="hidden md:inline">Search</span>
+        <kbd className="hidden md:inline text-[10px] font-mono bg-ink-900 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
+      </button>
+      {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
 
       {/* Location Selector */}
       <div className="relative shrink-0" ref={locRef}>

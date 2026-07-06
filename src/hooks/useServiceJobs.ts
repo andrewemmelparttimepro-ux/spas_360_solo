@@ -3,14 +3,39 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus } from '@/types/database';
 
+// Brandon's color language from the Jobber board:
+// red = delivery, orange = warranty, black = parts not received,
+// blue = service, green = ready, strikethrough = done.
 export const statusColors: Record<JobStatus, string> = {
-  'Delivery': 'border-l-red-500 bg-red-50 text-red-900',
-  'Parts on Order': 'border-l-slate-800 bg-slate-100 text-slate-900',
-  'Warranty': 'border-l-purple-500 bg-purple-50 text-purple-900',
-  'Ready for Pickup': 'border-l-emerald-500 bg-emerald-50 text-emerald-900',
-  'In Progress': 'border-l-blue-500 bg-blue-50 text-blue-900',
-  'Completed': 'border-l-slate-400 bg-slate-50 text-slate-600',
-  'Cancelled': 'border-l-slate-300 bg-slate-50 text-slate-400 opacity-60',
+  'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
+  'Parts on Order': 'border-l-ink-600 bg-black text-ink-300',
+  'Warranty': 'border-l-orange-500 bg-orange-500/10 text-orange-200',
+  'Ready for Pickup': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
+  'In Progress': 'border-l-brand-400 bg-brand-500/10 text-brand-300',
+  'Completed': 'border-l-ink-600 bg-ink-950 text-ink-500 line-through',
+  'Cancelled': 'border-l-ink-700 bg-ink-950 text-ink-600 opacity-60 line-through',
+};
+
+// Solid Jobber-style calendar chips — white text on the status color
+export const statusChipColors: Record<JobStatus, string> = {
+  'Delivery': 'bg-red-600 text-white',
+  'Parts on Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
+  'Warranty': 'bg-orange-600 text-white',
+  'Ready for Pickup': 'bg-emerald-600 text-white',
+  'In Progress': 'bg-brand-500 text-white',
+  'Completed': 'bg-ink-800 text-ink-400 line-through',
+  'Cancelled': 'bg-ink-800 text-ink-500 line-through opacity-60',
+};
+
+// Legend dots (filter chips)
+export const statusDotColors: Record<JobStatus, string> = {
+  'Delivery': 'bg-red-500',
+  'Parts on Order': 'bg-black ring-1 ring-ink-500',
+  'Warranty': 'bg-orange-500',
+  'Ready for Pickup': 'bg-emerald-500',
+  'In Progress': 'bg-brand-400',
+  'Completed': 'bg-ink-500',
+  'Cancelled': 'bg-ink-600',
 };
 
 export const JOB_STATUS_OPTIONS: JobStatus[] = ['In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
@@ -27,7 +52,7 @@ export function useServiceJobs() {
 
     let query = supabase
       .from('jobs')
-      .select('*, job_assignments(user_id, profiles:user_id(first_name, last_name))')
+      .select('*, contacts:contact_id(first_name, last_name), job_assignments(user_id, profiles:user_id(first_name, last_name))')
       .eq('org_id', profile.org_id)
       .order('scheduled_at', { ascending: true, nullsFirst: true });
 
@@ -47,7 +72,7 @@ export function useServiceJobs() {
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel('jobs-realtime')
+      .channel(`jobs-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
         fetchJobs();
       })

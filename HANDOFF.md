@@ -48,6 +48,16 @@ React 19 + TypeScript + Vite 6 + Tailwind v4 (CSS `@theme` tokens) + React Route
 api/
   chat.ts          AI assistant proxy — provider-agnostic (gemini, glm, anthropic, openai handlers
                    built in; frontend always speaks OpenAI message shape). Switch via AI_PROVIDER env.
+                   RAILS ARE ENFORCED HERE: system prompt injected server-side; any client-sent
+                   system message is discarded — guardrails can't be stripped from the browser.
+                   ESM runtime: api-relative imports need explicit .js extensions.
+  _lib/rails.ts    THE TRANSFERABLE GUARDRAIL MODULE: buildRails(RailsConfig) → scope-lock preamble
+                   (in-scope topics, friendly one-line redirect, no roleplay/identity swaps, no
+                   internals disclosure, tool-grounding with [CONFIRM] placeholders). Dependency-
+                   free — copy into any NDAI build with that app's config. SPAS360_RAILS lives here.
+  _lib/system-prompt.ts  The soul: ND-friendly persona, full rec-retail floor knowledge, document
+                   blueprints (1-Page Proposal, Special Offer, Trade-In, Follow-Up, Objection
+                   Response Card), six-pattern objection playbook, commission-integrity rule.
   sms.ts           Outbound SMS: verifies caller's Supabase JWT, sends via Twilio REST from TWILIO_FROM.
   sms-inbound.ts   Twilio webhook: HMAC signature check → match contact by phone (or create Unknown
                    Lead) → file into sms thread → notify assigned + managers. Service-role writes.

@@ -232,6 +232,112 @@ export const agentTools: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_open_deals',
+    description: 'List open (not closed) deals with stage, customer, amount, and days idle. Use when the user asks about "my deals", the board, or what\'s working.',
+    parameters: {
+      type: 'object',
+      properties: {
+        mine_only: { type: 'string', enum: ['true', 'false'], description: 'true = only deals assigned to the current user. Default false (whole store).' },
+      },
+    },
+    execute: async ({ mine_only }) => {
+      const me = await currentProfile();
+      if (!me) return { error: 'Could not resolve your account.' };
+      let q = supabase
+        .from('deals')
+        .select('id, title, amount, priority, updated_at, expected_close_date, pipeline_stages(name), contacts:contact_id(first_name, last_name), assigned:assigned_to(first_name, last_name)')
+        .eq('org_id', me.org_id)
+        .order('updated_at', { ascending: false })
+        .limit(25);
+      if (mine_only === 'true') q = q.eq('assigned_to', me.userId);
+      const { data } = await q;
+      const now = Date.now();
+      return (data ?? [])
+        .filter((d: Record<string, unknown>) => {
+          const stage = d.pipeline_stages as { name: string } | null;
+          return stage && !stage.name.startsWith('Closed');
+        })
+        .map((d: Record<string, unknown>) => {
+          const stage = d.pipeline_stages as { name: string } | null;
+          const c = d.contacts as { first_name: string; last_name: string } | null;
+          const a = d.assigned as { first_name: string; last_name: string } | null;
+          return {
+            title: d.title,
+            stage: stage?.name,
+            customer: c ? `${c.first_name} ${c.last_name}` : null,
+            amount: d.amount,
+            priority: d.priority,
+            salesperson: a ? `${a.first_name} ${a.last_name}` : null,
+            days_idle: Math.floor((now - new Date(d.updated_at as string).getTime()) / 86400000),
+            expected_close: d.expected_close_date,
+          };
+        });
+    },
+  },
+  {
+    name: 'get_deal_details',
+    description: 'Pull one deal with its full context: stage, customer contact info, notes history, and open tasks. Search by deal title or customer name (e.g. "Wyant").',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Deal title fragment or customer first/last name' },
+      },
+      required: ['query'],
+    },
+    execute: async ({ query }) => {
+      const me = await currentProfile();
+      if (!me) return { error: 'Could not resolve your account.' };
+      // Try deal title, then customer name
+      let { data: deals } = await supabase
+        .from('deals')
+        .select('id, title, amount, priority, lead_source, product_interest, expected_close_date, updated_at, contact_id, pipeline_stages(name), contacts:contact_id(first_name, last_name, phone, email), assigned:assigned_to(first_name, last_name)')
+        .eq('org_id', me.org_id)
+        .ilike('title', `%${query}%`)
+        .limit(3);
+      if (!deals || deals.length === 0) {
+        const { data: byContact } = await supabase
+          .from('contacts')
+          .select('id')
+          .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+          .limit(3);
+        const ids = (byContact ?? []).map(c => c.id);
+        if (ids.length > 0) {
+          const res = await supabase
+            .from('deals')
+            .select('id, title, amount, priority, lead_source, product_interest, expected_close_date, updated_at, contact_id, pipeline_stages(name), contacts:contact_id(first_name, last_name, phone, email), assigned:assigned_to(first_name, last_name)')
+            .eq('org_id', me.org_id)
+            .in('contact_id', ids)
+            .limit(3);
+          deals = res.data;
+        }
+      }
+      if (!deals || deals.length === 0) return { found: false, message: `No deal matching "${query}"` };
+      const deal = deals[0] as Record<string, unknown>;
+      const [notesRes, tasksRes] = await Promise.all([
+        supabase.from('notes').select('body, created_at').eq('deal_id', deal.id as string).order('created_at', { ascending: false }).limit(6),
+        supabase.from('tasks').select('title, due_at, status').eq('deal_id', deal.id as string).in('status', ['Pending', 'In Progress']).order('due_at').limit(5),
+      ]);
+      return {
+        found: true,
+        other_matches: deals.length > 1 ? deals.slice(1).map((d: Record<string, unknown>) => d.title) : [],
+        deal: {
+          title: deal.title,
+          stage: (deal.pipeline_stages as { name: string } | null)?.name,
+          amount: deal.amount,
+          priority: deal.priority,
+          lead_source: deal.lead_source,
+          interests: deal.product_interest,
+          expected_close: deal.expected_close_date,
+          salesperson: (() => { const a = deal.assigned as { first_name: string; last_name: string } | null; return a ? `${a.first_name} ${a.last_name}` : null; })(),
+          customer: deal.contacts,
+          days_idle: Math.floor((Date.now() - new Date(deal.updated_at as string).getTime()) / 86400000),
+        },
+        recent_notes: notesRes.data ?? [],
+        open_tasks: tasksRes.data ?? [],
+      };
+    },
+  },
+  {
     name: 'create_deal',
     description: 'Create a new sales deal/opportunity for an existing contact. The deal starts in the first pipeline stage. Always confirm the contact and amount with the user before calling.',
     parameters: {

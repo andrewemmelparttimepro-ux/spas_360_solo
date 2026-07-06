@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { SALES_AGENT_PROMPT } from '../src/agent/system-prompt';
 
 // Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, or GLM via Z.AI.
 // The frontend always speaks the OpenAI message/tool shape; each handler translates
@@ -23,7 +24,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!authHeader) return res.status(401).json({ error: 'Missing authorization' });
 
   try {
-    const { messages, tools } = req.body;
+    const { messages: clientMessages, tools } = req.body;
+
+    // RAILS ENFORCEMENT: the system prompt is injected HERE, server-side.
+    // Any system message a (possibly tampered) client sends is discarded, so
+    // the guardrails cannot be stripped or replaced from the browser.
+    const messages = [
+      { role: 'system', content: SALES_AGENT_PROMPT },
+      ...(Array.isArray(clientMessages) ? clientMessages.filter((m: { role: string }) => m.role !== 'system') : []),
+    ];
 
     if (PROVIDER === 'anthropic') {
       return await handleClaude(messages, tools, res);

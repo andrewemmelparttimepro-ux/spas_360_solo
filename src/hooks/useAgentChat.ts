@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { SALES_AGENT_PROMPT } from '@/agent/system-prompt';
 import { getOpenAITools, executeTool } from '@/agent/tools';
 
 interface ChatMessage {
@@ -110,9 +109,9 @@ export function useAgentChat() {
       sender_id: user.id,
     });
 
-    // Build message history for LLM
+    // Build message history for LLM (the system prompt/rails are injected
+    // server-side in /api/chat — the client never carries them)
     const history = [
-      { role: 'system' as const, content: SALES_AGENT_PROMPT },
       ...messages.filter(m => m.role !== 'tool').map(m => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,

@@ -196,7 +196,13 @@ server-side reminders (pg_cron writes notifications for stagnant parts/overdue t
 permission enforcement beyond landing pages → run `seed_demo.sql` only if a demo dataset is wanted
 (real inventory already loaded — may be unnecessary).
 
-## 10. Working conventions (hold these)
+## 10. The Owner's Manual
+
+`docs/SPAS360-Owners-Manual.pdf` is the USER-FACING single source of truth (this handoff is the
+agent-facing one). Regenerate it with `python3 scripts/build-owners-manual.py` whenever features
+change materially, bump the version string in the script, and re-commit both.
+
+## 11. Working conventions (hold these)
 
 - **Reliability first.** No decorative dead controls, no fake data, fail loudly. If a chart has no
   data, show an empty state — never random numbers.

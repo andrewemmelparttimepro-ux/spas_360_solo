@@ -11,6 +11,7 @@ export type PartStatus = 'Not Ordered' | 'Ordered' | 'Shipped' | 'Backordered' |
 export type InventoryStatus = 'On Order' | 'In Stock' | 'Sold' | 'In Transit' | 'Delivered' | 'Returned';
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 export type MessageSender = 'system' | 'customer' | 'agent';
+export type FixItStatus = 'open' | 'in_progress' | 'fixed' | 'agent_done' | 'archived';
 
 // Row types (what you get back from queries)
 export interface Organization { id: string; name: string; created_at: string; }
@@ -133,6 +134,28 @@ export interface AgentMessage {
   sender_id: string | null; created_at: string;
 }
 
+export interface FixItPost {
+  id: string; org_id: string; body: string | null; created_by: string;
+  claimed_by: string | null; agent_tested_by: string | null; agent_tested_at: string | null;
+  human_reviewed_by: string | null; human_reviewed_at: string | null;
+  archived_by: string | null; archived_at: string | null;
+  reopened_by: string | null; reopened_at: string | null;
+  reopen_count: number; reopened_from_status: string | null;
+  status: FixItStatus; created_at: string; updated_at: string;
+}
+
+export interface FixItComment {
+  id: string; org_id: string; post_id: string; body: string | null;
+  created_by: string; created_at: string; updated_at: string | null;
+}
+
+export interface FixItAttachment {
+  id: string; org_id: string; post_id: string; comment_id: string | null;
+  uploaded_by: string | null; name: string; purpose: 'report' | 'comment' | 'validation_proof';
+  type: string | null; mime_type: string | null; size: string | null;
+  storage_path: string | null; url: string | null; created_at: string;
+}
+
 // Simplified Database type for Supabase client generic
 // Using Record<string, unknown> for Insert/Update to avoid circular ref issues
 // The actual type safety comes from our Row interfaces above
@@ -143,7 +166,8 @@ export interface Database {
        'pipeline_stages' | 'deals' | 'jobs' | 'job_assignments' | 'parts' |
        'inventory_items' | 'communication_threads' | 'messages' | 'tasks' |
        'notes' | 'time_entries' | 'notifications' | 'audit_log' |
-       'agent_threads' | 'agent_messages']: {
+       'agent_threads' | 'agent_messages' | 'fix_it_posts' |
+       'fix_it_comments' | 'fix_it_attachments']: {
         Row: Record<string, unknown>;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

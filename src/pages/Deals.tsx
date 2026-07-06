@@ -1,7 +1,7 @@
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Plus, MoreHorizontal, Calendar, AlertTriangle, User, Snowflake } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { usePipeline, type PipelineDeal } from '@/hooks/usePipeline';
 import SalesBoard from '@/components/SalesBoard';
@@ -12,6 +12,19 @@ export default function Deals() {
   const [showWizard, setShowWizard] = useState(false);
   // IKEA effect: spotlight the customer card the salesperson just built
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Created from the dashboard's "+ New" → arrive here with the new card pulsing
+  useEffect(() => {
+    const hl = (location.state as { highlight?: string } | null)?.highlight;
+    if (hl) {
+      setHighlightId(hl);
+      setTimeout(() => setHighlightId(null), 4000);
+      navigate(location.pathname, { replace: true, state: null }); // consume the flag
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;

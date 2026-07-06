@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Wrench, AlertCircle } from 'lucide-react';
+import { DollarSign, Users, Wrench, AlertCircle, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
+import QuickCreate from '@/components/QuickCreate';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
@@ -18,6 +19,7 @@ const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inve
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<DashboardPeriod>('week');
+  const [showCreate, setShowCreate] = useState(false);
   const { stats, actions, revenueData, isLoading } = useDashboardStats(period);
 
   if (isLoading) {
@@ -28,16 +30,26 @@ export default function Dashboard() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
-          className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
-        >
-          {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
-            <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
+            className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
+              <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />New
+          </button>
+        </div>
       </div>
+
+      {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statMeta.map((meta) => {

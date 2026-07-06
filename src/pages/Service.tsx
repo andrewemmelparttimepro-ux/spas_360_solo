@@ -1,5 +1,5 @@
 import { Calendar as CalendarIcon, Clock, Plus, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
@@ -81,6 +81,8 @@ export default function Service() {
   const { locations, profile, activeLocationId } = useAuth();
   const { toast } = useToast();
 
+  const location = useLocation();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<Set<JobStatus>>(new Set());
@@ -166,6 +168,16 @@ export default function Service() {
 
   // ─── Create job modal ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
+
+  // Arriving via the dashboard's "+ New" → open the modal immediately, smart defaults applied
+  useEffect(() => {
+    if ((location.state as { openNew?: boolean } | null)?.openNew) {
+      setNewJob(j => ({ ...j, location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '' }));
+      setShowCreate(true);
+      navigate(location.pathname, { replace: true, state: null }); // consume the flag
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
   const autoTitleRef = useRef('');
   const applyAutoTitle = (contactId: string, jobType: string) => {
     const c = contacts.find(x => x.id === contactId);

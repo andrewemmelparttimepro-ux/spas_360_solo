@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { Settings, X } from 'lucide-react';
+import { Settings, X, Contact } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS } from './Header';
+import { NAV_SECTIONS } from './Header';
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -33,13 +33,32 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
 
-        <div className="flex-1 py-5 px-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass}>
-              <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
-              {item.name}
-            </NavLink>
+        <div className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
+          {NAV_SECTIONS.map((section, i) => (
+            <div key={section.label ?? `sec-${i}`}>
+              {section.label && (
+                <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
+                  {section.label}
+                </div>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => (
+                  <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass}>
+                    <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
+                    {item.name}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
+
+          <div>
+            <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">Admin</div>
+            <NavLink to="/contacts" onClick={onClose} className={linkClass}>
+              <Contact className="w-5 h-5 mr-3 flex-shrink-0" />
+              Contacts
+            </NavLink>
+          </div>
         </div>
 
         <div className="p-3 border-t border-ink-700 space-y-3">

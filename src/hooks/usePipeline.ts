@@ -9,10 +9,13 @@ export interface PipelineView {
   dealsByStage: Record<string, Deal[]>;
 }
 
+export type PipelineDeal = Deal & { contacts?: { first_name: string; last_name: string } | null };
+
 export function usePipeline() {
   const { profile, activeLocationId } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [deals, setDeals] = useState<PipelineDeal[]>([]);
+  const [dealsWithTasks, setDealsWithTasks] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPipeline = useCallback(async () => {
@@ -27,12 +30,21 @@ export function usePipeline() {
         .order('position'),
       supabase
         .from('deals')
-        .select('*')
+        .select('*, contacts:contact_id(first_name, last_name)')
         .eq('org_id', profile.org_id)
         .order('position'),
     ]);
 
     if (stageRes.data) setStages(stageRes.data);
+
+    // Which deals have an open follow-up task? (a lead with no task is a no-no)
+    const { data: openTasks } = await supabase
+      .from('tasks')
+      .select('deal_id')
+      .eq('org_id', profile.org_id)
+      .in('status', ['Pending', 'In Progress'])
+      .not('deal_id', 'is', null);
+    setDealsWithTasks(new Set((openTasks ?? []).map(t => t.deal_id as string)));
 
     let filteredDeals = dealRes.data ?? [];
     if (activeLocationId) {
@@ -48,7 +60,7 @@ export function usePipeline() {
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel('deals-realtime')
+      .channel(`deals-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
         fetchPipeline();
       })
@@ -57,7 +69,7 @@ export function usePipeline() {
     return () => { supabase.removeChannel(channel); };
   }, [profile, fetchPipeline]);
 
-  const getDealsForStage = useCallback((stageId: string): Deal[] => {
+  const getDealsForStage = useCallback((stageId: string): PipelineDeal[] => {
     return deals.filter(d => d.stage_id === stageId);
   }, [deals]);
 
@@ -106,6 +118,7 @@ export function usePipeline() {
   return {
     stages,
     deals,
+    dealsWithTasks,
     isLoading,
     getDealsForStage,
     moveDeal,

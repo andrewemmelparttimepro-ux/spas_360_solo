@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Contact, Users, Wrench, Package, MessageSquare, BarChart3 } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -6,14 +6,25 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 
-export const NAV_ITEMS = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Contacts', path: '/contacts', icon: Contact },
-  { name: 'CRM', path: '/crm', icon: Users },
-  { name: 'Service', path: '/service', icon: Wrench },
-  { name: 'Inventory', path: '/inventory', icon: Package },
-  { name: 'Comms', path: '/communication', icon: MessageSquare },
-  { name: 'Reports', path: '/reports', icon: BarChart3 },
+// Nav is organized around the two sides of the business: Sales and Service.
+// Contacts lives in the right-hand admin rail, not the top nav.
+export const NAV_SECTIONS = [
+  { label: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
+  {
+    label: 'Sales',
+    items: [
+      { name: 'Deals', path: '/deals', icon: Users },
+      { name: 'Inventory', path: '/inventory', icon: Package },
+    ],
+  },
+  { label: 'Service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
+  {
+    label: null,
+    items: [
+      { name: 'Comms', path: '/communication', icon: MessageSquare },
+      { name: 'Reports', path: '/reports', icon: BarChart3 },
+    ],
+  },
 ];
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -67,24 +78,33 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </span>
       </NavLink>
 
-      {/* Nav pills (desktop) — OMP style: recessed group, brand-tinted active */}
-      <nav className="hidden lg:flex gap-0.5 bg-ink-950 rounded-[10px] p-[3px]">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-1.5 px-3.5 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
-                isActive
-                  ? 'bg-brand-500/15 text-brand-400'
-                  : 'text-ink-500 hover:text-ink-300 hover:bg-ink-800'
-              )
-            }
-          >
-            <item.icon className="w-[15px] h-[15px]" />
-            {item.name}
-          </NavLink>
+      {/* Nav (desktop) — Sales / Service grouped pill clusters, OMP style */}
+      <nav className="hidden lg:flex items-center gap-2">
+        {NAV_SECTIONS.map((section, i) => (
+          <div key={section.label ?? `sec-${i}`} className="flex items-center gap-0.5 bg-ink-950 rounded-[10px] p-[3px]">
+            {section.label && (
+              <span className="px-2 text-[9px] font-bold uppercase tracking-[0.18em] text-ink-500 select-none">
+                {section.label}
+              </span>
+            )}
+            {section.items.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
+                    isActive
+                      ? 'bg-brand-500/15 text-brand-400'
+                      : 'text-ink-500 hover:text-ink-300 hover:bg-ink-800'
+                  )
+                }
+              >
+                <item.icon className="w-[15px] h-[15px]" />
+                {item.name}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 

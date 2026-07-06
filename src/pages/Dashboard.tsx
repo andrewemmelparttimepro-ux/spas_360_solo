@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 
 const statMeta = [
-  { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/crm' },
-  { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/crm' },
+  { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
+  { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
   { key: 'overduePartsCount', title: 'Parts Overdue', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/inventory' },
 ] as const;
@@ -14,7 +14,7 @@ const statMeta = [
 type ActionType = 'task' | 'part' | 'invoice' | 'lead';
 
 const actionDotColors: Record<ActionType, string> = { task: 'bg-amber-500', part: 'bg-brand-400', invoice: 'bg-emerald-500', lead: 'bg-purple-500' };
-const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/crm', lead: '/crm' };
+const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/deals', lead: '/deals' };
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<DashboardPeriod>('week');

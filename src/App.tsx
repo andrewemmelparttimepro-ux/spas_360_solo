@@ -6,7 +6,7 @@ import AppLayout from './components/layout/AppLayout';
 
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const CRM = lazy(() => import('./pages/CRM'));
+const Deals = lazy(() => import('./pages/Deals'));
 const Service = lazy(() => import('./pages/Service'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Communication = lazy(() => import('./pages/Communication'));
@@ -74,7 +74,9 @@ function AuthGate() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="contacts/:id" element={<ContactDetail />} />
-          <Route path="crm" element={<CRM />} />
+          <Route path="deals" element={<Deals />} />
+          <Route path="deals/:id" element={<DealDetail />} />
+          <Route path="crm" element={<Navigate to="/deals" replace />} />
           <Route path="crm/:id" element={<DealDetail />} />
           <Route path="service" element={<Service />} />
           <Route path="service/:id" element={<JobDetail />} />

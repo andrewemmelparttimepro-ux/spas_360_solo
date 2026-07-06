@@ -35,11 +35,12 @@ export function useContacts() {
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
-  // Real-time updates
+  // Real-time updates (channel name unique per hook instance — supabase-js
+  // reuses channels by topic and a second .on() after subscribe() throws)
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel('contacts-realtime')
+      .channel(`contacts-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => {
         fetchContacts();
       })

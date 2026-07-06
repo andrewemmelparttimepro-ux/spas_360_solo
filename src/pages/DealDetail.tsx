@@ -48,7 +48,7 @@ export default function DealDetail() {
   const saveDeal = async (updates: Partial<Deal>) => { await updateDeal(updates); toast('Deal updated'); };
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
-  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/crm" className="text-brand-400 text-sm mt-2 hover:underline">Back to CRM</Link></div>;
+  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
 
   const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
   const handleAddNote = async () => { if (!newNote.trim()) return; await createNote(newNote, { dealId: deal.id }); setNewNote(''); };
@@ -57,7 +57,7 @@ export default function DealDetail() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to="/crm" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
+        <Link to="/deals" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/contacts/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400 mt-1 inline-block">{contact.first_name} {contact.last_name} Â· {contact.phone}</Link>}</div>
         <EditablePriority value={deal.priority} onSave={saveDeal} />
       </div>

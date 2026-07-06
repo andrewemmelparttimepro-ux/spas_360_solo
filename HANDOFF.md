@@ -73,6 +73,8 @@ src/
     SalesBoard.tsx        LIVE scoreboard above the kanban (open pipeline w/ idle-$ loss framing,
                           won this month, closing this week, hot leads). Mono numerals, pulsing dot.
     SearchPalette.tsx     ⌘K/Ctrl+K global search: contacts, deals, jobs, inventory.
+    QuickCreate.tsx       Dashboard "+ New" chooser → wizard in place, or /service with the New
+                          Job modal auto-opened (navigation state flags, consumed on arrival).
     StoreSwitcher.tsx     All/Minot/Bismarck segmented control on Inventory — drives GLOBAL
                           activeLocationId (header pill, Deals, Schedule follow).
     ChatWidget.tsx        Floating AI sales assistant + team chat.

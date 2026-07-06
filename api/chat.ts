@@ -4,16 +4,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // The frontend always speaks the OpenAI message/tool shape; each handler translates
 // to/from its provider so the client never has to change.
 // Switch providers with AI_PROVIDER.
-const PROVIDER = process.env.AI_PROVIDER || 'gemini';
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const GLM_API_KEY = process.env.GLM_API_KEY || process.env.ZAI_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const GLM_MODEL = process.env.GLM_MODEL || 'glm-5.2';
-const GLM_BASE_URL = process.env.GLM_BASE_URL || 'https://api.z.ai/api/paas/v4';
+const envValue = (value: string | undefined, fallback = '') => (value || fallback).trim();
+const PROVIDER = envValue(process.env.AI_PROVIDER, 'gemini').toLowerCase();
+const ANTHROPIC_API_KEY = envValue(process.env.ANTHROPIC_API_KEY) || undefined;
+const GEMINI_API_KEY = envValue(process.env.GEMINI_API_KEY) || undefined;
+const OPENAI_API_KEY = envValue(process.env.OPENAI_API_KEY) || undefined;
+const GLM_API_KEY = envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY) || undefined;
+const ANTHROPIC_MODEL = envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6');
+const GEMINI_MODEL = envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
+const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
+const GLM_MODEL = envValue(process.env.GLM_MODEL, 'glm-5.2');
+const GLM_BASE_URL = envValue(process.env.GLM_BASE_URL, 'https://api.z.ai/api/paas/v4');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

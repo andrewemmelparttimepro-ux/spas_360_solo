@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import InventoryEditor from '@/components/InventoryEditor';
 import type { InventoryItem, InventoryStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -152,33 +153,14 @@ const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Ch
 
 // =============== Main page component ===============
 export default function Inventory() {
-  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem } = useInventory();
+  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, deleteItem } = useInventory();
   const { locations } = useAuth();
-  const [showCreate, setShowCreate] = useState(false);
-  const [newItem, setNewItem] = useState({
-    sku: '', product: '', brand: '', category: 'Hot Tubs',
-    model: '', color_finish: '', status: 'In Stock' as InventoryStatus,
-    cost: '', msrp: '', sale_price: '', location_id: '',
- notes: '',
-  });
+  // Editor drawer: null = closed, 'new' = create, item = edit
+  const [editorTarget, setEditorTarget] = useState<'new' | InventoryItem | null>(null);
 
-  const handleCreate = async () => {
-    await createItem({
-      sku: newItem.sku,
-      product: newItem.product,
-      brand: newItem.brand || null,
-      category: newItem.category,
-      model: newItem.model || null,
-      color_finish: newItem.color_finish || null,
-      status: newItem.status,
-      cost: newItem.cost ? parseFloat(newItem.cost) : null,
-      msrp: newItem.msrp ? parseFloat(newItem.msrp) : null,
-      sale_price: newItem.sale_price ? parseFloat(newItem.sale_price) : null,
-      location_id: newItem.location_id || (locations[0]?.id ?? ''),
-      notes: newItem.notes || null,
-    });
-    setShowCreate(false);
-    setNewItem({ sku: '', product: '', brand: '', category: 'Hot Tubs', model: '', color_finish: '', status: 'In Stock', cost: '', msrp: '', sale_price: '', location_id: '', notes: '' });
+  const handleEditorSave = async (values: Partial<InventoryItem>, id?: string) => {
+    if (id) return updateItem(id, values);
+    return (await createItem(values)) !== null;
   };
 
   const summaryCards = [
@@ -201,59 +183,18 @@ export default function Inventory() {
         </div>
         <div className="flex space-x-3">
           <button className="bg-ink-900 border border-ink-700 text-ink-300 hover:bg-ink-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><ArrowRightLeft className="w-4 h-4 mr-2" />Transfer</button>
-          <button onClick={() => setShowCreate(true)} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
+          <button onClick={() => setEditorTarget('new')} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
       </div>
 
-      {/* Add Item Modal */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-ink-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-ink-100">Add Inventory Item</h2>
-              <button onClick={() => setShowCreate(false)} className="text-ink-500 hover:text-ink-300"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <input placeholder="SKU *" value={newItem.sku} onChange={e => setNewItem({...newItem, sku: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-                <input placeholder="Product Name *" value={newItem.product} onChange={e => setNewItem({...newItem, product: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input placeholder="Brand" value={newItem.brand} onChange={e => setNewItem({...newItem, brand: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-                <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  {CATEGORY_OPTIONS.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input placeholder="Model" value={newItem.model} onChange={e => setNewItem({...newItem, model: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-                <input placeholder="Color / Finish" value={newItem.color_finish} onChange={e => setNewItem({...newItem, color_finish: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <select value={newItem.status} onChange={e => setNewItem({...newItem, status: e.target.value as InventoryStatus})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-                </select>
-                <select value={newItem.location_id} onChange={e => setNewItem({...newItem, location_id: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  <option value="">Location *</option>
-                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <input placeholder="Cost ($)" type="number" value={newItem.cost} onChange={e => setNewItem({...newItem, cost: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-                <input placeholder="MSRP ($)" type="number" value={newItem.msrp} onChange={e => setNewItem({...newItem, msrp: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-                <input placeholder="Sale Price ($)" type="number" value={newItem.sale_price} onChange={e => setNewItem({...newItem, sale_price: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              </div>
-              <textarea placeholder="Notes" value={newItem.notes} onChange={e => setNewItem({...newItem, notes: e.target.value})} rows={2} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-none" />
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} disabled={!newItem.sku || !newItem.product || !newItem.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">Add Item</button>
-            </div>
-          </div>
-        </div>
+      {editorTarget !== null && (
+        <InventoryEditor
+          item={editorTarget === 'new' ? null : editorTarget}
+          onClose={() => setEditorTarget(null)}
+          onSave={handleEditorSave}
+          onDelete={deleteItem}
+        />
       )}
-
-      {/* One-tap Minot ↔ Bismarck switching — the core inventory workflow */}
-      <StoreSwitcher />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 shrink-0">
         {summaryCards.map(card => (
@@ -281,11 +222,12 @@ export default function Inventory() {
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Category</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Status</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider text-right">Price</th>
+                <th className="p-2 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
               {items.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
               ) : items.map(item => (
                 <tr key={item.id} className="hover:bg-ink-800/60 transition-colors">
                   <td className="p-4 text-sm font-medium">
@@ -307,6 +249,16 @@ export default function Inventory() {
                       )}
                       <EditableCell value={item.sale_price ?? item.msrp ?? 0} field="sale_price" itemId={item.id} onSave={updateItem} type="number" prefix="$" className="justify-end" />
                     </div>
+                  </td>
+                  <td className="p-2 text-right">
+                    <button
+                      onClick={() => setEditorTarget(item)}
+                      className="p-1.5 text-ink-500 hover:text-brand-400 hover:bg-ink-800 rounded-lg transition-colors"
+                      title="Open full editor"
+                      aria-label={`Edit ${item.product}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}

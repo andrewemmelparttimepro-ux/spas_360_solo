@@ -39,7 +39,7 @@ export function useInventory() {
   useEffect(() => {
     if (!profile) return;
     const channel = supabase
-      .channel('inventory-realtime')
+      .channel(`inventory-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -54,7 +54,9 @@ export function useInventory() {
   const totalInStock = items.filter(i => i.status === 'In Stock').length;
   const awaitingDelivery = items.filter(i => i.status === 'Sold').length;
   const onOrder = items.filter(i => i.status === 'On Order').length;
-  const lowStockAlerts = items.filter(i => i.category === 'Chemicals' && i.status === 'In Stock').length < 5 ? 1 : 0;
+  const chemicalSkus = items.filter(i => i.category === 'Chemicals');
+  const chemicalsInStock = chemicalSkus.filter(i => i.status === 'In Stock').length;
+  const lowStockAlerts = chemicalSkus.length > 0 && chemicalsInStock < 5 ? 1 : 0;
 
   const createItem = useCallback(async (item: Partial<InventoryItem>) => {
     if (!profile) return null;
@@ -75,6 +77,17 @@ export function useInventory() {
     return true;
   }, [fetchItems]);
 
+  const deleteItem = useCallback(async (id: string) => {
+    // .select() so RLS-denied deletes (0 rows) report as failure, not silent success
+    const { data, error } = await supabase.from('inventory_items').delete().eq('id', id).select('id');
+    if (error || !data || data.length === 0) {
+      console.error('Error deleting inventory item:', error ?? 'no rows deleted (permissions?)');
+      return false;
+    }
+    await fetchItems();
+    return true;
+  }, [fetchItems]);
+
   return {
     items,
     isLoading,
@@ -86,6 +99,7 @@ export function useInventory() {
     lowStockAlerts,
     createItem,
     updateItem,
+    deleteItem,
     refresh: fetchItems,
   };
 }

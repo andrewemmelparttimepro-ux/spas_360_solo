@@ -62,7 +62,9 @@ src/
   components/
     layout/Header.tsx     Topbar: brand, grouped nav pills (⌜SALES: Deals·Inventory⌟ ⌜SERVICE:
                           Schedule⌟), ⌘K search trigger, location pill, notification bell, user menu.
-                          NAV_SECTIONS exported — single source of truth for nav.
+                          NAV_SECTIONS + NAV_TONE exported — single source of truth for nav; the two
+                          business sides wear their colors (Sales = brand blue, Service = emerald),
+                          neutral items stay ink. Drawer mirrors the tones.
     layout/Sidebar.tsx    Mobile-only drawer (mirrors NAV_SECTIONS + Contacts + Settings).
     layout/AdminRail.tsx  Right-docked contacts panel, collapsed by default (localStorage
                           `spas360.adminRail`), hidden for technicians.

@@ -1,13 +1,15 @@
 import { NavLink } from 'react-router-dom';
 import { Settings, X, Contact } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_SECTIONS } from './Header';
+import { NAV_SECTIONS, NAV_TONE } from './Header';
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
+const linkClass = (tone: 'sales' | 'service' | null) => ({ isActive }: { isActive: boolean }) => {
+  const t = NAV_TONE[tone ?? 'neutral'];
+  return cn(
     'flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors',
-    isActive ? 'bg-brand-500/15 text-brand-400' : 'text-ink-400 hover:bg-ink-800 hover:text-ink-100'
+    isActive ? t.active : 'text-ink-400 hover:bg-ink-800 hover:text-ink-100'
   );
+};
 
 /** Mobile-only nav drawer — desktop nav lives in the Header pills (OMP-style shell). */
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -37,13 +39,13 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label ?? `sec-${i}`}>
               {section.label && (
-                <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
+                <div className={cn('px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em]', NAV_TONE[section.tone ?? 'neutral'].label)}>
                   {section.label}
                 </div>
               )}
               <div className="space-y-1">
                 {section.items.map((item) => (
-                  <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass}>
+                  <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass(section.tone)}>
                     <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
                     {item.name}
                   </NavLink>
@@ -54,7 +56,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
 
           <div>
             <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">Admin</div>
-            <NavLink to="/contacts" onClick={onClose} className={linkClass}>
+            <NavLink to="/contacts" onClick={onClose} className={linkClass(null)}>
               <Contact className="w-5 h-5 mr-3 flex-shrink-0" />
               Contacts
             </NavLink>
@@ -62,7 +64,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
         </div>
 
         <div className="p-3 border-t border-ink-700 space-y-3">
-          <NavLink to="/settings" onClick={onClose} className={linkClass}>
+          <NavLink to="/settings" onClick={onClose} className={linkClass(null)}>
             <Settings className="w-5 h-5 mr-3 flex-shrink-0" />
             Settings
           </NavLink>

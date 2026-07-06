@@ -9,24 +9,51 @@ import SearchPalette from '@/components/SearchPalette';
 
 // Nav is organized around the two sides of the business: Sales and Service.
 // Contacts lives in the right-hand admin rail, not the top nav.
-export const NAV_SECTIONS = [
-  { label: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
+export type NavTone = 'sales' | 'service' | null;
+
+export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
+  { label: null, tone: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
   {
     label: 'Sales',
+    tone: 'sales',
     items: [
       { name: 'Deals', path: '/deals', icon: Users },
       { name: 'Inventory', path: '/inventory', icon: Package },
     ],
   },
-  { label: 'Service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
+  { label: 'Service', tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
   {
     label: null,
+    tone: null,
     items: [
       { name: 'Comms', path: '/communication', icon: MessageSquare },
       { name: 'Reports', path: '/reports', icon: BarChart3 },
     ],
   },
 ];
+
+// Each side of the business wears its own color: Sales = MCHL brand blue
+// (the money side), Service = emerald (the go/field side). Neutral stays ink.
+export const NAV_TONE = {
+  sales: {
+    container: 'bg-brand-500/[0.07] ring-1 ring-inset ring-brand-500/25',
+    label: 'text-brand-400',
+    active: 'bg-brand-500/20 text-brand-300',
+    idle: 'text-ink-400 hover:text-brand-300 hover:bg-brand-500/10',
+  },
+  service: {
+    container: 'bg-emerald-500/[0.07] ring-1 ring-inset ring-emerald-500/25',
+    label: 'text-emerald-400',
+    active: 'bg-emerald-500/20 text-emerald-300',
+    idle: 'text-ink-400 hover:text-emerald-300 hover:bg-emerald-500/10',
+  },
+  neutral: {
+    container: 'bg-ink-950',
+    label: 'text-ink-500',
+    active: 'bg-brand-500/15 text-brand-400',
+    idle: 'text-ink-500 hover:text-ink-300 hover:bg-ink-800',
+  },
+} as const;
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { profile, locations, activeLocationId, setActiveLocation, signOut } = useAuth();
@@ -94,32 +121,33 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Nav (desktop) — Sales / Service grouped pill clusters, OMP style */}
       <nav className="hidden lg:flex items-center gap-2">
-        {NAV_SECTIONS.map((section, i) => (
-          <div key={section.label ?? `sec-${i}`} className="flex items-center gap-0.5 bg-ink-950 rounded-[10px] p-[3px]">
-            {section.label && (
-              <span className="px-2 text-[9px] font-bold uppercase tracking-[0.18em] text-ink-500 select-none">
-                {section.label}
-              </span>
-            )}
-            {section.items.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
-                    isActive
-                      ? 'bg-brand-500/15 text-brand-400'
-                      : 'text-ink-500 hover:text-ink-300 hover:bg-ink-800'
-                  )
-                }
-              >
-                <item.icon className="w-[15px] h-[15px]" />
-                {item.name}
-              </NavLink>
-            ))}
-          </div>
-        ))}
+        {NAV_SECTIONS.map((section, i) => {
+          const tone = NAV_TONE[section.tone ?? 'neutral'];
+          return (
+            <div key={section.label ?? `sec-${i}`} className={cn('flex items-center gap-0.5 rounded-[10px] p-[3px]', tone.container)}>
+              {section.label && (
+                <span className={cn('px-2 text-[9px] font-bold uppercase tracking-[0.18em] select-none', tone.label)}>
+                  {section.label}
+                </span>
+              )}
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
+                      isActive ? tone.active : tone.idle
+                    )
+                  }
+                >
+                  <item.icon className="w-[15px] h-[15px]" />
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="flex-1" />

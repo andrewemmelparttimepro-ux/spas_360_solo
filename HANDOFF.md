@@ -33,7 +33,7 @@ QuickBooks, which stays as the accounting source (sync is a future milestone).
 | Storage | Supabase bucket `job-photos` (public read, authenticated write) |
 | Twilio | number **+1 701 929 9194** (trial account — see §8 blocked items) |
 | Dev server | preview name `spas360`, port 3009, defined in `~/Desktop/.claude/launch.json` |
-| Andrew's account | signed up on prod as owner_manager (first-signup trigger auto-promotes) |
+| Accounts | Andrew (andrew@ndai.pro) + Brandon (brandon_solem@hotmail.com) — both **owner_manager**, verified in DB |
 
 **⚠ History lesson:** prod was once wrongly pointed at Supabase ref `ldhzkdqznccfgpdvqyfk` — that is the
 **Hit Zero / Cheerful cheer-gym database** (it shares table *names* like profiles/messages/notifications
@@ -170,10 +170,10 @@ Documented in `.env.example`. AI assistant currently runs Gemini; set `AI_PROVID
    real customers (register MCHL as the brand).
 2. **Bismarck inventory tab** — not yet imported (screenshots only covered Minot + Used).
 3. **Brand backfill** — Oslo/Tokyo/Maximus + Hekla/Trend/Pro 6 items imported with brand NULL.
-4. **Lock down open signup** before Matt/Brandon get invites (Login has public sign-up).
-5. **Apply `supabase/migration_inventory_delete.sql`** (one CREATE POLICY — the Supabase MCP
-   connector was down when it was written; until applied, inventory delete reports an honest
-   "Delete failed"). When Brandon signs up: Settings → Team & Permissions → set him Owner/Manager.
+4. **Lock down open signup — NOW URGENT.** Brandon is in and real data is loaded; the public
+   sign-up on the Login page auto-joins new users to the org as Salesperson (they'd see org data).
+   Disable public signups (Supabase Auth settings or invite-only flow) before the URL spreads.
+   (`migration_inventory_delete.sql` is now APPLIED; Brandon's owner_manager role verified in DB.)
 
 ## 9. Next milestones (agreed roadmap)
 

@@ -1,12 +1,148 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, User, Wrench, Plus, Save, X, Pencil, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2 } from 'lucide-react';
 import { useJob, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
+import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
+import { useJobPhotos, PHOTO_TYPES, type JobPhoto } from '@/hooks/useJobPhotos';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
+
+// ─── Time clock: big start/stop, built for gloved thumbs ───
+function TimeClockCard({ jobId }: { jobId: string }) {
+  const { activeEntry, isWorking, start, stop, totalMinutes, entries } = useTimeClock(jobId);
+  const { toast } = useToast();
+  const [now, setNow] = useState(() => Date.now());
+
+  // live elapsed ticker while on the clock
+  useEffect(() => {
+    if (!activeEntry) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [activeEntry]);
+
+  const elapsedMs = activeEntry ? now - new Date(activeEntry.started_at).getTime() : 0;
+  const hh = String(Math.floor(elapsedMs / 3600000)).padStart(2, '0');
+  const mm = String(Math.floor((elapsedMs % 3600000) / 60000)).padStart(2, '0');
+  const ss = String(Math.floor((elapsedMs % 60000) / 1000)).padStart(2, '0');
+
+  const handleToggle = async () => {
+    const { error } = activeEntry ? await stop() : await start();
+    if (error) toast(error, 'error');
+    else toast(activeEntry ? 'Clocked out — time logged' : 'On the clock', 'success');
+  };
+
+  return (
+    <div className={cn(
+      'rounded-xl border p-4 sm:p-5 flex items-center justify-between gap-4',
+      activeEntry ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-ink-700 bg-ink-900'
+    )}>
+      <div className="min-w-0">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-1">Time Clock</p>
+        {activeEntry ? (
+          <p className="font-mono text-[26px] font-bold text-emerald-400 leading-none tabular-nums">{hh}:{mm}:{ss}</p>
+        ) : (
+          <p className="text-sm text-ink-400">
+            {totalMinutes > 0 ? `${formatDuration(totalMinutes)} logged · ${entries.filter(e => e.ended_at).length} session${entries.filter(e => e.ended_at).length === 1 ? '' : 's'}` : 'Not started'}
+          </p>
+        )}
+      </div>
+      <button
+        onClick={handleToggle}
+        disabled={isWorking}
+        className={cn(
+          'flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-colors shrink-0 disabled:opacity-50',
+          activeEntry ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+        )}
+      >
+        {activeEntry ? <><Square className="w-4 h-4 fill-current" />Stop Job</> : <><Play className="w-4 h-4 fill-current" />Start Job</>}
+      </button>
+    </div>
+  );
+}
+
+// ─── Photos: camera-first capture with type tags ───
+function PhotoCard({ jobId }: { jobId: string }) {
+  const { photos, isUploading, uploadPhoto, deletePhoto } = useJobPhotos(jobId);
+  const { toast } = useToast();
+  const [photoType, setPhotoType] = useState<string>('General');
+  const [viewer, setViewer] = useState<JobPhoto | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    for (const file of Array.from(files)) {
+      const { error } = await uploadPhoto(file, photoType);
+      if (error) { toast(`Upload failed: ${error}`, 'error'); return; }
+    }
+    toast(`Photo${files.length > 1 ? 's' : ''} added`, 'success');
+  };
+
+  return (
+    <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Photos</h2>
+        <div className="flex items-center gap-2">
+          <select
+            value={photoType}
+            onChange={e => setPhotoType(e.target.value)}
+            className="bg-ink-950 border border-ink-700 text-xs text-ink-300 rounded-lg px-2 py-2 outline-none focus:border-brand-500"
+          >
+            {PHOTO_TYPES.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={isUploading}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            <Camera className="w-4 h-4" />{isUploading ? 'Uploading…' : 'Add Photo'}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            className="hidden"
+            onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
+          />
+        </div>
+      </div>
+
+      {photos.length === 0 ? (
+        <p className="text-sm text-ink-500 text-center py-6">No photos yet — proof of delivery, damage, serial numbers</p>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {photos.map(p => (
+            <button key={p.id} onClick={() => setViewer(p)} className="relative aspect-square rounded-lg overflow-hidden border border-ink-700 group">
+              <img src={p.url} alt={p.photo_type} loading="lazy" className="w-full h-full object-cover" />
+              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] font-semibold text-ink-300 px-1.5 py-0.5 truncate">{p.photo_type}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Full-size viewer */}
+      {viewer && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setViewer(null)}>
+          <img src={viewer.url} alt={viewer.photo_type} className="max-w-full max-h-[80vh] rounded-lg object-contain" />
+          <div className="flex items-center gap-4 mt-4" onClick={e => e.stopPropagation()}>
+            <span className="text-sm text-ink-300">{viewer.photo_type} · {new Date(viewer.created_at).toLocaleString()}</span>
+            <button
+              onClick={async () => { const { error } = await deletePhoto(viewer); if (error) toast(error, 'error'); else { toast('Photo deleted', 'success'); setViewer(null); } }}
+              className="flex items-center gap-1 text-sm text-red-400 hover:text-red-300"
+            >
+              <Trash2 className="w-4 h-4" />Delete
+            </button>
+            <button onClick={() => setViewer(null)} className="text-sm text-ink-400 hover:text-ink-100">Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // --------------- Reusable inline editable field ---------------
 function EditableField({
@@ -159,6 +295,9 @@ export default function JobDetail() {
         <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
       </div>
 
+      {/* Field capture: time clock front and center for techs */}
+      <TimeClockCard jobId={job.id} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6 space-y-5">
           <div className="flex items-center justify-between">
@@ -177,6 +316,9 @@ export default function JobDetail() {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
+          {/* Photos: proof of delivery, damage, serials */}
+          <PhotoCard jobId={job.id} />
+
           {/* Notes */}
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Job Notes</h2>

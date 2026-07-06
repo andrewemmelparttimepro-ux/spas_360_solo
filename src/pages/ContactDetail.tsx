@@ -1,6 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Phone, Mail, MapPin, Plus, Save, X, Pencil } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign } from 'lucide-react';
 import { useContact } from '@/hooks/useContacts';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useState, useRef, useEffect } from 'react';
@@ -57,20 +59,60 @@ function EditableDetailRow({ label, value, field, onSave, type = 'text' }: { lab
   );
 }
 
+type ContactWithAssigned = Contact & { assigned?: { id: string; first_name: string; last_name: string } | null };
+
 export default function ContactDetail() {
   const { id } = useParams();
-  const { contact, isLoading, updateContact } = useContact(id);
+  const { contact: rawContact, isLoading, updateContact } = useContact(id);
+  const contact = rawContact as ContactWithAssigned | null;
+  const { profile } = useAuth();
   const { notes, createNote } = useNotes({ contactId: id });
   const { tasks, createTask, completeTask } = useTasks({ contactId: id });
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [team, setTeam] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
 
+  const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
+  const isOwner = !!profile && contact?.assigned_to === profile.id;
+  const assignedName = contact?.assigned ? `${contact.assigned.first_name} ${contact.assigned.last_name}` : null;
+
+  // Managers get the reassign control — load the team for it
+  useEffect(() => {
+    if (!isManager || !profile) return;
+    supabase.from('profiles').select('id, first_name, last_name').eq('org_id', profile.org_id).order('first_name')
+      .then(({ data }) => setTeam(data ?? []));
+  }, [isManager, profile]);
+
+  // Edits are always allowed — but edits by anyone other than the assigned
+  // salesperson leave a visible trail, and the assignment (commission) stays put.
   const saveContact = async (updates: Partial<Contact>) => {
     const ok = await updateContact(updates);
     toast(ok ? 'Contact updated' : 'Failed to save', ok ? 'success' : 'error');
+    if (ok && profile && contact && contact.assigned_to && contact.assigned_to !== profile.id) {
+      const fields = Object.keys(updates).join(', ').replace(/_/g, ' ');
+      await supabase.from('notes').insert({
+        contact_id: contact.id,
+        body: `✏️ ${profile.first_name} ${profile.last_name} updated ${fields} — ${assignedName ?? 'the assigned salesperson'} remains the assigned salesperson.`,
+        created_by: profile.id,
+      });
+    }
     return ok;
+  };
+
+  const reassign = async (newOwnerId: string) => {
+    if (!contact || !profile) return;
+    const newOwner = team.find(t => t.id === newOwnerId);
+    const ok = await updateContact({ assigned_to: newOwnerId });
+    if (ok && newOwner) {
+      toast(`Reassigned to ${newOwner.first_name} ${newOwner.last_name}`, 'success');
+      await supabase.from('notes').insert({
+        contact_id: contact.id,
+        body: `🔁 ${profile.first_name} ${profile.last_name} reassigned this customer from ${assignedName ?? 'unassigned'} to ${newOwner.first_name} ${newOwner.last_name}.`,
+        created_by: profile.id,
+      });
+    }
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
@@ -91,6 +133,30 @@ export default function ContactDetail() {
           </div>
         </div>
         <EditableTypeBadge value={contact.customer_type} onSave={saveContact} />
+      </div>
+
+      {/* Ownership — who gets the commission, always visible */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/25 text-[13px] font-semibold text-brand-300">
+          <BadgeDollarSign className="w-3.5 h-3.5" />
+          {assignedName ? `${assignedName}'s customer` : 'Unassigned'}
+        </span>
+        {isManager && team.length > 0 && (
+          <select
+            value={contact.assigned_to ?? ''}
+            onChange={e => e.target.value && reassign(e.target.value)}
+            className="bg-ink-900 border border-ink-700 text-xs text-ink-300 rounded-lg px-2 py-1.5 outline-none focus:border-brand-500"
+            title="Reassign (managers only — gets logged)"
+          >
+            <option value="" disabled>Reassign…</option>
+            {team.map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
+          </select>
+        )}
+        {!isOwner && !isManager && contact.assigned_to && (
+          <span className="text-xs text-amber-400/90 font-medium">
+            You can edit, but changes are logged — commission stays with {assignedName ?? 'the assigned salesperson'}.
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">

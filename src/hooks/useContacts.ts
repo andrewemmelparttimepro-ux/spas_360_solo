@@ -93,7 +93,7 @@ export function useContact(id: string | undefined) {
   const fetchContact = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
-    const { data, error } = await supabase.from('contacts').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('contacts').select('*, assigned:assigned_to(id, first_name, last_name)').eq('id', id).single();
     if (error) console.error('Error fetching contact:', error);
     setContact(data);
     setIsLoading(false);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Check, UserCheck, Phone } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Check, UserCheck, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
@@ -19,7 +20,15 @@ const PRIORITIES = [
   { value: 'Low', label: 'Low', hint: 'Long-term nurture' },
 ] as const;
 
-interface DupeMatch { id: string; first_name: string; last_name: string; phone: string }
+interface DupeMatch {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  customer_type: string;
+  assigned_to: string | null;
+  assigned?: { first_name: string; last_name: string } | null;
+}
 
 function StepHeader({ n, title, done }: { n: number; title: string; done: boolean }) {
   return (
@@ -63,8 +72,9 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const [last, setLast] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [dupe, setDupe] = useState<DupeMatch | null>(null);
-  const [useExisting, setUseExisting] = useState(false);
+  const [matches, setMatches] = useState<DupeMatch[]>([]);
+  const [existing, setExisting] = useState<DupeMatch | null>(null); // chosen existing customer
+  const navigate = useNavigate();
   const [source, setSource] = useState<string | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [amount, setAmount] = useState('');
@@ -76,27 +86,30 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const [firstNote, setFirstNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Duplicate detection — Brandon's double-entry pain, caught at the source
-  const checkDupe = useCallback(async () => {
+  // Live typeahead — existing customers surface as you type (name or phone)
+  const searchMatches = useCallback(async () => {
+    if (existing) return; // already locked onto one
     const digits = phone.replace(/\D/g, '');
-    if (digits.length < 7 && !(first && last)) { setDupe(null); return; }
-    let q = supabase.from('contacts').select('id, first_name, last_name, phone').limit(1);
-    if (digits.length >= 7) {
-      q = q.ilike('phone', `%${digits.slice(-7)}%`);
-    } else {
-      q = q.ilike('first_name', first).ilike('last_name', last);
-    }
-    const { data } = await q;
-    setDupe(data?.[0] ?? null);
-    if (!data?.[0]) setUseExisting(false);
-  }, [phone, first, last]);
+    const name = (first + last).trim();
+    if (digits.length < 3 && name.length < 2) { setMatches([]); return; }
+    const ors: string[] = [];
+    if (first.trim().length >= 2) ors.push(`first_name.ilike.${first.trim()}%`);
+    if (last.trim().length >= 2) ors.push(`last_name.ilike.${last.trim()}%`);
+    if (digits.length >= 3) ors.push(`phone.ilike.%${digits}%`);
+    const { data } = await supabase
+      .from('contacts')
+      .select('id, first_name, last_name, phone, customer_type, assigned_to, assigned:assigned_to(first_name, last_name)')
+      .or(ors.join(','))
+      .limit(4);
+    setMatches((data as unknown as DupeMatch[]) ?? []);
+  }, [phone, first, last, existing]);
 
   useEffect(() => {
-    const t = setTimeout(checkDupe, 400);
+    const t = setTimeout(searchMatches, 300);
     return () => clearTimeout(t);
-  }, [checkDupe]);
+  }, [searchMatches]);
 
-  const step1Done = useExisting || (first.trim().length > 0 && last.trim().length > 0 && phone.trim().length >= 7);
+  const step1Done = !!existing || (first.trim().length > 0 && last.trim().length > 0 && phone.trim().length >= 7);
   const step2Done = source !== null;
   const step3Done = interests.length > 0;
   const step4Done = priority !== null;
@@ -111,9 +124,9 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
     if (!profile || !user || !canCreate) return;
     setSaving(true);
     try {
-      // 1. Contact — reuse the existing record if the dupe check matched
-      let contactId = useExisting ? dupe!.id : null;
-      let contactFirst = useExisting ? dupe!.first_name : first.trim();
+      // 1. Contact — reuse the existing record if one was selected
+      let contactId = existing ? existing.id : null;
+      let contactFirst = existing ? existing.first_name : first.trim();
       if (!contactId) {
         const { data, error } = await supabase.from('contacts').insert({
           org_id: profile.org_id,
@@ -135,7 +148,10 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       const { data: stage, error: stageErr } = await supabase
         .from('pipeline_stages').select('id').eq('org_id', profile.org_id).order('position').limit(1).single();
       if (stageErr || !stage) throw new Error('No pipeline stages configured');
-      const title = `${useExisting ? dupe!.last_name : last.trim()} – ${interests[0]}`;
+      // Commission stays with the customer's salesperson; the person entering gets logged
+      const creditTo = existing?.assigned_to ?? user.id;
+      const enteredByOther = creditTo !== user.id;
+      const title = `${existing ? existing.last_name : last.trim()} – ${interests[0]}`;
       const { data: deal, error: dealErr } = await supabase.from('deals').insert({
         org_id: profile.org_id,
         contact_id: contactId,
@@ -145,16 +161,32 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
         priority,
         lead_source: source,
         product_interest: interests,
-        assigned_to: user.id,
+        assigned_to: creditTo,
         location_id: profile.location_id ?? null,
         position: 0,
       }).select('id').single();
       if (dealErr) throw new Error(dealErr.message);
 
+      // Entered on someone else's customer → visible attribution + heads-up
+      if (enteredByOther && existing) {
+        const assignedName = existing.assigned ? `${existing.assigned.first_name} ${existing.assigned.last_name}` : 'the assigned salesperson';
+        await supabase.from('notes').insert({
+          contact_id: contactId, deal_id: deal.id,
+          body: `✏️ Deal entered by ${profile.first_name} ${profile.last_name} — credited to ${assignedName} (assigned salesperson).`,
+          created_by: user.id,
+        });
+        await supabase.from('notifications').insert({
+          user_id: creditTo, type: 'deal',
+          title: `New deal on your customer: ${title}`,
+          body: `Entered by ${profile.first_name} ${profile.last_name} — credited to you.`,
+          link: `/deals/${deal.id}`,
+        });
+      }
+
       // 3. Mandatory follow-up task — every lead gets one, no exceptions
       const { error: taskErr } = await supabase.from('tasks').insert({
         org_id: profile.org_id,
-        assigned_to: user.id,
+        assigned_to: creditTo,
         created_by: user.id,
         contact_id: contactId,
         deal_id: deal.id,
@@ -211,32 +243,60 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
           <section>
             <StepHeader n={1} title="Who is this?" done={step1Done} />
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <input placeholder="First name *" value={first} onChange={e => setFirst(e.target.value)} className={inputClass} disabled={useExisting} />
-              <input placeholder="Last name *" value={last} onChange={e => setLast(e.target.value)} className={inputClass} disabled={useExisting} />
+              <input placeholder="First name *" value={first} onChange={e => setFirst(e.target.value)} className={inputClass} disabled={!!existing} />
+              <input placeholder="Last name *" value={last} onChange={e => setLast(e.target.value)} className={inputClass} disabled={!!existing} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <input placeholder="Phone *" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} disabled={useExisting} />
-              <input placeholder="Email (optional)" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} disabled={useExisting} />
+              <input placeholder="Phone *" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} disabled={!!existing} />
+              <input placeholder="Email (optional)" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} disabled={!!existing} />
             </div>
-            {dupe && (
-              <div className={cn(
-                'mt-3 px-3.5 py-2.5 rounded-lg border text-sm flex items-center justify-between gap-3',
-                useExisting ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-              )}>
-                <span className="flex items-center gap-2 min-w-0">
-                  {useExisting ? <UserCheck className="w-4 h-4 shrink-0" /> : <Phone className="w-4 h-4 shrink-0" />}
+
+            {/* Locked onto an existing customer */}
+            {existing && (
+              <div className="mt-3 px-3.5 py-2.5 rounded-lg border bg-emerald-500/10 border-emerald-500/30 text-sm flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2 min-w-0 text-emerald-300">
+                  <UserCheck className="w-4 h-4 shrink-0" />
                   <span className="truncate">
-                    {useExisting
-                      ? <>Using existing customer <strong>{dupe.first_name} {dupe.last_name}</strong></>
-                      : <><strong>{dupe.first_name} {dupe.last_name}</strong> ({dupe.phone}) already exists</>}
+                    <strong>{existing.first_name} {existing.last_name}</strong>
+                    {existing.assigned && <> · {existing.assigned.first_name} {existing.assigned.last_name}'s customer — they keep the commission</>}
                   </span>
                 </span>
-                <button
-                  onClick={() => setUseExisting(v => !v)}
-                  className="text-xs font-semibold underline underline-offset-2 shrink-0 hover:opacity-80"
-                >
-                  {useExisting ? 'Create new instead' : 'Use existing'}
+                <button onClick={() => setExisting(null)} className="text-xs font-semibold text-emerald-300 underline underline-offset-2 shrink-0 hover:opacity-80">
+                  Unlink
                 </button>
+              </div>
+            )}
+
+            {/* Live matches while typing — click the name to open their card */}
+            {!existing && matches.length > 0 && (
+              <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 overflow-hidden">
+                <p className="px-3.5 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                  Already in the system?
+                </p>
+                {matches.map(m => (
+                  <div key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 border-t border-amber-500/10 hover:bg-amber-500/10 transition-colors">
+                    <button
+                      onClick={() => { onClose(); navigate(`/contacts/${m.id}`); }}
+                      className="min-w-0 flex-1 text-left group"
+                      title="Open customer card"
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-100 group-hover:text-brand-300 group-hover:underline underline-offset-2">
+                        {m.first_name} {m.last_name}
+                        <ExternalLink className="w-3 h-3 opacity-50" />
+                      </span>
+                      <span className="block text-xs text-ink-500 truncate">
+                        {m.phone} · {m.customer_type}
+                        {m.assigned && <> · assigned to {m.assigned.first_name} {m.assigned.last_name}</>}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => { setExisting(m); setMatches([]); }}
+                      className="text-xs font-bold text-brand-300 bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg shrink-0 transition-colors"
+                    >
+                      Use for this deal
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </section>

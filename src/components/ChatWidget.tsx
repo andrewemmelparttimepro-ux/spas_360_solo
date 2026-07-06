@@ -89,7 +89,7 @@ export default function ChatWidget() {
 
   // ─── Chat header label ─────────────────────────────────
   const chatHeaderLabel = () => {
-    if (isAgent) return 'Sales Assistant';
+    if (isAgent) return 'Ari';
     if (!team.activeThread) return 'Team Chat';
     if (team.activeThread.is_main) return 'Main';
     if (team.activeThread.dm_partner) return team.activeThread.dm_partner.first_name + ' ' + team.activeThread.dm_partner.last_name;
@@ -155,10 +155,10 @@ export default function ChatWidget() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm leading-tight">
-                    {isAgent ? 'Sales Assistant' : 'Team Chat'}
+                    {isAgent ? 'Ari' : 'Team Chat'}
                   </h3>
                   <p className="text-[10px] text-ink-500">
-                    {isAgent ? (currentSending ? 'Thinking...' : 'Online') : `${profile?.first_name}'s team`}
+                    {isAgent ? (currentSending ? 'Working the phones…' : 'Sales Assistant · Online') : `${profile?.first_name}'s team`}
                   </p>
                 </div>
               </div>
@@ -194,7 +194,7 @@ export default function ChatWidget() {
                     <div className="w-12 h-12 bg-brand-500/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
                       <Bot className="w-6 h-6 text-brand-400" />
                     </div>
-                    <p className="text-sm font-medium text-ink-300">How can I help you sell today?</p>
+                    <p className="text-sm font-medium text-ink-300">What are we closing today?</p>
                     <div className="mt-4 space-y-2">
                       {['Look up a customer', "What's in the pipeline?", "Today's schedule", 'Draft a follow-up text'].map(s => (
                         <button
@@ -255,7 +255,7 @@ export default function ChatWidget() {
                       e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Ask your sales assistant..."
+                    placeholder="Ask Ari…"
                     className="flex-1 px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
                     disabled={agent.isSending}
                   />

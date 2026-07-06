@@ -216,10 +216,16 @@ export function useAgentChat() {
       await fetchThreads();
     } catch (err) {
       console.error('Agent error:', err);
+      // Never show raw provider JSON in the chat — translate to a human line
+      const raw = (err as Error).message ?? '';
+      let friendly = "Hit a snag talking to my brain — give it another shot in a moment.";
+      if (/429|rate.?limit|quota|retryDelay/i.test(raw)) friendly = "I'm being rate-limited right now — give me ~30 seconds and ask again.";
+      else if (/401|403|api.?key|unauthorized/i.test(raw)) friendly = "My AI connection isn't authorized — tell a manager to check the API key setup.";
+      else if (/timeout|timed out|network|fetch/i.test(raw)) friendly = "Connection hiccup — try that once more.";
       await supabase.from('agent_messages').insert({
         thread_id: threadId,
         role: 'assistant',
-        content: `Sorry, I encountered an error. Please try again. (${(err as Error).message})`,
+        content: friendly,
       });
       await fetchMessages();
     } finally {

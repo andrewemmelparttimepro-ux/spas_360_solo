@@ -75,6 +75,11 @@ src/
     SearchPalette.tsx     ⌘K/Ctrl+K global search: contacts, deals, jobs, inventory.
     QuickCreate.tsx       Dashboard "+ New" chooser → wizard in place, or /service with the New
                           Job modal auto-opened (navigation state flags, consumed on arrival).
+    InventoryEditor.tsx   Slide-over unit editor (create/edit): brand/category/store/status chips,
+                          smart defaults, live margin readout, Mark Sold w/ customer link, two-step
+                          manager-only delete. Settings has Team & Permissions (owner_manager only):
+                          role + home-store per teammate — THIS is how new signups (e.g. Brandon)
+                          get promoted from the default Salesperson role.
     StoreSwitcher.tsx     All/Minot/Bismarck segmented control on Inventory — drives GLOBAL
                           activeLocationId (header pill, Deals, Schedule follow).
     ChatWidget.tsx        Floating AI sales assistant + team chat.
@@ -166,6 +171,9 @@ Documented in `.env.example`. AI assistant currently runs Gemini; set `AI_PROVID
 2. **Bismarck inventory tab** — not yet imported (screenshots only covered Minot + Used).
 3. **Brand backfill** — Oslo/Tokyo/Maximus + Hekla/Trend/Pro 6 items imported with brand NULL.
 4. **Lock down open signup** before Matt/Brandon get invites (Login has public sign-up).
+5. **Apply `supabase/migration_inventory_delete.sql`** (one CREATE POLICY — the Supabase MCP
+   connector was down when it was written; until applied, inventory delete reports an honest
+   "Delete failed"). When Brandon signs up: Settings → Team & Permissions → set him Owner/Manager.
 
 ## 9. Next milestones (agreed roadmap)
 

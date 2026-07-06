@@ -301,7 +301,12 @@ export default function Inventory() {
                     <EditableStatus value={item.status} itemId={item.id} onSave={updateItem} />
                   </td>
                   <td className="p-4 text-sm font-medium text-ink-100 text-right">
-                    <EditableCell value={item.sale_price ?? item.msrp ?? 0} field="sale_price" itemId={item.id} onSave={updateItem} type="number" prefix="$" className="justify-end" />
+                    <div className="flex items-center justify-end gap-2">
+                      {item.msrp != null && item.sale_price != null && Number(item.msrp) > Number(item.sale_price) && (
+                        <span className="text-[11px] text-ink-500 line-through shrink-0" title="MSRP">${Number(item.msrp).toLocaleString()}</span>
+                      )}
+                      <EditableCell value={item.sale_price ?? item.msrp ?? 0} field="sale_price" itemId={item.id} onSave={updateItem} type="number" prefix="$" className="justify-end" />
+                    </div>
                   </td>
                 </tr>
               ))}

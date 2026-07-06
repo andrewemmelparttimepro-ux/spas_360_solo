@@ -78,7 +78,7 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
 export default function Service() {
   const { jobs, unscheduledJobs, scheduledJobs, isLoading, createJob, updateJob } = useServiceJobs();
   const { contacts } = useContacts();
-  const { locations } = useAuth();
+  const { locations, profile, activeLocationId } = useAuth();
   const { toast } = useToast();
 
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -166,6 +166,17 @@ export default function Service() {
 
   // ─── Create job modal ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
+  const autoTitleRef = useRef('');
+  const applyAutoTitle = (contactId: string, jobType: string) => {
+    const c = contacts.find(x => x.id === contactId);
+    if (!c) return;
+    const auto = `${c.last_name} – ${jobType}`;
+    setNewJob(j => {
+      if (j.title !== '' && j.title !== autoTitleRef.current) return j; // hand-edited: leave it alone
+      autoTitleRef.current = auto;
+      return { ...j, title: auto };
+    });
+  };
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
     job_type: 'Repair' as JobType, status: 'In Progress' as JobStatus,
@@ -195,7 +206,14 @@ export default function Service() {
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Service Schedule</h1>
           <p className="hidden sm:block text-sm text-ink-400 mt-1">Drag jobs from the queue onto a day — drag back to unschedule</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
+        <button
+          onClick={() => {
+            // Smart default: pre-pick the store you're already working in
+            setNewJob(j => ({ ...j, location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '' }));
+            setShowCreate(true);
+          }}
+          className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
+        >
           <Plus className="w-4 h-4 mr-2" />New Job
         </button>
       </div>
@@ -238,12 +256,12 @@ export default function Service() {
             </div>
             <div className="space-y-3">
               <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              <select value={newJob.contact_id} onChange={e => setNewJob({...newJob, contact_id: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+              <select value={newJob.contact_id} onChange={e => { setNewJob({...newJob, contact_id: e.target.value}); applyAutoTitle(e.target.value, newJob.job_type); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                 <option value="">Select Customer *</option>
                 {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} — {c.phone}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-3">
-                <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+                <select value={newJob.job_type} onChange={e => { setNewJob({...newJob, job_type: e.target.value as JobType}); applyAutoTitle(newJob.contact_id, e.target.value); }} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option>Delivery</option><option>Repair</option><option>Installation</option><option>Warranty</option><option>Maintenance</option><option>Pickup</option>
                 </select>
                 <select value={newJob.status} onChange={e => setNewJob({...newJob, status: e.target.value as JobStatus})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">

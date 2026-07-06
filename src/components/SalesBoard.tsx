@@ -22,12 +22,15 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
     const in7 = new Date(now); in7.setDate(in7.getDate() + 7);
 
     const won = deals.filter(d => d.stage_id === wonId && new Date(d.updated_at) >= monthStart);
+    const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cold = open.filter(d => new Date(d.updated_at) < sevenDaysAgo);
     const closing = open.filter(d => d.expected_close_date && new Date(d.expected_close_date) <= in7);
     const hot = open.filter(d => d.priority === 'High');
     const sum = (arr: Deal[]) => arr.reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
     return {
       pipeline: { value: sum(open), count: open.length },
+      cold: { value: sum(cold), count: cold.length },
       won: { value: sum(won), count: won.length },
       closing: { value: sum(closing), count: closing.length },
       hot: { count: hot.length },
@@ -35,7 +38,12 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
   }, [deals, stages]);
 
   const tiles = [
-    { icon: TrendingUp, label: 'Open Pipeline', big: money(board.pipeline.value), sub: `${board.pipeline.count} active deal${board.pipeline.count === 1 ? '' : 's'}`, featured: true },
+    {
+      icon: TrendingUp, label: 'Open Pipeline', big: money(board.pipeline.value), featured: true,
+      sub: board.cold.count > 0
+        ? `${board.pipeline.count} active · ${money(board.cold.value)} sitting idle 7d+`
+        : `${board.pipeline.count} active deal${board.pipeline.count === 1 ? '' : 's'}`,
+    },
     { icon: Trophy, label: 'Won This Month', big: money(board.won.value), sub: `${board.won.count} closed`, accent: 'text-emerald-400' },
     { icon: CalendarClock, label: 'Closing This Week', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'expected closes', accent: 'text-amber-400' },
     { icon: Flame, label: 'Hot Leads', big: String(board.hot.count), sub: 'close within a week', accent: 'text-red-400' },

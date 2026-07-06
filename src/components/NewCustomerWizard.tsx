@@ -101,6 +101,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const step3Done = interests.length > 0;
   const step4Done = priority !== null;
   const step5Done = followupDate.length > 0;
+  const doneCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
   const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !saving;
 
   const toggleInterest = (i: string) =>
@@ -185,12 +186,24 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col">
-        <div className="px-6 pt-5 pb-4 border-b border-ink-700 flex items-start justify-between shrink-0">
-          <div>
-            <h2 className="text-lg font-bold text-ink-100">New Customer</h2>
-            <p className="text-xs text-ink-500 mt-0.5">Guided clicks — every answer stays changeable.</p>
+        <div className="px-6 pt-5 pb-4 border-b border-ink-700 shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-ink-100">New Customer</h2>
+              <p className="text-xs text-ink-500 mt-0.5">Guided clicks — every answer stays changeable.</p>
+            </div>
+            <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
-          <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
+          {/* Endowed progress: the follow-up step is genuinely pre-completed, so this never starts at 0% */}
+          <div className="mt-3.5">
+            <div className="flex justify-between items-baseline text-[10px] font-semibold mb-1.5">
+              <span className="text-ink-400">{doneCount} of 5 complete</span>
+              {step5Done && doneCount < 5 && <span className="text-brand-400">Follow-up already set for you ✓</span>}
+            </div>
+            <div className="h-1.5 bg-ink-800 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${(doneCount / 5) * 100}%` }} />
+            </div>
+          </div>
         </div>
 
         <div className="px-6 py-5 space-y-6 overflow-y-auto">

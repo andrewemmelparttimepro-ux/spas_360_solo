@@ -1,5 +1,5 @@
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, MoreHorizontal, Calendar, AlertTriangle, User } from 'lucide-react';
+import { Plus, MoreHorizontal, Calendar, AlertTriangle, User, Snowflake } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,8 @@ import NewCustomerWizard from '@/components/NewCustomerWizard';
 export default function Deals() {
   const { stages, deals, dealsWithTasks, isLoading, getDealsForStage, moveDeal, refresh } = usePipeline();
   const [showWizard, setShowWizard] = useState(false);
+  // IKEA effect: spotlight the customer card the salesperson just built
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
@@ -28,7 +30,18 @@ export default function Deals() {
         </button>
       </div>
 
-      {showWizard && <NewCustomerWizard onClose={() => setShowWizard(false)} onCreated={() => refresh()} />}
+      {showWizard && (
+        <NewCustomerWizard
+          onClose={() => setShowWizard(false)}
+          onCreated={(dealId) => {
+            refresh();
+            if (dealId) {
+              setHighlightId(dealId);
+              setTimeout(() => setHighlightId(null), 4000);
+            }
+          }}
+        />
+      )}
 
       {/* The live board — realtime scoreboard above the pipeline */}
       <SalesBoard deals={deals} stages={stages} />
@@ -52,7 +65,14 @@ export default function Deals() {
                         className={cn('flex-1 p-3 overflow-y-auto min-h-[100px] space-y-3 transition-colors', snapshot.isDraggingOver ? 'bg-brand-500/10' : '')}
                       >
                         {stageDeals.map((deal, index) => (
-                          <DealCard key={deal.id} deal={deal} index={index} hasTask={dealsWithTasks.has(deal.id)} />
+                          <DealCard
+                            key={deal.id}
+                            deal={deal}
+                            index={index}
+                            hasTask={dealsWithTasks.has(deal.id)}
+                            closed={stage.name.startsWith('Closed')}
+                            highlight={deal.id === highlightId}
+                          />
                         ))}
                         {provided.placeholder}
                       </div>
@@ -74,8 +94,9 @@ const priorityEdge: Record<string, string> = {
   Low: 'border-l-brand-500',
 };
 
-function DealCard({ deal, index, hasTask }: { deal: PipelineDeal; index: number; hasTask: boolean }) {
+function DealCard({ deal, index, hasTask, closed, highlight }: { deal: PipelineDeal; index: number; hasTask: boolean; closed?: boolean; highlight?: boolean }) {
   const daysInStage = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+  const goingCold = !closed && daysInStage > 7; // loss framing: idle deals are money walking away
   const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : null;
   const interests = (deal.product_interest ?? []).slice(0, 3);
 
@@ -86,7 +107,8 @@ function DealCard({ deal, index, hasTask }: { deal: PipelineDeal; index: number;
           className={cn(
             'bg-ink-900 p-3.5 rounded-lg border border-ink-700 border-l-[3px] group hover:border-brand-500/40 transition-all',
             priorityEdge[deal.priority] ?? 'border-l-ink-600',
-            snapshot.isDragging ? 'shadow-lg ring-2 ring-brand-500/50' : ''
+            snapshot.isDragging ? 'shadow-lg ring-2 ring-brand-500/50' : '',
+            highlight && 'ring-2 ring-brand-400 shadow-[0_0_24px_rgba(52,160,255,0.4)] animate-pulse'
           )}>
           <div className="flex justify-between items-start gap-2 mb-1.5">
             <Link to={`/deals/${deal.id}`} className="min-w-0">
@@ -114,7 +136,13 @@ function DealCard({ deal, index, hasTask }: { deal: PipelineDeal; index: number;
           )}
 
           <div className="flex items-center justify-between text-[11px] border-t border-ink-800 pt-2.5">
-            <span className="text-ink-500">{daysInStage}d in stage</span>
+            {goingCold ? (
+              <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                <Snowflake className="w-3 h-3" />{daysInStage}d idle — going cold
+              </span>
+            ) : (
+              <span className="text-ink-500">{daysInStage}d in stage</span>
+            )}
             {!hasTask ? (
               <span className="flex items-center gap-1 text-red-400 font-semibold">
                 <AlertTriangle className="w-3 h-3" />No follow-up

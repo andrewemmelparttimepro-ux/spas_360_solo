@@ -110,8 +110,9 @@ src/
   hooks/           One hook per domain (usePipeline, useServiceJobs, useInventory, useContacts,
                    useConversations, useTeamChat, useAgentChat, useNotifications, useDashboard,
                    useReports, useTimeClock, useJobPhotos). All Supabase + realtime.
-  agent/           AI assistant system prompt + 13 tool definitions (search/create contacts,
-                   deals, tasks, notes, pipeline summary, schedule_job, etc.).
+  agent/           AI assistant tool definitions (15: search/create contacts & deals,
+                   list_open_deals, get_deal_details, tasks, notes, pipeline summary,
+                   schedule_job, etc.). Prompt/rails moved to api/_lib/ (server-side).
 supabase/          schema.sql (18 tables + RLS + triggers + seed) and applied migrations:
                    migration_agent.sql, migration_notifications.sql, migration_field_capture.sql,
                    migration_sms_realtime.sql. seed_demo.sql = staged demo data (NOT run).

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
+import StoreSwitcher from '@/components/StoreSwitcher';
 import type { InventoryItem, InventoryStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -250,6 +251,9 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {/* One-tap Minot ↔ Bismarck switching — the core inventory workflow */}
+      <StoreSwitcher />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 shrink-0">
         {summaryCards.map(card => (

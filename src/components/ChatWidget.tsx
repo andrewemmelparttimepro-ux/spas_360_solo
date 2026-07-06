@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, Users, Sparkles, ArrowLeft, Hash, User } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Users, Sparkles, ArrowLeft, Hash, User, History, SquarePen, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useTeamChat, type TeamMember } from '@/hooks/useTeamChat';
@@ -7,11 +7,14 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type Tab = 'agent' | 'team';
 type TeamView = 'directory' | 'chat';
+type AgentView = 'chat' | 'history';
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('agent');
   const [teamView, setTeamView] = useState<TeamView>('directory');
+  const [agentView, setAgentView] = useState<AgentView>('chat');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -32,6 +35,14 @@ export default function ChatWidget() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentMessages]);
+
+  // Continuity: opening the widget resumes the most recent conversation
+  useEffect(() => {
+    if (isOpen && isAgent && !agent.activeThreadId && agent.threads.length > 0 && agentView === 'chat') {
+      agent.setActiveThreadId(agent.threads[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, agent.threads.length]);
 
   // Focus input when entering chat view
   useEffect(() => {
@@ -84,6 +95,8 @@ export default function ChatWidget() {
     setDraft('');
     if (newTab === 'team') {
       setTeamView('directory');
+    } else {
+      setAgentView('chat');
     }
   };
 
@@ -149,18 +162,45 @@ export default function ChatWidget() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-brand-500/20 rounded-lg flex items-center justify-center mr-3">
+              <div className="flex items-center min-w-0">
+                {isAgent && agentView === 'history' && (
+                  <button onClick={() => setAgentView('chat')} className="p-1 mr-2 hover:bg-ink-800 rounded" aria-label="Back to chat">
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="w-8 h-8 bg-brand-500/20 rounded-lg flex items-center justify-center mr-3 shrink-0">
                   {isAgent ? <Bot className="w-4 h-4 text-brand-400" /> : <Users className="w-4 h-4 text-brand-400" />}
                 </div>
-                <div>
-                  <h3 className="font-semibold text-sm leading-tight">
-                    {isAgent ? 'Ari' : 'Team Chat'}
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-sm leading-tight truncate">
+                    {isAgent ? (agentView === 'history' ? 'Conversations' : 'Ari') : 'Team Chat'}
                   </h3>
                   <p className="text-[10px] text-ink-500">
-                    {isAgent ? (currentSending ? 'Working the phones…' : 'Sales Assistant · Online') : `${profile?.first_name}'s team`}
+                    {isAgent
+                      ? (agentView === 'history' ? `${agent.threads.length} saved` : currentSending ? 'Working the phones…' : 'Sales Assistant · Online')
+                      : `${profile?.first_name}'s team`}
                   </p>
                 </div>
+              </div>
+            )}
+            {isAgent && agentView === 'chat' && (
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setAgentView('history')}
+                  className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
+                  title="Conversation history"
+                  aria-label="Conversation history"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { agent.startNewChat(); setAgentView('chat'); setDraft(''); }}
+                  className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
+                  title="New conversation"
+                  aria-label="New conversation"
+                >
+                  <SquarePen className="w-4 h-4" />
+                </button>
               </div>
             )}
           </div>
@@ -185,8 +225,62 @@ export default function ChatWidget() {
             </button>
           </div>
 
-          {/* ═══ AGENT TAB ═══ */}
-          {isAgent && (
+          {/* ═══ AGENT TAB — HISTORY VIEW ═══ */}
+          {isAgent && agentView === 'history' && (
+            <div className="flex-1 overflow-y-auto bg-ink-950/50">
+              <button
+                onClick={() => { agent.startNewChat(); setAgentView('chat'); }}
+                className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-ink-800 text-brand-300 hover:bg-brand-500/10 transition-colors text-sm font-semibold"
+              >
+                <SquarePen className="w-4 h-4" /> New conversation
+              </button>
+              {agent.threads.length === 0 ? (
+                <p className="text-xs text-ink-500 text-center py-10">No conversations yet</p>
+              ) : agent.threads.map(t => (
+                <div
+                  key={t.id}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-3 border-b border-ink-800/60 hover:bg-ink-800 transition-colors group',
+                    t.id === agent.activeThreadId && 'bg-brand-500/10'
+                  )}
+                >
+                  <button
+                    onClick={() => { agent.setActiveThreadId(t.id); setAgentView('chat'); }}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className={cn('block text-sm truncate', t.id === agent.activeThreadId ? 'text-brand-300 font-semibold' : 'text-ink-100 font-medium')}>
+                      {t.title || 'Untitled'}
+                    </span>
+                    <span className="block text-[11px] text-ink-500">
+                      {t.last_message_at ? new Date(t.last_message_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' · ' + new Date(t.last_message_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Empty'}
+                    </span>
+                  </button>
+                  {confirmDeleteId === t.id ? (
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-semibold text-ink-400 hover:text-ink-200 px-1.5 py-1">Keep</button>
+                      <button
+                        onClick={async () => { await agent.deleteThread(t.id); setConfirmDeleteId(null); }}
+                        className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-2 py-1 rounded-md"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(t.id)}
+                      className="p-1.5 text-ink-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                      aria-label={`Delete conversation ${t.title ?? ''}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ═══ AGENT TAB — CHAT VIEW ═══ */}
+          {isAgent && agentView === 'chat' && (
             <>
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-ink-950/50">
                 {agent.messages.length === 0 && !agent.isSending && (

@@ -233,6 +233,24 @@ export function useAgentChat() {
     }
   }, [user, messages, isSending, fetchMessages, fetchThreads]);
 
+  // Delete a conversation (RLS: own threads only; messages cascade)
+  const deleteThread = useCallback(async (threadId: string) => {
+    const { data, error } = await supabase.from('agent_threads').delete().eq('id', threadId).select('id');
+    if (error || !data || data.length === 0) return false;
+    if (activeThreadRef.current === threadId) {
+      setActiveThreadId(null);
+      activeThreadRef.current = null;
+    }
+    await fetchThreads();
+    return true;
+  }, [fetchThreads]);
+
+  // Fresh conversation: clear the active thread; the next send lazy-creates one
+  const startNewChat = useCallback(() => {
+    setActiveThreadId(null);
+    activeThreadRef.current = null;
+  }, []);
+
   const activeThread = threads.find(t => t.id === activeThreadId);
 
   return {
@@ -244,6 +262,8 @@ export function useAgentChat() {
     isLoading,
     isSending,
     createThread,
+    deleteThread,
+    startNewChat,
     sendMessage,
     refresh: fetchThreads,
   };

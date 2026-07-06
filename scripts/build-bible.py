@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SPAS 360 Owner's Manual — comprehensive, branded PDF."""
+"""The SPAS 360 Bible — the single source of truth for operators AND builders."""
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor, white
@@ -24,7 +24,7 @@ RED = HexColor('#dc2626')
 PURPLE = HexColor('#7c3aed')
 BLACKC = HexColor('#111111')
 
-OUT = "/Users/andrewemmel/Desktop/antigravity/spas_360_solo/docs/SPAS360-Owners-Manual.pdf"
+OUT = "/Users/andrewemmel/Desktop/antigravity/spas_360_solo/docs/SPAS360-Bible.pdf"
 
 # ─── Styles ──────────────────────────────────────────────
 S = {}
@@ -94,6 +94,26 @@ def swatch_table(rows, widths):
     t.setStyle(TableStyle(styles))
     return t
 
+def token_table(rows, widths):
+    """rows: (hexcolor, token, hex_label, usage)"""
+    data = [[Paragraph('<b></b>', S['tcellw']), Paragraph('<b>Token</b>', S['tcellw']),
+             Paragraph('<b>Hex</b>', S['tcellw']), Paragraph('<b>Used for</b>', S['tcellw'])]]
+    styles = [
+        ('BACKGROUND', (0,0), (-1,0), NAVY),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, BORDER),
+        ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LEFTPADDING', (0,0), (-1,-1), 7),
+    ]
+    for i, (color, token, hexl, usage) in enumerate(rows, start=1):
+        data.append(['', Paragraph(f'<font face="Courier"><b>{token}</b></font>', S['tcell']),
+                     Paragraph(f'<font face="Courier">{hexl}</font>', S['tcell']),
+                     Paragraph(usage, S['tcell'])])
+        styles.append(('BACKGROUND', (0,i), (0,i), color))
+    t = Table(data, colWidths=widths, repeatRows=1)
+    t.setStyle(TableStyle(styles))
+    return t
+
 # ─── Page furniture ──────────────────────────────────────
 def on_page(canvas, doc):
     canvas.saveState()
@@ -101,7 +121,7 @@ def on_page(canvas, doc):
         canvas.setStrokeColor(BORDER); canvas.setLineWidth(0.5)
         canvas.line(0.8*inch, 0.62*inch, 7.7*inch, 0.62*inch)
         canvas.setFont('Helvetica', 8); canvas.setFillColor(GRAY)
-        canvas.drawString(0.8*inch, 0.45*inch, 'SPAS 360 Owner’s Manual  ·  Magic City Home Leisure')
+        canvas.drawString(0.8*inch, 0.45*inch, 'The SPAS 360 Bible  ·  Magic City Home Leisure')
         canvas.drawRightString(7.7*inch, 0.45*inch, f'Page {doc.page}')
         canvas.setFillColor(BRAND)
         canvas.rect(0, 10.85*inch, 8.5*inch, 0.06*inch, stroke=0, fill=1)
@@ -126,7 +146,7 @@ os.makedirs(os.path.dirname(OUT), exist_ok=True)
 doc = BaseDocTemplate(OUT, pagesize=letter,
                       leftMargin=0.8*inch, rightMargin=0.8*inch,
                       topMargin=0.75*inch, bottomMargin=0.85*inch,
-                      title="SPAS 360 Owner's Manual", author='NDAI')
+                      title="The SPAS 360 Bible", author='NDAI')
 frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='f')
 doc.addPageTemplates([
     PageTemplate(id='cover', frames=[Frame(0.8*inch, 1*inch, 6.9*inch, 7.4*inch)], onPage=on_cover),
@@ -139,11 +159,11 @@ E = []  # story
 E.append(Spacer(1, 1.2*inch))
 E.append(Paragraph("SPAS <font color='#34a0ff'>360</font>", S['cover_title']))
 E.append(Spacer(1, 10))
-E.append(Paragraph("Owner’s Manual", ParagraphStyle('ct2', fontName='Helvetica-Bold', fontSize=26, textColor=white, leading=32)))
+E.append(Paragraph("The Bible", ParagraphStyle('ct2', fontName='Helvetica-Bold', fontSize=26, textColor=white, leading=32)))
 E.append(Spacer(1, 22))
-E.append(Paragraph("The complete guide to running Magic City Home Leisure on one system — sales, service, inventory, customers, and Ari.", S['cover_sub']))
+E.append(Paragraph("The single source of truth — how to run Magic City Home Leisure on one system, and how to build on it. Sales, service, inventory, customers, Ari, and the design law.", S['cover_sub']))
 E.append(Spacer(1, 2.1*inch))
-E.append(Paragraph("Version 1.0 · July 2026", S['cover_meta']))
+E.append(Paragraph("Version 1.1 · July 2026", S['cover_meta']))
 E.append(Paragraph("Minot &amp; Bismarck, North Dakota", S['cover_meta']))
 E.append(Paragraph("Powered by NDAI", S['cover_meta']))
 E.append(PageBreak())
@@ -161,7 +181,8 @@ toc_items = [
     ('9', 'Service — The Schedule'), ('10', 'Service — Working a Job'),
     ('11', 'Ari — Your AI Sales Assistant'), ('12', 'Messages'),
     ('13', 'Customer Texting'), ('14', 'Reports'), ('15', 'Settings &amp; Team Management'),
-    ('16', 'Owner’s Operations Guide'), ('17', 'Quick Reference'),
+    ('16', 'Owner’s Operations Guide'), ('17', 'The Style Guide — Design Law for Builders'),
+    ('18', 'Quick Reference'),
 ]
 for num, t in toc_items:
     E.append(Paragraph(f'<font color="#1075b8"><b>{num}.</b></font>&nbsp;&nbsp;{t}', S['toc']))
@@ -469,9 +490,68 @@ E.append(P("QuickBooks sync (customers/estimates first) · install-to-home-scree
            "reminders for stagnant parts and overdue follow-ups · @Ari in team channels · role-based page "
            "restrictions beyond landing pages."))
 
-# ═══ 17. QUICK REFERENCE ═══
+# ═══ 17. STYLE GUIDE ═══
 E.append(PageBreak())
-E += section('17', 'Quick Reference')
+E += section('17', 'The Style Guide — Design Law for Builders')
+E.append(P("This chapter is for anyone — human or AI agent — who builds on SPAS 360. These aren’t suggestions; "
+           "they are the design law that keeps the product feeling like one hand made it. The deep engineering "
+           "companion (architecture, gotchas, infrastructure IDs) is <b>HANDOFF.md</b> in the repo root; this "
+           "chapter is the visual and experiential contract."))
+
+E.append(Paragraph('<b>Design tokens — use these names, never raw palette colors</b>', S['h2']))
+E.append(P("All colors are Tailwind v4 tokens defined in <font face='Courier'>src/index.css</font>. If you type a "
+           "raw Tailwind color (slate-, sky-, gray-) for a surface or accent, you’re doing it wrong."))
+E.append(token_table([
+    (HexColor('#0a0a0f'), 'ink-950', '#0a0a0f', 'Page background'),
+    (HexColor('#111116'), 'ink-900', '#111116', 'Cards, panels, the header'),
+    (HexColor('#16161B'), 'ink-850', '#16161B', 'Raised surfaces, dropdowns'),
+    (HexColor('#1E1E24'), 'ink-800', '#1E1E24', 'Hover states'),
+    (HexColor('#2A2A32'), 'ink-700', '#2A2A32', 'Borders (the default)'),
+    (HexColor('#6B7280'), 'ink-500', '#6B7280', 'Muted text, labels'),
+    (HexColor('#9CA3AF'), 'ink-400', '#9CA3AF', 'Secondary text'),
+    (HexColor('#F0F0F0'), 'ink-100', '#F0F0F0', 'Primary text'),
+], [0.55*inch, 1.1*inch, 0.95*inch, 3.9*inch]))
+E.append(Spacer(1, 6))
+E.append(token_table([
+    (HexColor('#34a0ff'), 'brand-400', '#34a0ff', 'Accent text, active icons, links'),
+    (HexColor('#1075b8'), 'brand-500', '#1075b8', 'THE brand blue (from magiccityhomeleisure.com) — primary buttons, active states'),
+    (HexColor('#0d629b'), 'brand-600', '#0d629b', 'Button hover (hover always darkens)'),
+    (HexColor('#002e56'), 'brand-900', '#002e56', 'Deep navy — gradients, cover art'),
+], [0.55*inch, 1.1*inch, 0.95*inch, 3.9*inch]))
+E.append(Spacer(1, 6))
+E.append(P("<b>Functional colors:</b> emerald = go/success/Service side · amber = warning/idle/sold-awaiting · "
+           "red = urgent/delivery/destructive · purple = on-order · black chip = parts-not-arrived (Brandon’s rule). "
+           "Status tints on dark are always <font face='Courier'>color-500/15</font> backgrounds with "
+           "<font face='Courier'>color-300</font> text — never light pastel fills."))
+
+E.append(Paragraph('<b>Typography</b>', S['h2']))
+E.append(B("<b>Inter</b> for everything. Weights do the talking: bold for values and names, semibold for actions, regular for body."))
+E.append(B("<b>JetBrains Mono</b> for money and scoreboard numerals only (deal amounts, the live board) — never for prose."))
+E.append(B("Labels above data: 10–11px, bold, uppercase, tracked wide, <font face='Courier'>ink-500</font>."))
+
+E.append(Paragraph('<b>Component language</b>', S['h2']))
+E.append(B("<b>Cards:</b> <font face='Courier'>bg-ink-900 · border-ink-700 · rounded-xl</font>. Hover: border tints brand. No drop-shadow theatrics on dark."))
+E.append(B("<b>Chips for choices:</b> anything with ≤ 8 options is chips, not a dropdown (the wizard, the editor, the legend). Active chip = <font face='Courier'>brand-500/15 bg + brand-500 border + brand-300 text</font>."))
+E.append(B("<b>Primary buttons:</b> <font face='Courier'>bg-brand-500 hover:bg-brand-600</font>, white text, rounded-lg, with a leading icon. One primary action per view."))
+E.append(B("<b>Nav tones:</b> Sales cluster wears brand blue, Service wears emerald, everything else stays neutral ink — defined once in <font face='Courier'>NAV_TONE</font> (Header.tsx)."))
+E.append(B("<b>Destructive actions:</b> always two-step inline confirm (Keep / Delete) — never a browser alert, never one-tap."))
+E.append(B("<b>Empty states:</b> icon + one honest sentence + what to do next. NEVER fake data, random numbers, or decorative dead controls."))
+
+E.append(Paragraph('<b>The UX doctrine</b>', S['h2']))
+E.append(B("<b>Reliability first.</b> Real data or an honest empty state. Errors fail loudly in plain English — no raw JSON, no silent failure. If a write can be denied, verify it happened."))
+E.append(B("<b>Jobber familiarity is a feature.</b> The crew’s muscle memory (colors, drag-to-schedule, queue-on-the-right, strikethrough-done) is load-bearing. Don’t modernize it away."))
+E.append(B("<b>Psychology, honestly applied:</b> smart defaults everywhere a value is predictable · endowed progress only when genuinely pre-completed · show people the thing they just built (highlight pulse) · loss-frame idle money (“going cold”) · anchor prices with struck-through MSRP. Never fake urgency or progress."))
+E.append(B("<b>Every screen works at 375px.</b> Techs live on phones. Test mobile before shipping."))
+E.append(B("<b>Nothing locked, everything witnessed:</b> prefer attribution (logged notes) over permission walls, except where money or data loss demands a manager gate."))
+
+E.append(Paragraph('<b>Voice &amp; writing</b>', S['h2']))
+E.append(B("North Dakota friendly, big-league competent. Short sentences. Verbs first on buttons (“Add Item”, “Mark Sold”)."))
+E.append(B("Speak the trade’s language: visits, the queue, the board, going cold, parts on order."))
+E.append(B("Ari stays professional-tenacious; his guardrails live server-side (api/_lib/rails.ts) and are the template for every future NDAI agent."))
+
+# ═══ 18. QUICK REFERENCE ═══
+E.append(PageBreak())
+E += section('18', 'Quick Reference')
 E.append(styled_table(
     ['Do this', 'How'],
     [['Search anything', '⌘K (Mac) / Ctrl+K (Windows), or the Search pill'],
@@ -494,7 +574,7 @@ E.append(P("<b>House rules the app enforces:</b> every lead gets a follow-up tas
            "manager · no customer contact from personal phones · the customer stays with their salesperson"))
 E.append(Spacer(1, 18))
 E.append(Paragraph('<font color="#5b6472">SPAS 360 · Built for Magic City Home Leisure · Powered by NDAI · '
-                   'Manual v1.0, July 2026</font>', ParagraphStyle('end', fontName='Helvetica-Oblique', fontSize=9,
+                   'The Bible v1.1, July 2026</font>', ParagraphStyle('end', fontName='Helvetica-Oblique', fontSize=9,
                    textColor=GRAY, alignment=TA_CENTER)))
 
 doc.build(E)

@@ -196,11 +196,13 @@ server-side reminders (pg_cron writes notifications for stagnant parts/overdue t
 permission enforcement beyond landing pages → run `seed_demo.sql` only if a demo dataset is wanted
 (real inventory already loaded — may be unnecessary).
 
-## 10. The Owner's Manual
+## 10. The SPAS 360 Bible
 
-`docs/SPAS360-Owners-Manual.pdf` is the USER-FACING single source of truth (this handoff is the
-agent-facing one). Regenerate it with `python3 scripts/build-owners-manual.py` whenever features
-change materially, bump the version string in the script, and re-commit both.
+`docs/SPAS360-Bible.pdf` is the single source of truth for operators AND builders — usage guide
+for the crew plus §17 "The Style Guide — Design Law" (tokens, component language, UX doctrine)
+for anyone building on the app. Regenerate with `python3 scripts/build-bible.py` whenever
+features or design law change materially; bump the version string; re-commit both. This handoff
+stays the deep engineering companion the Bible points to.
 
 ## 11. Working conventions (hold these)
 

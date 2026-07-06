@@ -70,11 +70,21 @@ export function useConversations() {
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
+  // Real-time: new threads / inbound texts anywhere refresh the list
+  useEffect(() => {
+    if (!profile) return;
+    const channel = supabase
+      .channel(`conv-threads-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'communication_threads' }, () => fetchThreads())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [profile, fetchThreads]);
+
   // Real-time messages
   useEffect(() => {
     if (!activeThreadId) return;
     const channel = supabase
-      .channel(`messages-${activeThreadId}`)
+      .channel(`messages-${activeThreadId}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -88,22 +98,40 @@ export function useConversations() {
     return () => { supabase.removeChannel(channel); };
   }, [activeThreadId, fetchMessages]);
 
-  const sendMessage = useCallback(async (body: string) => {
-    if (!activeThreadId || !profile) return;
+  const sendMessage = useCallback(async (body: string): Promise<{ error: string | null }> => {
+    if (!activeThreadId || !profile) return { error: 'No conversation selected' };
+    const thread = threads.find(t => t.id === activeThreadId);
+    if (!thread?.contact?.phone) return { error: 'Contact has no phone number' };
+
+    // Send through the business number first — only record what actually went out
+    const session = await supabase.auth.getSession();
+    const resp = await fetch('/api/sms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.data.session?.access_token}`,
+      },
+      body: JSON.stringify({ to: thread.contact.phone, body }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Send failed' }));
+      return { error: err.error ?? 'Send failed' };
+    }
+
     await supabase.from('messages').insert({
       thread_id: activeThreadId,
       sender_type: 'agent',
       sender_id: profile.id,
       body,
     });
-    // Update thread's last_message_at
     await supabase
       .from('communication_threads')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', activeThreadId);
     await fetchMessages();
     await fetchThreads();
-  }, [activeThreadId, profile, fetchMessages, fetchThreads]);
+    return { error: null };
+  }, [activeThreadId, threads, profile, fetchMessages, fetchThreads]);
 
   const activeThread = threads.find(t => t.id === activeThreadId) ?? null;
 

@@ -278,11 +278,16 @@ function TeamChatPanel() {
 // âââ Customer Messages Panel (original) âââ
 function CustomerPanel() {
   const { threads, activeThread, setActiveThreadId, messages, isLoading, sendMessage } = useConversations();
+  const { toast } = useToast();
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
-    if (!draft.trim()) return;
-    await sendMessage(draft);
+    if (!draft.trim() || sending) return;
+    setSending(true);
+    const { error } = await sendMessage(draft);
+    setSending(false);
+    if (error) { toast(`Text not sent: ${error}`, 'error'); return; }
     setDraft('');
   };
 

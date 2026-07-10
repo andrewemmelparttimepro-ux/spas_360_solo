@@ -103,7 +103,7 @@ export default function Customers() {
         </div>
         <button
           onClick={() => setShowWizard(true)}
-          className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
+          className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Customer
@@ -180,6 +180,13 @@ export default function Customers() {
           <Users className="w-12 h-12 mb-3" />
           <p className="text-lg font-medium">No customers yet</p>
           <p className="text-sm mt-1">Add your first customer to start building the book</p>
+          <button
+            onClick={() => setShowWizard(true)}
+            className="mt-4 bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Customer
+          </button>
         </div>
       ) : visible.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-ink-500">

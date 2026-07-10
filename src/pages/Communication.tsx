@@ -269,7 +269,7 @@ function TeamChatPanel() {
             </div>
 
             {/* Compose */}
-            <div className="p-4 border-t border-ink-700 bg-ink-900 shrink-0">
+            <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-ink-700 bg-ink-900 shrink-0">
               <div className="flex items-end space-x-2">
                 <div className="flex-1 bg-ink-950 rounded-xl border border-transparent focus-within:border-brand-500 focus-within:bg-ink-900 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
                   <MentionInput
@@ -279,7 +279,7 @@ function TeamChatPanel() {
                     picked={pickedRef}
                     onSubmit={handleSend}
                     placeholder="Type a message… @ mentions a teammate, customer, or Ari"
-                    className="w-full bg-transparent border-none p-3 text-sm outline-none resize-none"
+                    className="w-full bg-transparent border-none p-3 text-base sm:text-sm outline-none resize-none"
                   />
                 </div>
                 <button
@@ -379,7 +379,7 @@ function CustomerPanel() {
               ))}
             </div>
 
-            <div className="p-4 border-t border-ink-700 bg-ink-900 shrink-0">
+            <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-ink-700 bg-ink-900 shrink-0">
               <div className="flex items-end space-x-2">
                 <button className="p-3 text-ink-500 hover:text-ink-300 hover:bg-ink-800 rounded-lg transition-colors shrink-0"><Paperclip className="w-5 h-5" /></button>
                 <div className="flex-1 bg-ink-950 rounded-xl border border-transparent focus-within:border-brand-500 focus-within:bg-ink-900 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
@@ -387,7 +387,7 @@ function CustomerPanel() {
                     rows={2} value={draft} onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     placeholder="Type an SMS message..."
-                    className="w-full bg-transparent border-none p-3 text-sm outline-none resize-none"
+                    className="w-full bg-transparent border-none p-3 text-base sm:text-sm outline-none resize-none"
                   />
                 </div>
                 <button onClick={handleSend} className="p-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors shrink-0 shadow-sm"><Send className="w-5 h-5" /></button>

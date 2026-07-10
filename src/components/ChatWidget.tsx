@@ -18,6 +18,48 @@ import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 type View = 'directory' | 'chat' | 'ariHistory';
 type ActiveChat = 'ari' | 'team';
 
+/** Small-screen detection that tracks rotation/resize (matches Tailwind's sm breakpoint). */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isMobile;
+}
+
+/**
+ * iOS PWA keyboard fix. Fixed-position elements don't shrink when the software
+ * keyboard opens — Safari pans the page instead, stranding the composer mid-screen
+ * over a dead gap. visualViewport reports the TRUE visible height, so on mobile we
+ * drive the sheet's height from it: keyboard opens → sheet shrinks → composer sits
+ * directly on the keyboard. window.scrollTo(0,0) cancels Safari's pan.
+ */
+function useVisualViewportHeight(active: boolean) {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) { setHeight(null); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      setHeight(Math.round(vv.height));
+      window.scrollTo(0, 0);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [active]);
+  return height;
+}
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<View>('chat');
@@ -31,14 +73,26 @@ export default function ChatWidget() {
   const agent = useAgentChat();
   const team = useTeamChat();
 
+  const isMobile = useIsMobile();
+  const vvHeight = useVisualViewportHeight(isOpen && isMobile);
+
   const isAri = activeChat === 'ari';
   const currentMessages = isAri ? agent.messages : team.messages;
   const currentSending = isAri ? agent.isSending : team.isSending;
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages AND when the keyboard resizes the sheet —
+  // otherwise the last message hides behind the keyboard.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [currentMessages]);
+  }, [currentMessages, vvHeight]);
+
+  // Lock the page behind the full-screen sheet on mobile (no scroll bleed-through).
+  useEffect(() => {
+    if (!(isOpen && isMobile)) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen, isMobile]);
 
   // Continuity: opening straight into Ari resumes the latest conversation
   useEffect(() => {
@@ -102,8 +156,10 @@ export default function ChatWidget() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110',
-          isOpen ? 'bg-ink-800 text-white' : 'bg-brand-500 text-white shadow-brand-500/30 hover:shadow-brand-500/50'
+          'fixed right-6 z-50 w-14 h-14 rounded-full shadow-lg items-center justify-center transition-all duration-300 hover:scale-110',
+          'bottom-[max(1.5rem,env(safe-area-inset-bottom))]',
+          // On mobile the open sheet covers the screen — the header X closes it instead.
+          isOpen ? 'hidden sm:flex bg-ink-800 text-white' : 'flex bg-brand-500 text-white shadow-brand-500/30 hover:shadow-brand-500/50'
         )}
         aria-label={isOpen ? 'Close messages' : 'Open messages'}
       >
@@ -117,9 +173,18 @@ export default function ChatWidget() {
 
       {/* Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[400px] h-[560px] bg-ink-900 rounded-2xl shadow-2xl border border-ink-700 flex flex-col overflow-hidden">
+        <div
+          className={cn(
+            'fixed z-50 bg-ink-900 flex flex-col overflow-hidden',
+            // Mobile: full-screen sheet, height driven by the visual viewport (keyboard-aware)
+            'inset-x-0 top-0 h-[100dvh] rounded-none',
+            // Desktop: the classic popover
+            'sm:inset-x-auto sm:top-auto sm:bottom-24 sm:right-6 sm:w-[400px] sm:h-[560px] sm:rounded-2xl sm:shadow-2xl sm:border sm:border-ink-700'
+          )}
+          style={isMobile && vvHeight ? { height: vvHeight } : undefined}
+        >
           {/* Header */}
-          <div className="bg-ink-900 text-white px-4 py-3 flex items-center justify-between border-b border-ink-700 shrink-0">
+          <div className="bg-ink-900 text-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3 flex items-center justify-between border-b border-ink-700 shrink-0">
             <div className="flex items-center min-w-0">
               {view !== 'directory' && (
                 <button
@@ -144,24 +209,34 @@ export default function ChatWidget() {
                 <p className="text-[10px] text-ink-500 truncate">{headerSub()}</p>
               </div>
             </div>
-            {view === 'chat' && isAri && (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={() => setView('ariHistory')}
-                  className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
-                  title="Conversation history" aria-label="Conversation history"
-                >
-                  <History className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => { agent.startNewChat(); setDraft(''); }}
-                  className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
-                  title="New conversation" aria-label="New conversation"
-                >
-                  <SquarePen className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-1 shrink-0">
+              {view === 'chat' && isAri && (
+                <>
+                  <button
+                    onClick={() => setView('ariHistory')}
+                    className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
+                    title="Conversation history" aria-label="Conversation history"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => { agent.startNewChat(); setDraft(''); }}
+                    className="p-1.5 text-ink-400 hover:text-brand-300 hover:bg-ink-800 rounded-lg transition-colors"
+                    title="New conversation" aria-label="New conversation"
+                  >
+                    <SquarePen className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              {/* Mobile: the sheet covers the FAB, so the X lives here */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="sm:hidden p-1.5 -mr-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800 rounded-lg transition-colors"
+                aria-label="Close messages"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* ═══ DIRECTORY — everyone you can talk to ═══ */}
@@ -305,7 +380,7 @@ export default function ChatWidget() {
           {/* ═══ CHAT — Ari ═══ */}
           {view === 'chat' && isAri && (
             <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-ink-950/50">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 bg-ink-950/50">
                 {agent.messages.length === 0 && !agent.isSending && (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 bg-brand-500/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -359,7 +434,7 @@ export default function ChatWidget() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="p-3 border-t border-ink-700 bg-ink-900 shrink-0">
+              <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
                   <MentionInput
                     value={draft}
@@ -368,9 +443,9 @@ export default function ChatWidget() {
                     onSubmit={handleSend}
                     allowAri={false}
                     autoSize
-                    autoFocus
+                    autoFocus={!isMobile}
                     placeholder="Ask Ari… (@ mentions a customer)"
-                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
+                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-base sm:text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
                     disabled={agent.isSending}
                   />
                   <button
@@ -388,7 +463,7 @@ export default function ChatWidget() {
           {/* ═══ CHAT — Team (Main or DM) ═══ */}
           {view === 'chat' && !isAri && (
             <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-ink-950/50">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3 bg-ink-950/50">
                 {team.messages.length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 bg-brand-500/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -453,7 +528,7 @@ export default function ChatWidget() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="p-3 border-t border-ink-700 bg-ink-900 shrink-0">
+              <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
                   <MentionInput
                     value={draft}
@@ -461,9 +536,9 @@ export default function ChatWidget() {
                     picked={pickedRef}
                     onSubmit={handleSend}
                     autoSize
-                    autoFocus
+                    autoFocus={!isMobile}
                     placeholder={team.activeThread?.is_main ? 'Message the team… @ to mention' : `Message ${team.activeThread?.dm_partner?.first_name || 'teammate'}… @ to mention`}
-                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
+                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-base sm:text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
                     disabled={team.isSending}
                   />
                   <button

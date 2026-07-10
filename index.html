@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: draw under the notch/home bar (we pad with safe-area insets).
+         interactive-widget=resizes-content: Chrome/Android shrinks the layout for the keyboard
+         instead of overlaying it (iOS is handled via visualViewport in the chat widget). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0a0a0f" />
     <meta name="description" content="SPAS 360 — All-in-one spa dealership management platform. Sales pipeline, service scheduling, inventory tracking, and customer communication." />
     <title>SPAS 360 | Spa Dealership Management</title>

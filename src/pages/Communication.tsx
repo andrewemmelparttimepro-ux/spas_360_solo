@@ -1,10 +1,13 @@
-import { Search, Phone, Mail, Send, Paperclip, MoreVertical, Users, MessageSquare, Plus, UserPlus, Hash } from 'lucide-react';
+import { Search, Phone, Mail, Send, Paperclip, MoreVertical, Users, MessageSquare, Plus, UserPlus, Hash, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
 import { useTeamChat, type TeamThread } from '@/hooks/useTeamChat';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { useState, useRef, useEffect } from 'react';
+import MentionInput from '@/components/MentionInput';
+import MentionText from '@/components/MentionText';
+import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 type Tab = 'team' | 'customers';
 
@@ -36,20 +39,21 @@ function colorForId(id: string) {
 function TeamChatPanel() {
   const {
     threads, activeThread, activeThreadId, setActiveThreadId,
-    messages, teamMembers, isLoading, sendMessage,
+    messages, teamMembers, isLoading, sendMessage, ariThinking,
     createThread, createGroupThread,
     getSenderName, getSenderInitials, getThreadDisplayName, senderMap,
   } = useTeamChat();
   const { user } = useAuth();
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
+  const pickedRef = useRef<PickedMention[]>([]);
   const [showNewDM, setShowNewDM] = useState(false);
   const [search, setSearch] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, ariThinking]);
 
   const handleSend = async () => {
     if (!draft.trim()) return;
@@ -57,8 +61,10 @@ function TeamChatPanel() {
       toast('Select or start a conversation first', 'warning');
       return;
     }
-    await sendMessage(draft);
+    const body = composeMentionBody(draft, pickedRef.current);
+    pickedRef.current = [];
     setDraft('');
+    await sendMessage(body);
   };
 
   const handleStartDM = async (memberId: string) => {
@@ -214,22 +220,29 @@ function TeamChatPanel() {
                 </div>
               ) : messages.map(msg => {
                 const isMe = msg.sender_id === user?.id;
-                const senderName = getSenderName(msg.sender_id);
+                const isAriMsg = msg.role === 'assistant';
+                const senderName = isAriMsg ? 'Ari' : getSenderName(msg.sender_id);
                 const initials = getSenderInitials(msg.sender_id);
                 return (
                   <div key={msg.id} className={cn("flex gap-3", isMe ? "flex-row-reverse" : "flex-row")}>
-                    {!isMe && (
+                    {!isMe && (isAriMsg ? (
+                      <div className="shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-brand-400" />
+                      </div>
+                    ) : (
                       <Avatar initials={initials} color={colorForId(msg.sender_id || '')} small />
-                    )}
+                    ))}
                     <div className={cn("max-w-[70%]", isMe ? "text-right" : "text-left")}>
-                      {!isMe && <p className="text-[10px] font-medium text-ink-400 mb-1 px-1">{senderName}</p>}
+                      {!isMe && <p className={cn("text-[10px] font-medium mb-1 px-1", isAriMsg ? 'text-brand-400' : 'text-ink-400')}>{senderName}</p>}
                       <div className={cn(
-                        "rounded-2xl px-4 py-2.5 text-sm inline-block",
+                        "rounded-2xl px-4 py-2.5 text-sm inline-block text-left whitespace-pre-wrap",
                         isMe
                           ? "bg-brand-500 text-white rounded-tr-md"
-                          : "bg-ink-900 border border-ink-700 text-ink-100 rounded-tl-md"
+                          : isAriMsg
+                            ? "bg-brand-500/10 border border-brand-500/30 text-ink-100 rounded-tl-md"
+                            : "bg-ink-900 border border-ink-700 text-ink-100 rounded-tl-md"
                       )}>
-                        {msg.content}
+                        <MentionText body={msg.content} />
                       </div>
                       <p className="text-[10px] text-ink-500 mt-1 px-1">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -238,6 +251,20 @@ function TeamChatPanel() {
                   </div>
                 );
               })}
+              {ariThinking && (
+                <div className="flex gap-3">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-brand-400" />
+                  </div>
+                  <div className="bg-brand-500/10 border border-brand-500/30 rounded-2xl rounded-tl-md px-4 py-3">
+                    <div className="flex space-x-1.5">
+                      <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -245,12 +272,13 @@ function TeamChatPanel() {
             <div className="p-4 border-t border-ink-700 bg-ink-900 shrink-0">
               <div className="flex items-end space-x-2">
                 <div className="flex-1 bg-ink-950 rounded-xl border border-transparent focus-within:border-brand-500 focus-within:bg-ink-900 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
-                  <textarea
+                  <MentionInput
                     rows={2}
                     value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Type a message..."
+                    onValueChange={setDraft}
+                    picked={pickedRef}
+                    onSubmit={handleSend}
+                    placeholder="Type a message… @ mentions a teammate, customer, or Ari"
                     className="w-full bg-transparent border-none p-3 text-sm outline-none resize-none"
                   />
                 </div>

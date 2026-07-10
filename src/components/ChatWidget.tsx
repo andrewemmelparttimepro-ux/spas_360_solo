@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useTeamChat, type TeamMember } from '@/hooks/useTeamChat';
 import { useAuth } from '@/contexts/AuthContext';
+import MentionInput from '@/components/MentionInput';
+import MentionText from '@/components/MentionText';
+import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 /**
  * One communication surface. The directory lists everyone you can talk to —
@@ -20,9 +23,9 @@ export default function ChatWidget() {
   const [view, setView] = useState<View>('chat');
   const [activeChat, setActiveChat] = useState<ActiveChat>('ari');
   const [draft, setDraft] = useState('');
+  const pickedRef = useRef<PickedMention[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { user, profile } = useAuth();
 
   const agent = useAgentChat();
@@ -45,17 +48,12 @@ export default function ChatWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, agent.threads.length]);
 
-  // Focus input when a chat is on screen
-  useEffect(() => {
-    if (isOpen && view === 'chat') {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen, view, activeChat]);
-
   // ─── Send ──────────────────────────────────────────────
   const handleSend = async () => {
     if (!draft.trim() || currentSending) return;
-    const msg = draft;
+    // Picked @mentions become tokens in the stored body
+    const msg = composeMentionBody(draft, pickedRef.current);
+    pickedRef.current = [];
     setDraft('');
     if (isAri) {
       if (!agent.activeThreadId) {
@@ -318,7 +316,7 @@ export default function ChatWidget() {
                       {['Look up a customer', "What's in the pipeline?", "Today's schedule", 'Draft a follow-up email'].map(s => (
                         <button
                           key={s}
-                          onClick={() => { setDraft(s); inputRef.current?.focus(); }}
+                          onClick={() => setDraft(s)}
                           className="block mx-auto px-3 py-1.5 text-xs bg-ink-900 border border-ink-700 rounded-full text-ink-300 hover:bg-brand-500/10 hover:border-brand-500/30 hover:text-brand-300 transition-colors"
                         >
                           {s}
@@ -341,7 +339,7 @@ export default function ChatWidget() {
                           <Sparkles className="w-3 h-3 mr-1" /> Using tools...
                         </div>
                       )}
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
                     </div>
                   </div>
                 ))}
@@ -363,18 +361,16 @@ export default function ChatWidget() {
 
               <div className="p-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
-                  <textarea
-                    ref={inputRef}
-                    rows={1}
+                  <MentionInput
                     value={draft}
-                    onChange={e => {
-                      setDraft(e.target.value);
-                      e.target.style.height = 'auto';
-                      e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-                    }}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder="Ask Ari…"
-                    className="flex-1 px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
+                    onValueChange={setDraft}
+                    picked={pickedRef}
+                    onSubmit={handleSend}
+                    allowAri={false}
+                    autoSize
+                    autoFocus
+                    placeholder="Ask Ari… (@ mentions a customer)"
+                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
                     disabled={agent.isSending}
                   />
                   <button
@@ -410,19 +406,26 @@ export default function ChatWidget() {
 
                 {team.messages.map(msg => {
                   const isMe = msg.sender_id === user?.id;
+                  const isAriMsg = msg.role === 'assistant';
                   return (
                     <div key={msg.id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
                       <div className="max-w-[85%]">
-                        {!isMe && msg.sender_name && (
+                        {!isMe && (isAriMsg ? (
+                          <p className="flex items-center gap-1 text-[10px] font-semibold text-brand-400 mb-0.5 ml-1">
+                            <Bot className="w-3 h-3" />Ari
+                          </p>
+                        ) : msg.sender_name && (
                           <p className="text-[10px] font-semibold text-ink-400 mb-0.5 ml-1">{msg.sender_name}</p>
-                        )}
+                        ))}
                         <div className={cn(
                           'rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
                           isMe
                             ? 'bg-brand-500 text-white rounded-br-md'
-                            : 'bg-ink-900 border border-ink-700 text-ink-100 rounded-bl-md shadow-sm'
+                            : isAriMsg
+                              ? 'bg-brand-500/10 border border-brand-500/30 text-ink-100 rounded-bl-md shadow-sm'
+                              : 'bg-ink-900 border border-ink-700 text-ink-100 rounded-bl-md shadow-sm'
                         )}>
-                          <div className="whitespace-pre-wrap">{msg.content}</div>
+                          <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
                         </div>
                         <p className={cn('text-[9px] text-ink-500 mt-0.5', isMe ? 'text-right mr-1' : 'ml-1')}>
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -432,23 +435,35 @@ export default function ChatWidget() {
                   );
                 })}
 
+                {team.ariThinking && (
+                  <div className="flex justify-start">
+                    <div className="bg-brand-500/10 border border-brand-500/30 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Bot className="w-3.5 h-3.5 text-brand-400" />
+                        <div className="flex space-x-1.5">
+                          <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
 
               <div className="p-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
-                  <textarea
-                    ref={inputRef}
-                    rows={1}
+                  <MentionInput
                     value={draft}
-                    onChange={e => {
-                      setDraft(e.target.value);
-                      e.target.style.height = 'auto';
-                      e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px';
-                    }}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    placeholder={team.activeThread?.is_main ? 'Message the team...' : `Message ${team.activeThread?.dm_partner?.first_name || 'teammate'}...`}
-                    className="flex-1 px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
+                    onValueChange={setDraft}
+                    picked={pickedRef}
+                    onSubmit={handleSend}
+                    autoSize
+                    autoFocus
+                    placeholder={team.activeThread?.is_main ? 'Message the team… @ to mention' : `Message ${team.activeThread?.dm_partner?.first_name || 'teammate'}… @ to mention`}
+                    className="w-full px-3 py-2 bg-ink-950 border-none rounded-xl text-sm outline-none resize-none focus:bg-ink-800 focus:ring-2 focus:ring-brand-500 transition-all"
                     disabled={team.isSending}
                   />
                   <button

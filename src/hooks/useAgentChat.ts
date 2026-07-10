@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { getOpenAITools, executeTool } from '@/agent/tools';
+import { toAgentText } from '@/lib/mentions';
 
 interface ChatMessage {
   id: string;
@@ -110,13 +111,15 @@ export function useAgentChat() {
     });
 
     // Build message history for LLM (the system prompt/rails are injected
-    // server-side in /api/chat — the client never carries them)
+    // server-side in /api/chat — the client never carries them). Mention
+    // tokens become plain text; @customer tokens carry the UUID so Ari can
+    // hit get_contact_details without searching.
     const history = [
       ...messages.filter(m => m.role !== 'tool').map(m => ({
         role: m.role as 'user' | 'assistant',
-        content: m.content,
+        content: toAgentText(m.content),
       })),
-      { role: 'user' as const, content },
+      { role: 'user' as const, content: toAgentText(content) },
     ];
 
     try {

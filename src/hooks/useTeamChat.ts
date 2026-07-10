@@ -2,6 +2,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { createNotification } from '@/hooks/useNotifications';
+import { parseMentions, stripMentions, notifyMentionedUsers } from '@/lib/mentions';
+import { runAriChatMention } from '@/agent/ariTasks';
+import { friendlyAgentError } from '@/agent/run';
 
 export interface TeamMember {
   id: string;
@@ -123,7 +126,8 @@ export function useTeamChat() {
     if (data) {
       setMessages(data.map(m => ({
         ...m,
-        sender_name: m.sender_id ? (senderMapRef.current[m.sender_id]?.first_name ?? 'Unknown') : undefined,
+        sender_name: m.role === 'assistant' ? 'Ari'
+          : m.sender_id ? (senderMapRef.current[m.sender_id]?.first_name ?? 'Unknown') : undefined,
       })));
     }
   }, [activeThreadId]);
@@ -257,6 +261,31 @@ export function useTeamChat() {
     return createThread(allIds, title);
   }, [user, profile, members, createThread]);
 
+  // ─── @Ari in a channel: he answers right in the thread ──
+  const [ariThinking, setAriThinking] = useState(false);
+  const summonAri = useCallback(async (tid: string, content: string, channelTitle: string) => {
+    const senderName = profile ? `${profile.first_name} ${profile.last_name}` : 'A teammate';
+    setAriThinking(true);
+    try {
+      const recentLines = messages.slice(-8)
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => `${m.role === 'assistant' ? 'Ari' : (m.sender_name ?? 'Teammate')}: ${stripMentions(m.content)}`);
+      const reply = await runAriChatMention({ channelTitle, senderName, message: content, recentLines });
+      await supabase.from('agent_messages').insert({ thread_id: tid, role: 'assistant', content: reply, sender_id: null });
+    } catch (err) {
+      // Fail loudly, in the thread, in plain English
+      await supabase.from('agent_messages').insert({
+        thread_id: tid, role: 'assistant', sender_id: null,
+        content: friendlyAgentError((err as Error).message ?? ''),
+      });
+    } finally {
+      setAriThinking(false);
+      await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', tid);
+      await fetchMessages();
+      await fetchThreads();
+    }
+  }, [profile, messages, fetchMessages, fetchThreads]);
+
   // ─── Send message ──────────────────────────────────────
   const sendMessage = useCallback(async (content: string, threadId?: string) => {
     const tid = threadId || activeThreadId;
@@ -273,27 +302,43 @@ export function useTeamChat() {
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', tid);
 
-      // Notify the other participants so their bell lights up in realtime
       const thread = threads.find(t => t.id === tid);
       const senderName = profile ? `${profile.first_name} ${profile.last_name}` : 'A teammate';
       const channelLabel = thread?.title || 'Team Chat';
-      const recipients = (thread?.participants ?? []).filter(id => id && id !== user.id);
-      const preview = content.length > 80 ? content.slice(0, 80) + '…' : content;
-      await Promise.all(recipients.map(rid => createNotification(rid, {
+      const participants = (thread?.participants ?? []).filter(id => id && id !== user.id);
+      const preview = stripMentions(content);
+
+      // @-mentioned teammates get the louder "mentioned you"; everyone else
+      // in the thread gets the regular new-message ping (never both).
+      const mentioned = await notifyMentionedUsers({
+        body: content,
+        senderId: user.id,
+        senderName,
+        contextLabel: channelLabel,
+        link: '/communication',
+        onlyIds: participants,
+      });
+      const rest = participants.filter(id => !mentioned.includes(id));
+      await Promise.all(rest.map(rid => createNotification(rid, {
         type: 'message',
         title: `${senderName} · ${channelLabel}`,
-        body: preview,
+        body: preview.length > 80 ? preview.slice(0, 80) + '…' : preview,
         link: '/communication',
       })));
 
       await fetchMessages();
       await fetchThreads();
+
+      // @Ari answers in the thread — fired after send so the composer frees up
+      if (parseMentions(content).ari) {
+        void summonAri(tid, content, channelLabel);
+      }
     } catch (err) {
       console.error('Send team message error:', err);
     } finally {
       setIsSending(false);
     }
-  }, [activeThreadId, user, profile, threads, isSending, fetchMessages, fetchThreads]);
+  }, [activeThreadId, user, profile, threads, isSending, fetchMessages, fetchThreads, summonAri]);
 
   // ─── Helper functions (Communication page) ─────────────
   const getSenderName = useCallback((senderId: string | null) => {
@@ -329,6 +374,7 @@ export function useTeamChat() {
     setActiveThreadId,
     messages,
     isSending,
+    ariThinking,
     isLoading,
     sendMessage,
     refresh: fetchThreads,

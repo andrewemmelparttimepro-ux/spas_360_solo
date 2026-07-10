@@ -69,6 +69,20 @@ src/
   App.tsx          Routes + RoleLanding (tech→/service, salesperson→/deals, managers→/dashboard).
   contexts/AuthContext.tsx   Auth + profile + locations + activeLocationId (global store filter).
                    Contains the DEV-ONLY preview harness (see §6).
+  lib/mentions.ts  THE @ SYSTEM. One token grammar in stored bodies —
+                   @[Name](user:<uuid>) / @[Name](customer:<uuid>) / @[Ari](ari) — shared by team
+                   chat, deal/customer notes, and Ari chat. parse/strip/toAgentText/compose helpers +
+                   notifyMentionedUsers (type 'mention', deep link, replaces the generic ping).
+                   Composer = components/MentionInput.tsx (@ → popup: Ari, team, live customer
+                   search; friendly "@Name" text in the textarea, tokens swapped in at send via
+                   composeMentionBody + a picked-mentions ref). Renderer = components/MentionText.tsx
+                   (customer chips link to /customers/:id in violet). @Ari SUMMONS THE AGENT IN
+                   PLACE: agent/run.ts (headless tool loop, no thread persistence) + agent/ariTasks.ts
+                   (deal/customer data packets built client-side, "reply with only the deliverable");
+                   on deal/contact notes his answer is saved as a note prefixed with his own token
+                   (ARI_NOTE_PREFIX → bot header + Copy button in the UI); in team chat he replies in
+                   the thread as role 'assistant', sender_id null (rendered as "Ari", brand-tinted).
+                   @customer tokens reach the LLM as "Name [customer_id: uuid]" so Ari skips search.
   contexts/CustomerDragContext.tsx   CROSS-PAGE CUSTOMER DRAG. Pointer-based (not HTML5 DnD, so it
                    survives route changes and can't fight the kanban's dnd). Grab a customer card →
                    hover the Deals/Schedule pill (they glow violet) → 400ms dwell spring-loads the

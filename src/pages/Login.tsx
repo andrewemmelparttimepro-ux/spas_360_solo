@@ -18,7 +18,13 @@ export default function Login() {
 
     if (isSignUp) {
       const { error: err } = await signUp(email, password, { first_name: firstName, last_name: lastName });
-      if (err) setError(err);
+      // Signups are invite-only (DB-enforced) — the trigger's rejection surfaces
+      // as a generic "database error"; translate it to the real story.
+      if (err) {
+        setError(/invite_only|database error saving new user/i.test(err)
+          ? 'Sign-ups are invite-only. Ask your manager to invite this email address, then try again.'
+          : err);
+      }
     } else {
       const { error: err } = await signIn(email, password);
       if (err) setError(err);

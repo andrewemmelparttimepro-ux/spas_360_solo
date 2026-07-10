@@ -167,7 +167,8 @@ export interface Database {
        'inventory_items' | 'communication_threads' | 'messages' | 'tasks' |
        'notes' | 'time_entries' | 'notifications' | 'audit_log' |
        'agent_threads' | 'agent_messages' | 'fix_it_posts' |
-       'fix_it_comments' | 'fix_it_attachments']: {
+       'fix_it_comments' | 'fix_it_attachments' | 'app_invites' |
+       'push_subscriptions']: {
         Row: Record<string, unknown>;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

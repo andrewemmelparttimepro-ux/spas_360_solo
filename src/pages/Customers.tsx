@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/useCustomerCards';
@@ -29,6 +29,9 @@ const SORTS: { value: CustomerSort; label: string }[] = [
   { value: 'name', label: 'Name A–Z' },
 ];
 
+type ViewMode = 'cards' | 'list';
+const VIEW_KEY = 'spas360.customersView';
+
 export default function Customers() {
   const { cards, countsByType, isLoading, refresh } = useCustomerCards();
   const { dragging } = useCustomerDrag();
@@ -37,7 +40,13 @@ export default function Customers() {
   const [typeFilter, setTypeFilter] = useState<ContactType | 'All'>('All');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<CustomerSort>('recent');
+  const [view, setView] = useState<ViewMode>(() => (localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'cards'));
   const navigate = useNavigate();
+
+  const switchView = (v: ViewMode) => {
+    setView(v);
+    localStorage.setItem(VIEW_KEY, v);
+  };
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -125,6 +134,23 @@ export default function Customers() {
         >
           {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        {/* Cards ↔ list view toggle — choice sticks per device */}
+        <div className="flex items-center bg-ink-900 border border-ink-700 rounded-lg p-0.5">
+          <button
+            onClick={() => switchView('cards')}
+            className={cn('p-1.5 rounded-md transition-colors', view === 'cards' ? 'bg-violet-500/20 text-violet-300' : 'text-ink-500 hover:text-ink-300')}
+            title="Card view" aria-label="Card view"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => switchView('list')}
+            className={cn('p-1.5 rounded-md transition-colors', view === 'list' ? 'bg-violet-500/20 text-violet-300' : 'text-ink-500 hover:text-ink-300')}
+            title="List view" aria-label="List view"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {cards.length === 0 ? (
@@ -138,7 +164,7 @@ export default function Customers() {
           <Search className="w-10 h-10 mb-3" />
           <p className="text-sm">Nothing matches — try a different search or filter</p>
         </div>
-      ) : (
+      ) : view === 'cards' ? (
         <div className={cn('flex-1 overflow-y-auto pb-4 transition-opacity', dragging && 'opacity-80')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             {visible.map(c => (
@@ -146,8 +172,114 @@ export default function Customers() {
             ))}
           </div>
         </div>
+      ) : (
+        <div className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}>
+          <table className="w-full text-left border-collapse min-w-[860px]">
+            <thead>
+              <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Phone</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">In Play</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">Lifetime</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Owner</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-800">
+              {visible.map(c => (
+                <CustomerRow key={c.id} customer={c} onNewDeal={() => setQuickDealFor(c.id)} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
+  );
+}
+
+// Shared health read for both views
+function healthOf(c: CustomerCard) {
+  const idleDays = Math.floor((Date.now() - new Date(c.lastActivity).getTime()) / (1000 * 60 * 60 * 24));
+  const inPlay = c.customer_type === 'Lead' || c.customer_type === 'Prospect' || c.openDealCount > 0;
+  return {
+    idleDays,
+    needsFollowUp: inPlay && !c.hasFollowUp,
+    goingCold: inPlay && c.hasFollowUp && idleDays > 7,
+  };
+}
+
+function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNewDeal: () => void }) {
+  const { armDrag } = useCustomerDrag();
+  const navigate = useNavigate();
+  const assignedName = c.assigned ? `${c.assigned.first_name} ${c.assigned.last_name}` : null;
+  const { idleDays, needsFollowUp, goingCold } = healthOf(c);
+
+  return (
+    <tr
+      onPointerDown={e => {
+        if ((e.target as HTMLElement).closest('a, button')) return;
+        armDrag({ id: c.id, first_name: c.first_name, last_name: c.last_name, customer_type: c.customer_type, phone: c.phone }, e);
+      }}
+      onClick={e => {
+        if ((e.target as HTMLElement).closest('a, button')) return;
+        navigate(`/customers/${c.id}`);
+      }}
+      className="hover:bg-ink-800 transition-colors cursor-grab"
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-7 h-7 rounded-full bg-violet-500/15 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">
+            {`${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-ink-100 truncate">{c.first_name} {c.last_name}</span>
+            <span className={cn('inline-block px-1.5 py-px rounded-full text-[9px] font-semibold', TYPE_BADGE[c.customer_type] ?? 'bg-ink-950 text-ink-300')}>
+              {c.customer_type}
+            </span>
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300">{c.phone}</a>
+      </td>
+      <td className="px-4 py-3 text-right font-mono text-sm font-bold text-ink-100">
+        ${c.openDealValue.toLocaleString()}
+        {c.openDealCount > 0 && <span className="text-[10px] font-medium text-ink-500 ml-1">({c.openDealCount})</span>}
+      </td>
+      <td className="px-4 py-3 text-right font-mono text-sm font-bold text-emerald-300">${c.wonValue.toLocaleString()}</td>
+      <td className="px-4 py-3 text-sm text-ink-400 truncate max-w-[140px]">{assignedName ?? 'Unassigned'}</td>
+      <td className="px-4 py-3 text-[11px] whitespace-nowrap">
+        {needsFollowUp ? (
+          <span className="flex items-center gap-1 text-red-400 font-semibold"><AlertTriangle className="w-3 h-3" />No follow-up</span>
+        ) : goingCold ? (
+          <span className="flex items-center gap-1 text-amber-400 font-semibold"><Snowflake className="w-3 h-3" />{idleDays}d quiet</span>
+        ) : (
+          <span className="text-ink-500">{formatDistanceToNow(new Date(c.lastActivity), { addSuffix: true })}</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-1.5">
+          {c.openJobCount > 0 && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold" title={`${c.openJobCount} open service job(s)`}>
+              <Wrench className="w-3 h-3" />{c.openJobCount}
+            </span>
+          )}
+          {c.equipmentCount > 0 && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-300 text-[10px] font-semibold" title={`${c.equipmentCount} unit(s) owned`}>
+              <Package className="w-3 h-3" />{c.equipmentCount}
+            </span>
+          )}
+          <button
+            onClick={onNewDeal}
+            className="p-1.5 rounded-lg text-ink-500 hover:text-brand-300 hover:bg-brand-500/10 transition-colors"
+            title="New deal for this customer" aria-label={`New deal for ${c.first_name} ${c.last_name}`}
+          >
+            <Handshake className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -156,10 +288,7 @@ function CustomerCardView({ customer: c, onNewDeal }: { customer: CustomerCard; 
   const navigate = useNavigate();
   const initials = `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase();
   const assignedName = c.assigned ? `${c.assigned.first_name} ${c.assigned.last_name}` : null;
-  const idleDays = Math.floor((Date.now() - new Date(c.lastActivity).getTime()) / (1000 * 60 * 60 * 24));
-  const inPlay = c.customer_type === 'Lead' || c.customer_type === 'Prospect' || c.openDealCount > 0;
-  const needsFollowUp = inPlay && !c.hasFollowUp;
-  const goingCold = inPlay && c.hasFollowUp && idleDays > 7;
+  const { idleDays, needsFollowUp, goingCold } = healthOf(c);
 
   return (
     <div

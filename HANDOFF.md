@@ -222,17 +222,25 @@ through `AI_PROVIDER`.
    real customers (register MCHL as the brand).
 2. **Bismarck inventory tab** — not yet imported (screenshots only covered Minot + Used).
 3. **Brand backfill** — Oslo/Tokyo/Maximus + Hekla/Trend/Pro 6 items imported with brand NULL.
-4. **Lock down open signup — NOW URGENT.** Brandon is in and real data is loaded; the public
-   sign-up on the Login page auto-joins new users to the org as Salesperson (they'd see org data).
-   Disable public signups (Supabase Auth settings or invite-only flow) before the URL spreads.
-   (`migration_inventory_delete.sql` is now APPLIED; Brandon's owner_manager role verified in DB.)
+4. ~~Lock down open signup~~ — **DONE 2026-07-09.** Signups are invite-only, DB-enforced
+   (`migration_invite_only.sql`): handle_new_user rejects emails without an open `app_invites`
+   row (also killed the metadata self-role hole). Managers invite via Settings → Team &
+   Permissions. Verified live: uninvited signup rejected, no orphan auth rows.
 
 ## 9. Next milestones (agreed roadmap)
 
-QuickBooks sync (customers/estimates one-way first) → PWA install for techs (manifest + SW) →
-server-side reminders (pg_cron writes notifications for stagnant parts/overdue tasks) → role
-permission enforcement beyond landing pages → run `seed_demo.sql` only if a demo dataset is wanted
-(real inventory already loaded — may be unnecessary).
+DONE 2026-07-09: PWA (manifest + `public/sw.js`, bump CACHE_NAME on caching changes) ·
+**Web Push end-to-end** (`migration_web_push.sql`: push_subscriptions + claim RPC; notifications
+INSERT → pg_net trigger → `/api/push` with VAPID env in Vercel; client `src/lib/push.ts`, Settings
+panel + bell nudge; verified DB→Vercel→FCM round trip) · **pg_cron 7am-Central reminders**
+(`send_daily_reminders()`: overdue tasks → assignee, stagnant-parts digest → managers, 20h dupe
+guard) · ⌘K command palette actions · skeleton loaders · customer Timeline.
+NOTE: iOS push requires the app installed to Home Screen (iOS 16.4+); expired push endpoints are
+returned by /api/push and cleaned by the client's next resync.
+
+Still ahead: Ari's printable customer-facing one-pager → custom domain + Bible v3 regen →
+QuickBooks sync (customers/estimates one-way first) → role permission enforcement beyond landing
+pages → Twilio A2P activation (blocked on Andrew, §8.1).
 
 ## 10. The SPAS 360 Bible
 

@@ -17,9 +17,18 @@ import { runAriMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
 
 // The full relationship behind the customer card: deals, service jobs, equipment
-type RelDeal = { id: string; title: string; amount: number | null; stage?: { name: string } | null };
-type RelJob = { id: string; title: string; status: string; scheduled_at: string | null };
+type RelDeal = { id: string; title: string; amount: number | null; created_at: string; stage?: { name: string } | null };
+type RelJob = { id: string; title: string; status: string; scheduled_at: string | null; created_at: string };
 type RelEquip = { id: string; product: string; brand: string | null; sku: string; status: string };
+type RelText = { id: string; body: string; sender_type: string; created_at: string };
+
+// One chronological stream: everything that happened with this customer
+interface TimelineEvent {
+  at: string;
+  kind: 'note' | 'deal' | 'job' | 'task' | 'text';
+  text: string;
+  link?: string;
+}
 
 const CONTACT_TYPE_OPTIONS: ContactType[] = ['Lead', 'Prospect', 'Customer', 'Past Customer'];
 const TYPE_COLORS: Record<ContactType, string> = {
@@ -92,17 +101,29 @@ export default function ContactDetail() {
   const [relJobs, setRelJobs] = useState<RelJob[]>([]);
   const [relEquip, setRelEquip] = useState<RelEquip[]>([]);
 
+  const [relTexts, setRelTexts] = useState<RelText[]>([]);
+
   // The 360° view: everything this customer has going on across the app
   useEffect(() => {
     if (!id) return;
     Promise.all([
-      supabase.from('deals').select('id, title, amount, stage:stage_id(name)').eq('contact_id', id).order('updated_at', { ascending: false }),
-      supabase.from('jobs').select('id, title, status, scheduled_at').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('deals').select('id, title, amount, created_at, stage:stage_id(name)').eq('contact_id', id).order('updated_at', { ascending: false }),
+      supabase.from('jobs').select('id, title, status, scheduled_at, created_at').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('inventory_items').select('id, product, brand, sku, status').eq('customer_id', id),
-    ]).then(([d, j, inv]) => {
+      supabase.from('communication_threads').select('id').eq('contact_id', id),
+    ]).then(async ([d, j, inv, threads]) => {
       setRelDeals((d.data as unknown as RelDeal[]) ?? []);
       setRelJobs((j.data as unknown as RelJob[]) ?? []);
       setRelEquip((inv.data as unknown as RelEquip[]) ?? []);
+      const threadIds = (threads.data ?? []).map(t => t.id);
+      if (threadIds.length > 0) {
+        const { data: msgs } = await supabase.from('messages')
+          .select('id, body, sender_type, created_at')
+          .in('thread_id', threadIds)
+          .order('created_at', { ascending: false })
+          .limit(15);
+        setRelTexts((msgs as RelText[]) ?? []);
+      }
     });
   }, [id]);
 
@@ -184,6 +205,43 @@ export default function ContactDetail() {
   const copyAriNote = async (body: string) => {
     await navigator.clipboard.writeText(stripMentions(ariNoteBody(body)));
     toast('Copied — paste it anywhere', 'success');
+  };
+
+  // One chronological stream — every touch on this relationship, newest first
+  const timeline: TimelineEvent[] = [
+    ...notes.map(n => ({
+      at: n.created_at, kind: 'note' as const,
+      text: isAriNote(n.body)
+        ? `Ari delivered: ${stripMentions(ariNoteBody(n.body)).slice(0, 80)}…`
+        : `${n.author_name ?? 'Note'}: ${stripMentions(n.body).slice(0, 90)}`,
+    })),
+    ...relDeals.map(d => ({
+      at: d.created_at, kind: 'deal' as const,
+      text: `Deal opened — ${d.title}${d.amount ? ` ($${Number(d.amount).toLocaleString()})` : ''}`,
+      link: `/deals/${d.id}`,
+    })),
+    ...relJobs.map(j => ({
+      at: j.created_at, kind: 'job' as const,
+      text: `Service job — ${j.title} · ${j.status}`,
+      link: `/service/${j.id}`,
+    })),
+    ...tasks.map(t => ({
+      at: t.created_at, kind: 'task' as const,
+      text: `${t.status === 'Completed' ? '✓ ' : ''}Task — ${t.title}`,
+    })),
+    ...relTexts.map(m => ({
+      at: m.created_at, kind: 'text' as const,
+      text: `${m.sender_type === 'customer' ? 'Text from customer' : 'Text sent'} — ${(m.body ?? '').slice(0, 80)}`,
+      link: '/communication',
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 25);
+
+  const TIMELINE_STYLE: Record<TimelineEvent['kind'], { dot: string; label: string }> = {
+    note: { dot: 'bg-ink-500', label: 'text-ink-300' },
+    deal: { dot: 'bg-brand-400', label: 'text-brand-300' },
+    job: { dot: 'bg-emerald-400', label: 'text-emerald-300' },
+    task: { dot: 'bg-amber-400', label: 'text-amber-300' },
+    text: { dot: 'bg-violet-400', label: 'text-violet-300' },
   };
   const handleAddTask = async () => { if (!newTaskTitle.trim()) return; await createTask({ title: newTaskTitle, contact_id: contact.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' }); setNewTaskTitle(''); setShowTaskForm(false); };
 
@@ -362,6 +420,34 @@ export default function ContactDetail() {
             <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2><button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-400 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button></div>
             {showTaskForm && <div className="flex space-x-3 mb-4"><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Task title..." className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" autoFocus /><button onClick={handleAddTask} className="px-3 py-2 bg-brand-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button><button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-ink-500 hover:text-ink-300"><X className="w-4 h-4" /></button></div>}
             <div className="space-y-2">{tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No tasks yet</p> : tasks.map(t => <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800"><input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" /><span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-ink-500' : 'text-ink-100'}`}>{t.title}</span><span className="text-xs text-ink-500">{new Date(t.due_at).toLocaleDateString()}</span></div>)}</div>
+          </div>
+
+          {/* The whole story in order — notes, deals, jobs, tasks, texts */}
+          <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Timeline</h2>
+            {timeline.length === 0 ? (
+              <p className="text-sm text-ink-500 text-center py-4">Nothing yet — the story starts with the first note or deal</p>
+            ) : (
+              <div className="relative pl-4 space-y-3 before:absolute before:left-[3px] before:top-1.5 before:bottom-1.5 before:w-px before:bg-ink-700">
+                {timeline.map((ev, i) => {
+                  const style = TIMELINE_STYLE[ev.kind];
+                  const body = (
+                    <>
+                      <span className={cn('absolute -left-4 top-1.5 w-[7px] h-[7px] rounded-full ring-2 ring-ink-900', style.dot)} />
+                      <span className="block text-sm text-ink-100 leading-snug">{ev.text}</span>
+                      <span className="block text-[11px] text-ink-500 mt-0.5">
+                        {new Date(ev.at).toLocaleDateString([], { month: 'short', day: 'numeric' })} · {new Date(ev.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </>
+                  );
+                  return ev.link ? (
+                    <Link key={`${ev.kind}-${i}`} to={ev.link} className="relative block hover:bg-ink-800/60 rounded-md px-2 py-1 -mx-2 transition-colors">{body}</Link>
+                  ) : (
+                    <div key={`${ev.kind}-${i}`} className="relative px-2 py-1 -mx-2">{body}</div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

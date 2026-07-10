@@ -4,6 +4,7 @@ import { DollarSign, Users, Wrench, AlertCircle, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 import QuickCreate from '@/components/QuickCreate';
+import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
@@ -23,7 +24,16 @@ export default function Dashboard() {
   const { stats, actions, revenueData, isLoading } = useDashboardStats(period);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto">
+        <Skeleton className="h-8 w-56" />
+        <StatsSkeleton />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
   }
 
   return (

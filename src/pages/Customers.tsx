@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,7 @@ import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/
 import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 import QuickDealModal from '@/components/QuickDealModal';
+import { Skeleton, GridSkeleton } from '@/components/ui/Skeleton';
 import type { ContactType } from '@/types/database';
 
 // The CRM pillar: every customer is a CARD. Read it top to bottom and you know
@@ -42,6 +43,16 @@ export default function Customers() {
   const [sort, setSort] = useState<CustomerSort>('recent');
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'cards'));
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ⌘K → "New Customer" arrives with the wizard flag
+  useEffect(() => {
+    if ((location.state as { openWizard?: boolean } | null)?.openWizard) {
+      setShowWizard(true);
+      navigate(location.pathname, { replace: true, state: null }); // consume the flag
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const switchView = (v: ViewMode) => {
     setView(v);
@@ -67,7 +78,18 @@ export default function Customers() {
   }, [cards, typeFilter, search, sort]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-violet-500 rounded-full animate-spin" /></div>;
+    return (
+      <div className="h-full max-w-[1600px] mx-auto space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-16 rounded-full" />
+          <Skeleton className="h-8 w-20 rounded-full" />
+          <Skeleton className="h-8 w-24 rounded-full" />
+          <Skeleton className="h-8 w-28 rounded-full" />
+        </div>
+        <GridSkeleton />
+      </div>
+    );
   }
 
   return (

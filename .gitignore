@@ -9,3 +9,7 @@ coverage/
 .vercel
 .env.local
 .env
+
+# Fix-It Feed proof artifacts + supabase CLI temp stay local
+docs/reports/evidence/
+supabase/.temp/

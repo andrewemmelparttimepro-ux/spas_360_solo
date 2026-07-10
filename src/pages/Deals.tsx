@@ -11,6 +11,7 @@ import { useCustomerDrag, type DragCustomer } from '@/contexts/CustomerDragConte
 import SalesBoard from '@/components/SalesBoard';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 import QuickDealModal from '@/components/QuickDealModal';
+import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
 
 export default function Deals() {
   const { stages, deals, dealsWithTasks, isLoading, getDealsForStage, moveDeal, refresh } = usePipeline();
@@ -82,7 +83,13 @@ export default function Deals() {
   }, [attach, deals, profile, toast, refresh, spotlight]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+    return (
+      <div className="h-full max-w-[1600px] mx-auto space-y-4">
+        <Skeleton className="h-8 w-40" />
+        <StatsSkeleton />
+        <BoardSkeleton />
+      </div>
+    );
   }
 
   const attachDeal = attach ? deals.find(d => d.id === attach.dealId) : null;

@@ -31,16 +31,27 @@ export function useCustomerCards() {
     if (!profile) return;
     setIsLoading(true);
 
-    let contactQuery = supabase
-      .from('contacts')
-      .select('*, assigned:assigned_to(first_name, last_name)')
-      .eq('org_id', profile.org_id)
-      .order('updated_at', { ascending: false })
-      .limit(1000);
-    if (activeLocationId) contactQuery = contactQuery.eq('location_id', activeLocationId);
+    const fetchEveryContact = async () => {
+      const pageSize = 1000;
+      const rows: typeof contacts = [];
+      for (let from = 0; ; from += pageSize) {
+        let query = supabase
+          .from('contacts')
+          .select('*, assigned:assigned_to(first_name, last_name)')
+          .eq('org_id', profile.org_id)
+          .order('updated_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (activeLocationId) query = query.eq('location_id', activeLocationId);
+        const { data, error } = await query;
+        if (error) return { data: rows, error };
+        const page = (data ?? []) as typeof contacts;
+        rows.push(...page);
+        if (page.length < pageSize) return { data: rows, error: null };
+      }
+    };
 
     const [contactRes, stageRes, dealRes, jobRes, equipRes, taskRes] = await Promise.all([
-      contactQuery,
+      fetchEveryContact(),
       supabase.from('pipeline_stages').select('id, name').eq('org_id', profile.org_id),
       supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id),
       supabase.from('jobs').select('contact_id, status').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),

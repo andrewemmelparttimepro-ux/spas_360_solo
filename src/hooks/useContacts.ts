@@ -13,23 +13,34 @@ export function useContacts() {
     if (!profile) return;
     setIsLoading(true);
 
-    let query = supabase
-      .from('contacts')
-      .select('*')
-      .eq('org_id', profile.org_id)
-      .order('updated_at', { ascending: false });
+    const pageSize = 1000;
+    const allContacts: Contact[] = [];
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase
+        .from('contacts')
+        .select('*')
+        .eq('org_id', profile.org_id)
+        .order('updated_at', { ascending: false })
+        .range(from, from + pageSize - 1);
 
-    if (activeLocationId) {
-      query = query.eq('location_id', activeLocationId);
+      if (activeLocationId) {
+        query = query.eq('location_id', activeLocationId);
+      }
+
+      if (searchQuery.trim()) {
+        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        break;
+      }
+      const page = (data ?? []) as Contact[];
+      allContacts.push(...page);
+      if (page.length < pageSize) break;
     }
-
-    if (searchQuery.trim()) {
-      query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
-    }
-
-    const { data, error } = await query.limit(100);
-    if (error) console.error('Error fetching contacts:', error);
-    setContacts(data ?? []);
+    setContacts(allContacts);
     setIsLoading(false);
   }, [profile, activeLocationId, searchQuery]);
 

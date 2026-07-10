@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Calendar, User, AlertCircle, Plus, Save, X, Pencil, Bot, Copy } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, User, AlertCircle, Plus, Save, X, Pencil, Bot } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
@@ -13,6 +13,8 @@ import MentionText from '@/components/MentionText';
 import { composeMentionBody, parseMentions, notifyMentionedUsers, isAriNote, ariNoteBody, stripMentions, ARI_NOTE_PREFIX, type PickedMention } from '@/lib/mentions';
 import { runAriMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
+import AriNoteCard from '@/components/AriNoteCard';
+import type { AriOutputFormat } from '@/lib/ariExport';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
 
@@ -92,9 +94,28 @@ export default function DealDetail() {
     }
   };
 
-  const copyAriNote = async (body: string) => {
-    await navigator.clipboard.writeText(stripMentions(ariNoteBody(body)));
-    toast('Copied — paste it anywhere', 'success');
+  const replyToAri = async (request: string, outputFormat: AriOutputFormat, previousOutput: string) => {
+    if (!profile || ariBusy) return null;
+    setAriBusy(true);
+    try {
+      await createNote(`↳ Reply to Ari${outputFormat === 'note' ? '' : ` · ${outputFormat.toUpperCase()}`}: ${request}`, { dealId: deal.id });
+      const result = await runAriMention({
+        surface: 'deal',
+        entityId: deal.id,
+        request,
+        requesterName: `${profile.first_name} ${profile.last_name}`,
+        previousOutput,
+        outputFormat,
+      });
+      await createNote(ARI_NOTE_PREFIX + result, { dealId: deal.id });
+      toast(outputFormat === 'note' ? 'Ari replied here' : `Ari replied — building the ${outputFormat.toUpperCase()}`, 'success');
+      return result;
+    } catch (err) {
+      toast(friendlyAgentError((err as Error).message ?? ''), 'error');
+      return null;
+    } finally {
+      setAriBusy(false);
+    }
   };
   const handleAddTask = async () => { if (!newTaskTitle.trim()) return; await createTask({ title: newTaskTitle, deal_id: deal.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' }); setNewTaskTitle(''); setShowTaskForm(false); };
 
@@ -141,17 +162,15 @@ export default function DealDetail() {
                 </span>
               </div>
             )}
-            <div className="space-y-3 max-h-96 overflow-y-auto">{notes.length === 0 && !ariBusy ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => isAriNote(n.body) ? (
-              <div key={n.id} className="p-3 bg-brand-500/5 rounded-lg border border-brand-500/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-400"><Bot className="w-3.5 h-3.5" />Ari — Sales Assistant</span>
-                  <button onClick={() => copyAriNote(n.body)} className="flex items-center gap-1 text-[11px] font-medium text-ink-400 hover:text-brand-300 transition-colors" title="Copy to clipboard">
-                    <Copy className="w-3 h-3" />Copy
-                  </button>
-                </div>
-                <p className="text-sm text-ink-100 whitespace-pre-wrap"><MentionText body={ariNoteBody(n.body)} /></p>
-                <p className="text-xs text-ink-500 mt-2">for {n.author_name} · {new Date(n.created_at).toLocaleDateString()}</p>
-              </div>
+            <div className="space-y-3 max-h-[34rem] overflow-y-auto">{notes.length === 0 && !ariBusy ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => isAriNote(n.body) ? (
+              <AriNoteCard
+                key={n.id}
+                note={n}
+                contextTitle={deal.title}
+                preparedFor={contact ? `${contact.first_name} ${contact.last_name}` : undefined}
+                disabled={ariBusy}
+                onReply={replyToAri}
+              />
             ) : (
               <div key={n.id} className="p-3 bg-ink-950 rounded-lg border border-ink-800">
                 <p className="text-sm text-ink-100 whitespace-pre-wrap"><MentionText body={n.body} /></p>

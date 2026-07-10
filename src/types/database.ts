@@ -57,7 +57,9 @@ export interface Job {
   location_id: string; title: string; job_type: JobType; status: JobStatus;
   description: string | null; scheduled_at: string | null;
   estimated_duration: number | null; priority: DealPriority | null;
-  amount_to_collect: number | null; created_by: string;
+  amount_to_collect: number | null;
+  service_level: 1 | 2 | 3 | null; // expected invoice tier when amount_to_collect is unknown
+  created_by: string;
   created_at: string; updated_at: string;
 }
 

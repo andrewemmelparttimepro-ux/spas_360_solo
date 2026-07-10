@@ -147,13 +147,14 @@ function PhotoCard({ jobId }: { jobId: string }) {
 // --------------- Reusable inline editable field ---------------
 function EditableField({
   label, value, field, onSave, icon: Icon,
-  type = 'text', options, prefix, bold, color, multiline,
+  type = 'text', options, prefix, bold, color, multiline, numeric,
 }: {
   label: string; value: string | number | null; field: string;
   onSave: (u: Partial<Job>) => Promise<boolean>;
   icon?: React.ElementType;
   type?: 'text' | 'number' | 'select' | 'datetime-local'; options?: string[];
   prefix?: string; bold?: boolean; color?: string; multiline?: boolean;
+  numeric?: boolean; // parse select/text drafts to a number before save (e.g. service_level)
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ''));
@@ -166,7 +167,7 @@ function EditableField({
   const commit = async () => {
     if (draft === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
-    const parsed = type === 'number' ? (draft ? parseFloat(draft) : null) : (draft || null);
+    const parsed = (type === 'number' || numeric) ? (draft ? parseFloat(draft) : null) : (draft || null);
     await onSave({ [field]: parsed } as Partial<Job>);
     setSaving(false);
     setEditing(false);
@@ -312,6 +313,10 @@ export default function JobDetail() {
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
             {job.description && <div className="text-sm text-ink-300 bg-ink-950 p-3 rounded-lg">{job.description}</div>}
             <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
+            {/* When the invoice can't be estimated yet, the level (1=routine, 3=expensive) carries "in play" on the customer card */}
+            {!job.amount_to_collect && (
+              <EditableField label="Service Level (1–3)" value={job.service_level ?? null} field="service_level" onSave={saveJob} icon={Wrench} type="select" options={['1', '2', '3']} numeric color="text-amber-300" />
+            )}
           </div>
         </div>
 

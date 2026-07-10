@@ -266,8 +266,16 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
         <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300">{c.phone}</a>
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-ink-100">
-        ${c.openDealValue.toLocaleString()}
+        ${(c.openDealValue + c.serviceAmount).toLocaleString()}
         {c.openDealCount > 0 && <span className="text-[10px] font-medium text-ink-500 ml-1">({c.openDealCount})</span>}
+        {c.serviceLevel != null && (
+          <span
+            className="ml-1.5 px-1 py-px rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold align-middle"
+            title={`Active service job, invoice not yet estimated — level ${c.serviceLevel} of 3 expected cost`}
+          >
+            SVC&nbsp;L{c.serviceLevel}
+          </span>
+        )}
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-emerald-300">${c.wonValue.toLocaleString()}</td>
       <td className="px-4 py-3 text-sm text-ink-400 truncate max-w-[140px]">{assignedName ?? 'Unassigned'}</td>
@@ -358,9 +366,17 @@ function CustomerCardView({ customer: c, onNewDeal }: { customer: CustomerCard; 
         <div className="bg-ink-950 rounded-lg px-2.5 py-2">
           <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-ink-500">In play</p>
           <p className="font-mono text-sm font-bold text-ink-100">
-            ${c.openDealValue.toLocaleString()}
+            ${(c.openDealValue + c.serviceAmount).toLocaleString()}
             {c.openDealCount > 0 && <span className="text-[10px] font-medium text-ink-500 ml-1">({c.openDealCount})</span>}
           </p>
+          {c.serviceLevel != null && (
+            <p
+              className="text-[9px] font-bold text-amber-300/90 mt-0.5"
+              title={`Active service job, invoice not yet estimated — level ${c.serviceLevel} of 3 expected cost`}
+            >
+              + service · L{c.serviceLevel}
+            </p>
+          )}
         </div>
         <div className="bg-ink-950 rounded-lg px-2.5 py-2">
           <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-ink-500">Lifetime</p>
@@ -379,6 +395,8 @@ function CustomerCardView({ customer: c, onNewDeal }: { customer: CustomerCard; 
           {c.openJobCount > 0 && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold">
               <Wrench className="w-3 h-3" />{c.openJobCount} in service
+              {c.serviceAmount > 0 && <span className="text-emerald-200/90">· ${c.serviceAmount.toLocaleString()}</span>}
+              {c.serviceLevel != null && <span className="text-amber-300/90">· L{c.serviceLevel}</span>}
             </span>
           )}
         </div>

@@ -11,6 +11,8 @@ export interface CustomerCard extends Contact {
   openDealValue: number;
   wonValue: number; // lifetime closed-won $
   openJobCount: number;
+  serviceAmount: number; // sum of amount_to_collect across active jobs (invoice $ in play)
+  serviceLevel: 1 | 2 | 3 | null; // max level across active UNPRICED jobs — how expensive, when $ unknown
   equipmentCount: number; // inventory units tied to this customer
   hasFollowUp: boolean; // any open task on them or their open deals
   lastActivity: string; // ISO — max(last_activity_at, updated_at)
@@ -22,7 +24,7 @@ export function useCustomerCards() {
   const { profile, activeLocationId } = useAuth();
   const [contacts, setContacts] = useState<(Contact & { assigned?: { first_name: string; last_name: string } | null })[]>([]);
   const [dealAgg, setDealAgg] = useState<Map<string, { open: number; openValue: number; won: number }>>(new Map());
-  const [jobAgg, setJobAgg] = useState<Map<string, number>>(new Map());
+  const [jobAgg, setJobAgg] = useState<Map<string, { count: number; amount: number; level: 1 | 2 | 3 | null }>>(new Map());
   const [equipAgg, setEquipAgg] = useState<Map<string, number>>(new Map());
   const [followUps, setFollowUps] = useState<Set<string>>(new Set()); // contact ids with an open task
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +56,7 @@ export function useCustomerCards() {
       fetchEveryContact(),
       supabase.from('pipeline_stages').select('id, name').eq('org_id', profile.org_id),
       supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id),
-      supabase.from('jobs').select('contact_id, status').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),
+      supabase.from('jobs').select('contact_id, status, amount_to_collect, service_level').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),
       supabase.from('inventory_items').select('customer_id').eq('org_id', profile.org_id).not('customer_id', 'is', null),
       supabase.from('tasks').select('contact_id, deal_id').eq('org_id', profile.org_id).in('status', ['Pending', 'In Progress']),
     ]);
@@ -80,10 +82,21 @@ export function useCustomerCards() {
     }
     setDealAgg(deals);
 
-    const jobs = new Map<string, number>();
+    // Service money in play: priced jobs contribute real dollars; unpriced jobs
+    // contribute a 1-3 "how expensive" level (we surface the max).
+    const jobs = new Map<string, { count: number; amount: number; level: 1 | 2 | 3 | null }>();
     for (const j of jobRes.data ?? []) {
       const cid = j.contact_id as string;
-      jobs.set(cid, (jobs.get(cid) ?? 0) + 1);
+      const agg = jobs.get(cid) ?? { count: 0, amount: 0, level: null };
+      agg.count += 1;
+      const amt = Number(j.amount_to_collect) || 0;
+      if (amt > 0) {
+        agg.amount += amt;
+      } else {
+        const lvl = (j.service_level as 1 | 2 | 3 | null) ?? 2;
+        agg.level = agg.level === null ? lvl : (Math.max(agg.level, lvl) as 1 | 2 | 3);
+      }
+      jobs.set(cid, agg);
     }
     setJobAgg(jobs);
 
@@ -126,7 +139,9 @@ export function useCustomerCards() {
       openDealCount: d?.open ?? 0,
       openDealValue: d?.openValue ?? 0,
       wonValue: d?.won ?? 0,
-      openJobCount: jobAgg.get(c.id) ?? 0,
+      openJobCount: jobAgg.get(c.id)?.count ?? 0,
+      serviceAmount: jobAgg.get(c.id)?.amount ?? 0,
+      serviceLevel: jobAgg.get(c.id)?.level ?? null,
       equipmentCount: equipAgg.get(c.id) ?? 0,
       hasFollowUp: followUps.has(c.id),
       lastActivity: last,

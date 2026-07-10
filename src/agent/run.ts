@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { getOpenAITools, executeTool } from '@/agent/tools';
+import { archiveAriOutput, type CitadelArchiveInput } from '@/agent/citadel';
 
 // Headless Ari: same /api/chat proxy + client-side tool loop as the chat
 // widget, but with no thread persistence — used by @Ari mentions in notes and
@@ -12,7 +13,10 @@ interface ApiMessage {
   tool_call_id?: string;
 }
 
-export async function runAgentTask(userContent: string): Promise<string> {
+export async function runAgentTask(
+  userContent: string,
+  archiveContext: Omit<CitadelArchiveInput, 'content'> = {}
+): Promise<string> {
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
 
@@ -42,7 +46,15 @@ export async function runAgentTask(userContent: string): Promise<string> {
     msg = await call();
   }
 
-  if (msg?.content) return msg.content;
+  if (msg?.content) {
+    await archiveAriOutput({
+      ...archiveContext,
+      request: archiveContext.request ?? userContent,
+      deliveryChannels: archiveContext.deliveryChannels ?? ['headless'],
+      content: msg.content,
+    });
+    return msg.content;
+  }
   throw new Error('Ari went through several steps but could not wrap that up cleanly.');
 }
 

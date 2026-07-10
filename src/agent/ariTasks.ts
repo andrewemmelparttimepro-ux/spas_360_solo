@@ -46,27 +46,48 @@ export async function runAriMention(opts: {
   entityId: string;
   request: string; // raw body with tokens
   requesterName: string;
+  /** The Ari output being refined when the user replies inline. */
+  previousOutput?: string;
+  /** The delivery format selected beside the inline reply composer. */
+  outputFormat?: 'note' | 'pdf' | 'jpg';
 }): Promise<string> {
   const packet = opts.surface === 'deal'
     ? await buildDealPacket(opts.entityId)
     : await buildContactPacket(opts.entityId);
 
   const content = [
-    `${opts.requesterName} @-mentioned you in a note on a ${opts.surface === 'deal' ? 'deal' : 'customer'} in SPAS 360.`,
-    `Do the work now and reply with ONLY the finished deliverable — clean, copy-ready markdown. It will be saved as a note on this ${opts.surface} for ${opts.requesterName} to use. No preamble, no "here you go".`,
+    opts.previousOutput
+      ? `${opts.requesterName} replied directly to one of your earlier outputs on a ${opts.surface === 'deal' ? 'deal' : 'customer'} in SPAS 360.`
+      : `${opts.requesterName} @-mentioned you in a note on a ${opts.surface === 'deal' ? 'deal' : 'customer'} in SPAS 360.`,
+    `Do the work now and reply with ONLY the finished deliverable — clean, copy-ready markdown. It will be saved as a note on this ${opts.surface} for ${opts.requesterName} to use${opts.outputFormat && opts.outputFormat !== 'note' ? ` and rendered by SPAS 360 as a polished ${opts.outputFormat.toUpperCase()}` : ''}. No preamble, no "here you go".`,
     `The verified data packet is below — use it as your source of truth. Only reach for tools if you need something that is not in the packet. Never invent numbers; unknowns become [CONFIRM: …].`,
+    opts.outputFormat && opts.outputFormat !== 'note'
+      ? `Format the content for a customer-facing document: one strong title, no more than four short sections, and no chatty closing question. Enforce a single US-letter page (or one shareable portrait image): stay under 425 words, use at most eight compact bullets, and DO NOT use Markdown tables. Ruthlessly prioritize the strongest verified selling points. The app handles the actual file rendering.`
+      : '',
     '',
     '### Data packet',
     packet,
+    opts.previousOutput ? `\n### Your previous output\n${opts.previousOutput}` : '',
     '',
     `### Request from ${opts.requesterName}`,
     toAgentText(opts.request),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
-  return runAgentTask(content);
+  const request = stripMentions(opts.request);
+  return runAgentTask(content, {
+    request,
+    title: `${opts.surface === 'deal' ? 'Deal' : 'Customer'}${opts.outputFormat && opts.outputFormat !== 'note' ? ` · ${opts.outputFormat.toUpperCase()}` : ''} · ${request}`,
+    dealId: opts.surface === 'deal' ? opts.entityId : null,
+    customerId: opts.surface === 'contact' ? opts.entityId : null,
+    deliveryChannels: [
+      opts.surface === 'deal' ? 'deal_note' : 'customer_note',
+      ...(opts.outputFormat && opts.outputFormat !== 'note' ? [opts.outputFormat] : []),
+    ],
+  });
 }
 
 export async function runAriChatMention(opts: {
+  threadId: string;
   channelTitle: string;
   senderName: string;
   message: string; // raw body with tokens
@@ -81,5 +102,11 @@ export async function runAriChatMention(opts: {
     toAgentText(opts.message),
   ].filter(Boolean).join('\n');
 
-  return runAgentTask(content);
+  const request = stripMentions(opts.message);
+  return runAgentTask(content, {
+    request,
+    title: `${opts.channelTitle} · ${request}`,
+    threadId: opts.threadId,
+    deliveryChannels: ['team_chat'],
+  });
 }

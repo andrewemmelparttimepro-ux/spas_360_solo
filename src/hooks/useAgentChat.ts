@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { getOpenAITools, executeTool } from '@/agent/tools';
+import { archiveAriOutput } from '@/agent/citadel';
 import { toAgentText } from '@/lib/mentions';
 
 interface ChatMessage {
@@ -194,6 +195,15 @@ export function useAgentChat() {
 
       // Save final assistant response
       if (assistantMessage?.content) {
+        // The Citadel is the canonical copy. Archive first so a response is
+        // never presented as successfully delivered while its main copy is missing.
+        await archiveAriOutput({
+          content: assistantMessage.content,
+          request: content,
+          title: `Ari chat · ${content}`,
+          threadId,
+          deliveryChannels: ['ari_chat'],
+        });
         await supabase.from('agent_messages').insert({
           thread_id: threadId,
           role: 'assistant',

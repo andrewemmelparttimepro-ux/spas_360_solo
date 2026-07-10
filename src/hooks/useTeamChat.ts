@@ -270,7 +270,7 @@ export function useTeamChat() {
       const recentLines = messages.slice(-8)
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => `${m.role === 'assistant' ? 'Ari' : (m.sender_name ?? 'Teammate')}: ${stripMentions(m.content)}`);
-      const reply = await runAriChatMention({ channelTitle, senderName, message: content, recentLines });
+      const reply = await runAriChatMention({ threadId: tid, channelTitle, senderName, message: content, recentLines });
       await supabase.from('agent_messages').insert({ thread_id: tid, role: 'assistant', content: reply, sender_id: null });
     } catch (err) {
       // Fail loudly, in the thread, in plain English

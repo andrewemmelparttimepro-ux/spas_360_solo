@@ -94,8 +94,21 @@ export async function notifyMentionedUsers(opts: {
   return targets;
 }
 
-// A note written BY Ari starts with his own mention token — the notes UI keys
-// off this to render the Ari treatment (bot header + copy button).
-export const ARI_NOTE_PREFIX = '@[Ari](ari) ';
-export const isAriNote = (body: string) => body.startsWith(ARI_NOTE_PREFIX);
-export const ariNoteBody = (body: string) => body.slice(ARI_NOTE_PREFIX.length);
+// A note written BY Ari carries a delivery marker after his mention token.
+// User prompts also start with @Ari, so the marker keeps prompts from being
+// mistaken for Ari outputs (and therefore from showing export/reply actions).
+const LEGACY_ARI_PREFIX = '@[Ari](ari) ';
+export const ARI_NOTE_PREFIX = '@[Ari](ari) [delivered] ';
+
+export const isAriNote = (body: string) => {
+  if (body.startsWith(ARI_NOTE_PREFIX)) return true;
+  if (!body.startsWith(LEGACY_ARI_PREFIX)) return false;
+  // Backward compatibility for Ari responses created before the delivery
+  // marker shipped. Existing short @Ari prompts remain ordinary notes.
+  const legacyBody = body.slice(LEGACY_ARI_PREFIX.length);
+  return legacyBody.length > 240 || /(^|\n)(#{1,4}\s|---+$|\|.+\|)/m.test(legacyBody);
+};
+
+export const ariNoteBody = (body: string) => body.startsWith(ARI_NOTE_PREFIX)
+  ? body.slice(ARI_NOTE_PREFIX.length)
+  : body.slice(LEGACY_ARI_PREFIX.length);

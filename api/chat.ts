@@ -17,11 +17,31 @@ const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
 const GLM_MODEL = envValue(process.env.GLM_MODEL, 'glm-5.2');
 const GLM_BASE_URL = envValue(process.env.GLM_BASE_URL, 'https://api.z.ai/api/paas/v4');
 
+// Verify the caller's Supabase session token against the auth server.
+// Presence of a header is not authentication — an invented "Bearer test" must be rejected,
+// otherwise /api/chat is an open LLM proxy anyone can drain.
+async function verifySupabaseUser(authHeader: string): Promise<boolean> {
+  const supabaseUrl = envValue(process.env.VITE_SUPABASE_URL);
+  const anonKey = envValue(process.env.VITE_SUPABASE_ANON_KEY);
+  if (!supabaseUrl || !anonKey) return false; // fail closed — misconfig should be loud, not open
+  try {
+    const r = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: anonKey, Authorization: authHeader },
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Missing authorization' });
+  if (!(await verifySupabaseUser(authHeader))) {
+    return res.status(401).json({ error: 'Invalid or expired session' });
+  }
 
   try {
     const { messages: clientMessages, tools } = req.body;
@@ -86,7 +106,7 @@ async function handleClaude(messages: OAIMessage[], tools: OAITool[], res: Verce
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
-      max_tokens: 1024,
+      max_tokens: 4096,
       temperature: 0.7,
       system,
       messages: anthropicMessages,
@@ -188,7 +208,7 @@ async function handleGemini(
         systemInstruction: messages.find(m => m.role === 'system')
           ? { parts: [{ text: messages.find(m => m.role === 'system')!.content }] }
           : undefined,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       }),
     }
   );
@@ -323,7 +343,9 @@ async function handleOpenAICompatible({
       tools: tools?.length > 0 ? tools : undefined,
       tool_choice: tools?.length > 0 ? 'auto' : undefined,
       temperature: 0.7,
-      max_tokens: 1024,
+      // GLM 5.2 spends reasoning tokens out of this budget before writing — a 1k cap
+      // truncated long deliverables (proposals). 4k covers a 1-pager with room to think.
+      max_tokens: 4096,
     }),
   });
 

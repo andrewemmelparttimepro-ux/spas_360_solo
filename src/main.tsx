@@ -8,6 +8,13 @@ import {installClarity} from './lib/clarity';
 
 installClarity();
 
+// PWA: register the service worker (prod only — HMR and a SW don't mix)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW registration failed:', err));
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

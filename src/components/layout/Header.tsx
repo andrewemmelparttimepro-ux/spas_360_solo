@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import SearchPalette from '@/components/SearchPalette';
+import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 
 // Nav is organized around the three pillars: the people (CRM), and the two
 // sides of the business that serve them — Sales and Service.
@@ -77,6 +78,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Nudge until they decide either way; hides itself after grant/deny
+  const [pushNudge, setPushNudge] = useState(() => pushSupported() && pushPermission() === 'default');
   const locRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -243,6 +246,18 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                 </button>
               )}
             </div>
+            {pushNudge && (
+              <button
+                onClick={async () => {
+                  const ok = await enablePush();
+                  setPushNudge(false);
+                  void ok;
+                }}
+                className="w-full text-left px-4 py-2.5 bg-brand-500/10 border-b border-brand-500/25 text-[12px] font-medium text-brand-300 hover:bg-brand-500/20 transition-colors"
+              >
+                🔔 Get these on your phone — tap to enable push notifications on this device
+              </button>
+            )}
             <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
                 <p className="text-sm text-ink-500 text-center py-8">You're all caught up</p>

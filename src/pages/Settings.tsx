@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
-import { LogOut, User, MapPin, Shield, Users, MailPlus, X } from 'lucide-react';
+import { LogOut, User, MapPin, Shield, Users, MailPlus, X, BellRing } from 'lucide-react';
 import type { Profile } from '@/types/database';
+import { pushSupported, pushPermission, pushEnabledHere, enablePush, disablePush } from '@/lib/push';
 
 interface AppInvite {
   id: string;
@@ -181,6 +182,69 @@ function TeamPanel() {
   );
 }
 
+/** Push notifications for THIS device — mentions, Ari, deal-won, reminders
+ *  hit the lock screen even when the app is closed. */
+function NotificationsPanel() {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const supported = pushSupported();
+  const permission = pushPermission();
+
+  useEffect(() => { pushEnabledHere().then(setEnabled); }, []);
+
+  const toggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+        toast('Push notifications off on this device', 'success');
+      } else {
+        const ok = await enablePush();
+        setEnabled(ok);
+        toast(ok
+          ? 'This device will now get notifications 🎉'
+          : 'Couldn’t enable — check the browser’s notification permission', ok ? 'success' : 'error');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+      <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-1 flex items-center">
+        <BellRing className="w-4 h-4 mr-2" /> Notifications on this device
+      </h2>
+      <p className="text-xs text-ink-500 mb-4">
+        Mentions, Ari finishing work, won deals, and morning reminders — pushed to this device even when the app is closed.
+        {' '}On iPhone, add SPAS 360 to your Home Screen first (Share → Add to Home Screen), then enable here from the installed app.
+      </p>
+      {!supported ? (
+        <p className="text-sm text-amber-400/90 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+          This browser can't do push notifications{/iPhone|iPad/.test(navigator.userAgent) ? ' — install the app to your Home Screen first, then come back here' : ''}.
+        </p>
+      ) : permission === 'denied' ? (
+        <p className="text-sm text-amber-400/90 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+          Notifications are blocked in the browser settings for this site — unblock them there, then flip this on.
+        </p>
+      ) : (
+        <button
+          onClick={toggle}
+          disabled={busy}
+          className={enabled
+            ? 'px-4 py-2 rounded-lg text-sm font-medium border border-ink-700 text-ink-300 hover:text-red-300 hover:border-red-500/40 transition-colors disabled:opacity-50'
+            : 'px-4 py-2 rounded-lg text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white transition-colors disabled:opacity-50'}
+        >
+          {busy ? 'Working…' : enabled ? 'Turn off on this device' : 'Enable push notifications'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const { profile, locations, signOut } = useAuth();
 
@@ -210,6 +274,9 @@ export default function Settings() {
           <p className="text-sm text-ink-500">Loading...</p>
         )}
       </div>
+
+      {/* Push notifications for this device */}
+      <NotificationsPanel />
 
       {/* Team & permissions — owner/manager only */}
       <TeamPanel />

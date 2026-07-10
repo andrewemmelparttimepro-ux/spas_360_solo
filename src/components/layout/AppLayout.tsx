@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { resyncPush } from '@/lib/push';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import AdminRail from './AdminRail';
@@ -12,6 +13,9 @@ import { CustomerDragProvider } from '@/contexts/CustomerDragContext';
  *  from any page onto the Deals/Schedule pills in the topbar. */
 export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Keep this device's push subscription fresh + owned by the signed-in user
+  useEffect(() => { resyncPush(); }, []);
 
   return (
     <CustomerDragProvider>

@@ -1,0 +1,7 @@
+-- Applied 2026-07-09 via MCP (migrations: web_push, daily_reminders).
+-- 1) push_subscriptions + claim RPC (RLS: own rows; claim reassigns on shared devices)
+-- 2) private.push_config (endpoint + shared secret for /api/push — value lives in DB + Vercel env, not here)
+-- 3) notify_push trigger: notifications INSERT → pg_net POST to /api/push with the user's subscriptions
+-- 4) pg_cron 'spas360-daily-reminders' @ 13:00 UTC → send_daily_reminders():
+--    overdue tasks → assignee; overdue/stagnant(14d) parts digest → service/owner managers; 20h dupe-guard.
+-- See the applied migrations in Supabase for the authoritative SQL.

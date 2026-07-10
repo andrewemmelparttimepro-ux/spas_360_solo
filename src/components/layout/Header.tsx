@@ -1,23 +1,25 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import SearchPalette from '@/components/SearchPalette';
 
-// Nav is organized around the two sides of the business: Sales and Service.
-// Contacts lives in the right-hand admin rail, not the top nav.
-export type NavTone = 'sales' | 'service' | null;
+// Nav is organized around the three pillars: the people (CRM), and the two
+// sides of the business that serve them — Sales and Service.
+export type NavTone = 'sales' | 'service' | 'customers' | null;
 
 export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
   { label: null, tone: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
+  { label: 'CRM', tone: 'customers', items: [{ name: 'Customers', path: '/customers', icon: Users }] },
   {
     label: 'Sales',
     tone: 'sales',
     items: [
-      { name: 'Deals', path: '/deals', icon: Users },
+      { name: 'Deals', path: '/deals', icon: Handshake },
       { name: 'Inventory', path: '/inventory', icon: Package },
     ],
   },
@@ -32,8 +34,13 @@ export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name:
   },
 ];
 
+// Customer cards dragged from the CRM can land on these pills (spring-loaded
+// navigation lives in CustomerDragContext).
+const NAV_DROP_PATHS = new Set(['/deals', '/service']);
+
 // Each side of the business wears its own color: Sales = MCHL brand blue
-// (the money side), Service = emerald (the go/field side). Neutral stays ink.
+// (the money side), Service = emerald (the go/field side), Customers = violet
+// (the people pillar both sides share). Neutral stays ink.
 export const NAV_TONE = {
   sales: {
     container: 'bg-brand-500/[0.07] ring-1 ring-inset ring-brand-500/25',
@@ -47,6 +54,12 @@ export const NAV_TONE = {
     active: 'bg-emerald-500/20 text-emerald-300',
     idle: 'text-ink-400 hover:text-emerald-300 hover:bg-emerald-500/10',
   },
+  customers: {
+    container: 'bg-violet-500/[0.07] ring-1 ring-inset ring-violet-500/25',
+    label: 'text-violet-400',
+    active: 'bg-violet-500/20 text-violet-300',
+    idle: 'text-ink-400 hover:text-violet-300 hover:bg-violet-500/10',
+  },
   neutral: {
     container: 'bg-ink-950',
     label: 'text-ink-500',
@@ -58,6 +71,7 @@ export const NAV_TONE = {
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { profile, locations, activeLocationId, setActiveLocation, signOut } = useAuth();
   const { items: notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { dragging, activeTarget } = useCustomerDrag();
   const navigate = useNavigate();
   const [locOpen, setLocOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -130,21 +144,31 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   {section.label}
                 </span>
               )}
-              {section.items.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
-                      isActive ? tone.active : tone.idle
-                    )
-                  }
-                >
-                  <item.icon className="w-[15px] h-[15px]" />
-                  {item.name}
-                </NavLink>
-              ))}
+              {section.items.map((item) => {
+                const isDropNav = NAV_DROP_PATHS.has(item.path);
+                const isDropHover = activeTarget === `nav:${item.path}`;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    title={item.name}
+                    {...(isDropNav ? { 'data-cdrop': 'nav', 'data-cdrop-nav': item.path } : {})}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
+                        isActive ? tone.active : tone.idle,
+                        // A customer card is in flight — light up the landing zones
+                        dragging && isDropNav && 'ring-2 ring-violet-400/50',
+                        isDropHover && 'ring-2 ring-violet-400 bg-violet-500/20 text-violet-200 scale-105'
+                      )
+                    }
+                  >
+                    <item.icon className="w-[15px] h-[15px]" />
+                    {/* Neutral pills go icon-only below xl so the three colored groups always fit */}
+                    <span className={cn(!section.tone && 'hidden xl:inline')}>{item.name}</span>
+                  </NavLink>
+                );
+              })}
             </div>
           );
         })}

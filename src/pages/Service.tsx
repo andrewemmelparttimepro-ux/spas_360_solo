@@ -169,10 +169,18 @@ export default function Service() {
   // ─── Create job modal ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
 
-  // Arriving via the dashboard's "+ New" → open the modal immediately, smart defaults applied
+  // Arriving via the dashboard's "+ New" → open the modal immediately, smart defaults applied.
+  // A customer card dropped on the Schedule pill arrives with contactId pre-picked.
+  const pendingContactRef = useRef<string | null>(null);
   useEffect(() => {
-    if ((location.state as { openNew?: boolean } | null)?.openNew) {
-      setNewJob(j => ({ ...j, location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '' }));
+    const st = location.state as { openNew?: boolean; contactId?: string } | null;
+    if (st?.openNew) {
+      setNewJob(j => ({
+        ...j,
+        contact_id: st.contactId ?? j.contact_id,
+        location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '',
+      }));
+      if (st.contactId) pendingContactRef.current = st.contactId;
       setShowCreate(true);
       navigate(location.pathname, { replace: true, state: null }); // consume the flag
     }
@@ -189,6 +197,15 @@ export default function Service() {
       return { ...j, title: auto };
     });
   };
+  // Prefilled customer: fire the auto-title once the contact list arrives
+  useEffect(() => {
+    const cid = pendingContactRef.current;
+    if (cid && contacts.some(c => c.id === cid)) {
+      pendingContactRef.current = null;
+      applyAutoTitle(cid, newJob.job_type);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contacts]);
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
     job_type: 'Repair' as JobType, status: 'In Progress' as JobStatus,

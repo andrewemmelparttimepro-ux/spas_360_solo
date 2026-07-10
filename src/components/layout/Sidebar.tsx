@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { Settings, X, Contact } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_SECTIONS, NAV_TONE } from './Header';
+import { NAV_SECTIONS, NAV_TONE, type NavTone } from './Header';
 
-const linkClass = (tone: 'sales' | 'service' | null) => ({ isActive }: { isActive: boolean }) => {
+const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
   const t = NAV_TONE[tone ?? 'neutral'];
   return cn(
     'flex items-center px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors',
@@ -53,14 +53,6 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
               </div>
             </div>
           ))}
-
-          <div>
-            <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">Admin</div>
-            <NavLink to="/contacts" onClick={onClose} className={linkClass(null)}>
-              <Contact className="w-5 h-5 mr-3 flex-shrink-0" />
-              Contacts
-            </NavLink>
-          </div>
         </div>
 
         <div className="p-3 border-t border-ink-700 space-y-3">

@@ -69,12 +69,23 @@ src/
   App.tsx          Routes + RoleLanding (tech→/service, salesperson→/deals, managers→/dashboard).
   contexts/AuthContext.tsx   Auth + profile + locations + activeLocationId (global store filter).
                    Contains the DEV-ONLY preview harness (see §6).
+  contexts/CustomerDragContext.tsx   CROSS-PAGE CUSTOMER DRAG. Pointer-based (not HTML5 DnD, so it
+                   survives route changes and can't fight the kanban's dnd). Grab a customer card →
+                   hover the Deals/Schedule pill (they glow violet) → 400ms dwell spring-loads the
+                   page mac-dock-style → drop on a deal card (attach w/ confirm) or a stage column
+                   (QuickDealModal). Drop straight ON a pill = quick-create intent (Deals →
+                   QuickDealModal via location.state.customerDrop; Schedule → New Job modal
+                   prefilled via {openNew, contactId}). Targets are declared with data-cdrop
+                   attributes; pages register drop resolution via setDropHandler. Touch is
+                   deliberately excluded (phones scroll) — cards carry explicit buttons instead.
   components/
-    layout/Header.tsx     Topbar: brand, grouped nav pills (⌜SALES: Deals·Inventory⌟ ⌜SERVICE:
-                          Schedule⌟), ⌘K search trigger, location pill, notification bell, user menu.
-                          NAV_SECTIONS + NAV_TONE exported — single source of truth for nav; the two
-                          business sides wear their colors (Sales = brand blue, Service = emerald),
-                          neutral items stay ink. Drawer mirrors the tones.
+    layout/Header.tsx     Topbar: brand, grouped nav pills (⌜CRM: Customers⌟ ⌜SALES: Deals·Inventory⌟
+                          ⌜SERVICE: Schedule⌟), ⌘K search trigger, location pill, notification bell,
+                          user menu. NAV_SECTIONS + NAV_TONE exported — single source of truth for
+                          nav; the three pillars wear their colors (Customers = violet, Sales = brand
+                          blue, Service = emerald), neutral items stay ink and go icon-only below xl
+                          so all three groups always fit. Deals/Schedule pills are customer-drag drop
+                          targets. Drawer mirrors the tones.
     layout/Sidebar.tsx    Mobile-only drawer (mirrors NAV_SECTIONS + Contacts + Settings).
     layout/AdminRail.tsx  Right-docked contacts panel, collapsed by default (localStorage
                           `spas360.adminRail`), hidden for technicians.
@@ -116,8 +127,20 @@ src/
                      anchoring beside discounted sale prices.
     Communication.tsx  Team chat + customer SMS threads (real Twilio sends — see §8).
     Reports.tsx      Revenue by location, pipeline by stage, jobs by status, inventory aging.
-    Contacts.tsx / ContactDetail / DealDetail / InventoryDetail / Settings / Login.
+    Customers.tsx    THE CRM PILLAR (route /customers; /contacts redirects). Card-first: every
+                     customer is a card — lifecycle badge (Lead/Prospect/Customer/Past), tap-to-call,
+                     open-pipeline $ + lifetime $ (mono), equipment owned, jobs in service,
+                     commission owner, No-follow-up / going-quiet flags. Lifecycle filter chips
+                     w/ counts, search, sort (recent/value/name). Cards drag to Deals/Schedule
+                     (CustomerDragContext); per-card "New Deal" button is the touch path.
+                     QuickDealModal.tsx = fast deal for a KNOWN customer (interest chips → wizard's
+                     auto-title ritual, commission credited to assigned salesperson, MANDATORY
+                     follow-up task) — used by card button, stage drops, pill drops, ContactDetail.
+    ContactDetail / DealDetail / InventoryDetail / Settings / Login. ContactDetail now leads with
+                     the 360° relationship strip (deals w/ stage, service jobs, equipment owned)
+                     + New Deal button. Old table Contacts.tsx is deleted.
   hooks/           One hook per domain (usePipeline, useServiceJobs, useInventory, useContacts,
+                   useCustomerCards (per-customer aggregates powering the card grid),
                    useConversations, useTeamChat, useAgentChat, useNotifications, useDashboard,
                    useReports, useTimeClock, useJobPhotos). All Supabase + realtime.
   agent/           AI assistant tool definitions (15: search/create contacts & deals,
@@ -159,7 +182,8 @@ the salesperson. This is Brandon's "Wyant – Sundance – delivery" ritual, aut
 - **Ship flow:** commit to `main` → push → Vercel auto-deploys prod (~20s). Verify with
   `vercel ls` + curl the live bundle for feature markers (content-hashed chunk names prove fresh code).
 - **Known gotchas:**
-  - `node_modules` has corrupted to dangling symlinks **twice** — if `vite`/`tsc` "command not found":
+  - `node_modules` has corrupted **three times** (dangling symlinks, then Finder-style "`name 2`"
+    duplicate dirs in `@types` breaking tsc) — if `vite`/`tsc` breaks weirdly:
     `rm -rf node_modules package-lock.json && npm install`.
   - Supabase-js **reuses realtime channels by topic**; a second `.on()` after `subscribe()` THROWS and
     (without a boundary) black-screens the app. Every hook now uses per-instance channel suffixes —

@@ -276,7 +276,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                 {matches.map(m => (
                   <div key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 border-t border-amber-500/10 hover:bg-amber-500/10 transition-colors">
                     <button
-                      onClick={() => { onClose(); navigate(`/contacts/${m.id}`); }}
+                      onClick={() => { onClose(); navigate(`/customers/${m.id}`); }}
                       className="min-w-0 flex-1 text-left group"
                       title="Open customer card"
                     >

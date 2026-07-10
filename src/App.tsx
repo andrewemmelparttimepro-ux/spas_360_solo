@@ -11,7 +11,7 @@ const Service = lazy(() => import('./pages/Service'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Communication = lazy(() => import('./pages/Communication'));
 const Reports = lazy(() => import('./pages/Reports'));
-const Contacts = lazy(() => import('./pages/Contacts'));
+const Customers = lazy(() => import('./pages/Customers'));
 const ContactDetail = lazy(() => import('./pages/ContactDetail'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
 const JobDetail = lazy(() => import('./pages/JobDetail'));
@@ -82,7 +82,10 @@ function AuthGate() {
         <Route path="/" element={<AppLayout />}>
           <Route index element={<RoleLanding />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="contacts" element={<Contacts />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="customers/:id" element={<ContactDetail />} />
+          {/* Legacy paths — old links and notifications keep working */}
+          <Route path="contacts" element={<Navigate to="/customers" replace />} />
           <Route path="contacts/:id" element={<ContactDetail />} />
           <Route path="deals" element={<Deals />} />
           <Route path="deals/:id" element={<DealDetail />} />

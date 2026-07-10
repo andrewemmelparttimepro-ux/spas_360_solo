@@ -290,7 +290,7 @@ export default function JobDetail() {
         <Link to="/service" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{job.title}</h1>
-          {contact && <Link to={`/contacts/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400">{contact.first_name} {contact.last_name}</Link>}
+          {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400">{contact.first_name} {contact.last_name}</Link>}
         </div>
         <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
       </div>

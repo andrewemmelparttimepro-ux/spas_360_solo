@@ -122,7 +122,7 @@ export default function AdminRail() {
                 ) : contacts.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => navigate(`/contacts/${c.id}`)}
+                    onClick={() => navigate(`/customers/${c.id}`)}
                     className="w-full text-left px-3 py-2.5 border-b border-ink-800/60 hover:bg-ink-800 transition-colors flex items-center gap-2.5"
                   >
                     <span className="w-7 h-7 rounded-full bg-brand-500/15 text-brand-300 text-[11px] font-bold flex items-center justify-center shrink-0">
@@ -140,7 +140,7 @@ export default function AdminRail() {
               </div>
 
               <button
-                onClick={() => navigate('/contacts')}
+                onClick={() => navigate('/customers')}
                 className="shrink-0 flex items-center justify-center gap-1.5 py-2.5 border-t border-ink-700 text-[12px] font-medium text-ink-400 hover:text-brand-400 transition-colors"
               >
                 Open full view <ExternalLink className="w-3 h-3" />

@@ -1,5 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign, Handshake, Wrench, Package } from 'lucide-react';
 import { useContact } from '@/hooks/useContacts';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,12 @@ import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactType } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
+import QuickDealModal from '@/components/QuickDealModal';
+
+// The full relationship behind the customer card: deals, service jobs, equipment
+type RelDeal = { id: string; title: string; amount: number | null; stage?: { name: string } | null };
+type RelJob = { id: string; title: string; status: string; scheduled_at: string | null };
+type RelEquip = { id: string; product: string; brand: string | null; sku: string; status: string };
 
 const CONTACT_TYPE_OPTIONS: ContactType[] = ['Lead', 'Prospect', 'Customer', 'Past Customer'];
 const TYPE_COLORS: Record<ContactType, string> = {
@@ -69,10 +75,29 @@ export default function ContactDetail() {
   const { notes, createNote } = useNotes({ contactId: id });
   const { tasks, createTask, completeTask } = useTasks({ contactId: id });
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [newNote, setNewNote] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [team, setTeam] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+  const [showQuickDeal, setShowQuickDeal] = useState(false);
+  const [relDeals, setRelDeals] = useState<RelDeal[]>([]);
+  const [relJobs, setRelJobs] = useState<RelJob[]>([]);
+  const [relEquip, setRelEquip] = useState<RelEquip[]>([]);
+
+  // The 360° view: everything this customer has going on across the app
+  useEffect(() => {
+    if (!id) return;
+    Promise.all([
+      supabase.from('deals').select('id, title, amount, stage:stage_id(name)').eq('contact_id', id).order('updated_at', { ascending: false }),
+      supabase.from('jobs').select('id, title, status, scheduled_at').eq('contact_id', id).order('created_at', { ascending: false }),
+      supabase.from('inventory_items').select('id, product, brand, sku, status').eq('customer_id', id),
+    ]).then(([d, j, inv]) => {
+      setRelDeals((d.data as unknown as RelDeal[]) ?? []);
+      setRelJobs((j.data as unknown as RelJob[]) ?? []);
+      setRelEquip((inv.data as unknown as RelEquip[]) ?? []);
+    });
+  }, [id]);
 
   const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
   const isOwner = !!profile && contact?.assigned_to === profile.id;
@@ -116,7 +141,7 @@ export default function ContactDetail() {
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
-  if (!contact) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p className="text-lg">Contact not found</p><Link to="/contacts" className="text-brand-400 text-sm mt-2 hover:underline">Back to Contacts</Link></div>;
+  if (!contact) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p className="text-lg">Customer not found</p><Link to="/customers" className="text-brand-400 text-sm mt-2 hover:underline">Back to Customers</Link></div>;
 
   const handleAddNote = async () => { if (!newNote.trim()) return; await createNote(newNote, { contactId: contact.id }); setNewNote(''); };
   const handleAddTask = async () => { if (!newTaskTitle.trim()) return; await createTask({ title: newTaskTitle, contact_id: contact.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' }); setNewTaskTitle(''); setShowTaskForm(false); };
@@ -124,7 +149,7 @@ export default function ContactDetail() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link to="/contacts" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
+        <Link to="/customers" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{contact.first_name} {contact.last_name}</h1>
           <div className="flex items-center space-x-4 mt-1 text-sm text-ink-400">
@@ -132,8 +157,24 @@ export default function ContactDetail() {
             {contact.email && <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{contact.email}</span>}
           </div>
         </div>
+        <button
+          onClick={() => setShowQuickDeal(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium transition-colors shadow-sm"
+          title="New deal for this customer"
+        >
+          <Handshake className="w-4 h-4" />
+          <span className="hidden sm:inline">New Deal</span>
+        </button>
         <EditableTypeBadge value={contact.customer_type} onSave={saveContact} />
       </div>
+
+      {showQuickDeal && (
+        <QuickDealModal
+          contactId={contact.id}
+          onClose={() => setShowQuickDeal(false)}
+          onCreated={(dealId) => navigate('/deals', { state: { highlight: dealId } })}
+        />
+      )}
 
       {/* Ownership — who gets the commission, always visible */}
       <div className="flex flex-wrap items-center gap-3">
@@ -158,6 +199,67 @@ export default function ContactDetail() {
           </span>
         )}
       </div>
+      {/* The relationship — deals, service, equipment. The card's full story. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-4">
+          <h2 className="text-xs font-semibold text-brand-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Handshake className="w-3.5 h-3.5" />Deals ({relDeals.length})
+          </h2>
+          {relDeals.length === 0 ? (
+            <p className="text-xs text-ink-500 py-2">No deals yet — start one with the button above</p>
+          ) : (
+            <div className="space-y-2">
+              {relDeals.slice(0, 5).map(d => (
+                <Link key={d.id} to={`/deals/${d.id}`} className="block p-2.5 bg-ink-950 rounded-lg border border-ink-800 hover:border-brand-500/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-ink-100 font-medium truncate">{d.title}</span>
+                    <span className="font-mono text-xs font-bold text-ink-300 shrink-0">${(Number(d.amount) || 0).toLocaleString()}</span>
+                  </div>
+                  {d.stage?.name && <span className="text-[10px] text-ink-500">{d.stage.name}</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-4">
+          <h2 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Wrench className="w-3.5 h-3.5" />Service Jobs ({relJobs.length})
+          </h2>
+          {relJobs.length === 0 ? (
+            <p className="text-xs text-ink-500 py-2">No service history</p>
+          ) : (
+            <div className="space-y-2">
+              {relJobs.slice(0, 5).map(j => (
+                <Link key={j.id} to={`/service/${j.id}`} className="block p-2.5 bg-ink-950 rounded-lg border border-ink-800 hover:border-emerald-500/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-ink-100 font-medium truncate">{j.title}</span>
+                    <span className="text-[10px] text-emerald-300 shrink-0">{j.status}</span>
+                  </div>
+                  {j.scheduled_at && <span className="text-[10px] text-ink-500">{new Date(j.scheduled_at).toLocaleDateString()}</span>}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-4">
+          <h2 className="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5" />Equipment Owned ({relEquip.length})
+          </h2>
+          {relEquip.length === 0 ? (
+            <p className="text-xs text-ink-500 py-2">Nothing on record yet</p>
+          ) : (
+            <div className="space-y-2">
+              {relEquip.slice(0, 5).map(i => (
+                <Link key={i.id} to={`/inventory/${i.id}`} className="block p-2.5 bg-ink-950 rounded-lg border border-ink-800 hover:border-violet-500/40 transition-colors">
+                  <span className="block text-sm text-ink-100 font-medium truncate">{i.brand ? `${i.brand} ` : ''}{i.product}</span>
+                  <span className="text-[10px] text-ink-500 font-mono">{i.sku} · {i.status}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Contact Details</h2><span className="text-[10px] text-ink-500">Click any value to edit</span></div>

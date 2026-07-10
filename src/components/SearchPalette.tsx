@@ -54,7 +54,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
         id: c.id, kind: 'contact' as const,
         primary: `${c.first_name} ${c.last_name}`,
         secondary: `${c.phone} · ${c.customer_type}`,
-        link: `/contacts/${c.id}`,
+        link: `/customers/${c.id}`,
       })),
       ...(deals.data ?? []).map((d) => {
         const contact = d.contacts as unknown as { first_name: string; last_name: string } | null;

@@ -69,6 +69,15 @@ select, input, textarea {
   color: #fff;
 }
 
+/* Customer-card drag in flight (CustomerDragContext) */
+body.cdrag-active {
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.cdrag-active, body.cdrag-active * {
+  cursor: grabbing !important;
+}
+
 /* Branded pulse for loading screens */
 @keyframes brand-breathe {
   0%, 100% { opacity: 0.65; transform: scale(0.985); }

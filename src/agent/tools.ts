@@ -554,6 +554,84 @@ export const agentTools: ToolDefinition[] = [
     },
   },
   {
+    name: 'request_service_hold',
+    description: 'Soft-hold a service slot for a customer. Creates the job in "Pending Confirm" — it does NOT lock the schedule; the service manager confirms, adjusts, or reaches out to the customer. Use when a customer wants service scheduled. Returns the day\'s existing jobs so you can suggest a realistic slot. Report the result as "held, pending confirmation" — never as booked.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contact_id: { type: 'string', description: 'UUID of the customer (look them up first)' },
+        issue: { type: 'string', description: 'Short description of the problem, e.g. "jets not working on Cameo 880"' },
+        preferred_datetime: { type: 'string', description: 'Customer-preferred slot, ISO or YYYY-MM-DD (defaults to 9:00 AM if no time)' },
+        job_type: { type: 'string', enum: ['Repair', 'Maintenance', 'Warranty', 'Delivery'], description: 'Default: Repair' },
+      },
+      required: ['contact_id', 'issue', 'preferred_datetime'],
+    },
+    execute: async ({ contact_id, issue, preferred_datetime, job_type }) => {
+      const me = await currentProfile();
+      if (!me) return { error: 'Could not resolve your account.' };
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone, location_id')
+        .eq('id', contact_id)
+        .single();
+      if (!contact) return { error: 'Contact not found.' };
+
+      const when = preferred_datetime.includes('T') ? preferred_datetime : `${preferred_datetime}T09:00:00`;
+      const day = when.slice(0, 10);
+
+      // Same-day context so the hold lands on a realistic slot
+      const { data: dayJobs } = await supabase
+        .from('jobs')
+        .select('title, status, scheduled_at')
+        .gte('scheduled_at', `${day}T00:00:00`)
+        .lte('scheduled_at', `${day}T23:59:59`)
+        .not('status', 'in', '("Completed","Cancelled")')
+        .order('scheduled_at');
+
+      const { data: job, error } = await supabase
+        .from('jobs')
+        .insert({
+          org_id: me.org_id,
+          contact_id: contact.id,
+          location_id: contact.location_id ?? me.location_id,
+          title: `HOLD: ${issue}`.slice(0, 120),
+          job_type: job_type || 'Repair',
+          status: 'Pending Confirm',
+          description: `Held by Ari — awaiting service-manager confirmation. Customer issue: ${issue}`,
+          scheduled_at: when,
+          priority: 'Medium',
+          created_by: me.userId,
+        })
+        .select('id, title, scheduled_at')
+        .single();
+      if (error) return { error: error.message };
+
+      // Ping the service desk by ROLE (works for any org, no hardcoded names)
+      const { data: managers } = await supabase
+        .from('profiles')
+        .select('id, first_name')
+        .eq('org_id', me.org_id)
+        .in('role', ['service_manager', 'owner_manager']);
+      const notifs = (managers ?? []).map(m => ({
+        user_id: m.id,
+        type: 'service_hold',
+        title: `Ari held a service slot — needs your confirm`,
+        body: `${contact.first_name} ${contact.last_name} · ${issue} · ${new Date(when).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`,
+        link: `/service/${job.id}`,
+      }));
+      if (notifs.length > 0) await supabase.from('notifications').insert(notifs);
+
+      return {
+        held: true,
+        pending_confirmation: true,
+        job_id: job.id,
+        held_slot: job.scheduled_at,
+        same_day_schedule: dayJobs ?? [],
+        instruction: 'Tell the user the slot is HELD pending the service manager\'s confirmation — the manager may confirm, adjust the time, or call the customer directly. Never say it is booked or confirmed.',
+      };
+    },
+  },
+  {
     name: 'schedule_job',
     description: 'Schedule (or reschedule) an existing service/delivery job by setting its date/time. Confirm the job and time with the user first.',
     parameters: {

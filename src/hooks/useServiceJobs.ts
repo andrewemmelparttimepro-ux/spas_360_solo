@@ -7,6 +7,7 @@ import type { Job, JobStatus } from '@/types/database';
 // red = delivery, orange = warranty, black = parts not received,
 // blue = service, green = ready, strikethrough = done.
 export const statusColors: Record<JobStatus, string> = {
+  'Pending Confirm': 'border-l-amber-500 bg-amber-500/10 text-amber-200',
   'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
   'Parts on Order': 'border-l-ink-600 bg-black text-ink-300',
   'Warranty': 'border-l-orange-500 bg-orange-500/10 text-orange-200',
@@ -18,6 +19,7 @@ export const statusColors: Record<JobStatus, string> = {
 
 // Solid Jobber-style calendar chips — white text on the status color
 export const statusChipColors: Record<JobStatus, string> = {
+  'Pending Confirm': 'bg-amber-500 text-black',
   'Delivery': 'bg-red-600 text-white',
   'Parts on Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
   'Warranty': 'bg-orange-600 text-white',
@@ -29,6 +31,7 @@ export const statusChipColors: Record<JobStatus, string> = {
 
 // Legend dots (filter chips)
 export const statusDotColors: Record<JobStatus, string> = {
+  'Pending Confirm': 'bg-amber-500',
   'Delivery': 'bg-red-500',
   'Parts on Order': 'bg-black ring-1 ring-ink-500',
   'Warranty': 'bg-orange-500',
@@ -38,7 +41,7 @@ export const statusDotColors: Record<JobStatus, string> = {
   'Cancelled': 'bg-ink-600',
 };
 
-export const JOB_STATUS_OPTIONS: JobStatus[] = ['In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
+export const JOB_STATUS_OPTIONS: JobStatus[] = ['Pending Confirm', 'In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
 export const JOB_TYPE_OPTIONS = ['Delivery', 'Repair', 'Installation', 'Warranty', 'Maintenance', 'Pickup'];
 
 export function useServiceJobs() {

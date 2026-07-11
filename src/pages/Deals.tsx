@@ -101,7 +101,8 @@ export default function Deals() {
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Deals</h1>
           <p className="hidden sm:block text-sm text-ink-400 mt-1">Every customer, every stage — live</p>
         </div>
-        <button onClick={() => setShowWizard(true)} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
+        {/* Violet = customer action, everywhere it appears (page color system) */}
+        <button onClick={() => setShowWizard(true)} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
           <Plus className="w-4 h-4 mr-2" />
           New Customer
         </button>

@@ -40,10 +40,10 @@ export default function QuickCreate({ onClose }: { onClose: () => void }) {
         <div className="p-4 space-y-2.5">
           <button
             onClick={() => setMode('customer')}
-            className="w-full flex items-center gap-4 p-4 rounded-xl bg-ink-950 border border-ink-700 hover:border-brand-500/50 hover:bg-brand-500/10 transition-all text-left group"
+            className="w-full flex items-center gap-4 p-4 rounded-xl bg-ink-950 border border-ink-700 hover:border-violet-500/50 hover:bg-violet-500/10 transition-all text-left group"
           >
-            <span className="p-2.5 rounded-[10px] bg-brand-500/15 shrink-0">
-              <Users className="w-5 h-5 text-brand-400" />
+            <span className="p-2.5 rounded-[10px] bg-violet-500/15 shrink-0">
+              <Users className="w-5 h-5 text-violet-300" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-2">

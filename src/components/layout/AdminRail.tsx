@@ -110,7 +110,7 @@ export default function AdminRail() {
                 </div>
                 <button
                   onClick={() => setShowWizard(true)}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-[13px] font-semibold rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-violet-500 hover:bg-violet-600 text-white text-[13px] font-semibold rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> New Customer
                 </button>

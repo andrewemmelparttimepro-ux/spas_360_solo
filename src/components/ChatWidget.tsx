@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, Sparkles, ArrowLeft, Hash, User, History, SquarePen, Trash2 } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, ArrowLeft, Hash, User, History, SquarePen, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useTeamChat, type TeamMember } from '@/hooks/useTeamChat';
 import { useAuth } from '@/contexts/AuthContext';
 import MentionInput from '@/components/MentionInput';
 import MentionText from '@/components/MentionText';
+import AriAvatar from '@/components/AriAvatar';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 /**
@@ -195,15 +196,18 @@ export default function ChatWidget() {
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
-              <div className={cn(
-                'w-8 h-8 rounded-lg flex items-center justify-center mr-3 shrink-0',
-                view === 'chat' && !isAri && !team.activeThread?.is_main ? 'bg-emerald-500/15' : 'bg-brand-500/20'
-              )}>
-                {view === 'directory' ? <MessageSquare className="w-4 h-4 text-brand-400" />
-                  : isAri || view === 'ariHistory' ? <Bot className="w-4 h-4 text-brand-400" />
-                  : team.activeThread?.is_main ? <Hash className="w-4 h-4 text-brand-400" />
-                  : <User className="w-4 h-4 text-emerald-300" />}
-              </div>
+              {((view === 'chat' && isAri) || view === 'ariHistory') ? (
+                <AriAvatar size="sm" className="mr-3" />
+              ) : (
+                <div className={cn(
+                  'w-8 h-8 rounded-lg flex items-center justify-center mr-3 shrink-0',
+                  view === 'chat' && !team.activeThread?.is_main ? 'bg-emerald-500/15' : 'bg-brand-500/20'
+                )}>
+                  {view === 'directory' ? <MessageSquare className="w-4 h-4 text-brand-400" />
+                    : team.activeThread?.is_main ? <Hash className="w-4 h-4 text-brand-400" />
+                    : <User className="w-4 h-4 text-emerald-300" />}
+                </div>
+              )}
               <div className="min-w-0">
                 <h3 className="font-semibold text-sm leading-tight truncate">{headerTitle()}</h3>
                 <p className="text-[10px] text-ink-500 truncate">{headerSub()}</p>
@@ -247,10 +251,7 @@ export default function ChatWidget() {
                 onClick={openAri}
                 className="w-full text-left p-4 border-b border-ink-800 hover:bg-brand-500/10 transition-colors flex items-center"
               >
-                <div className="relative w-9 h-9 bg-brand-500/20 rounded-lg flex items-center justify-center mr-3 shrink-0">
-                  <Bot className="w-5 h-5 text-brand-400" />
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-ink-900" />
-                </div>
+                <AriAvatar size="md" showStatus className="mr-3" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-ink-100">Ari</p>
                   <p className="text-[11px] text-ink-400 truncate">
@@ -383,9 +384,7 @@ export default function ChatWidget() {
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 bg-ink-950/50">
                 {agent.messages.length === 0 && !agent.isSending && (
                   <div className="text-center py-12">
-                    <div className="w-12 h-12 bg-brand-500/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                      <Bot className="w-6 h-6 text-brand-400" />
-                    </div>
+                    <AriAvatar size="lg" className="mx-auto mb-3" />
                     <p className="text-sm font-medium text-ink-300">What are we closing today?</p>
                     <div className="mt-4 space-y-2">
                       {['Look up a customer', "What's in the pipeline?", "Today's schedule", 'Draft a follow-up email'].map(s => (
@@ -487,7 +486,7 @@ export default function ChatWidget() {
                       <div className="max-w-[85%]">
                         {!isMe && (isAriMsg ? (
                           <p className="flex items-center gap-1 text-[10px] font-semibold text-brand-400 mb-0.5 ml-1">
-                            <Bot className="w-3 h-3" />Ari
+                            <AriAvatar size="xs" />Ari
                           </p>
                         ) : msg.sender_name && (
                           <p className="text-[10px] font-semibold text-ink-400 mb-0.5 ml-1">{msg.sender_name}</p>
@@ -514,7 +513,7 @@ export default function ChatWidget() {
                   <div className="flex justify-start">
                     <div className="bg-brand-500/10 border border-brand-500/30 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                       <div className="flex items-center gap-2">
-                        <Bot className="w-3.5 h-3.5 text-brand-400" />
+                        <AriAvatar size="xs" />
                         <div className="flex space-x-1.5">
                           <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                           <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />

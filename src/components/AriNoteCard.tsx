@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Bot, Copy, FileText, Image, MessageCircleReply, Send, X } from 'lucide-react';
+import { Copy, FileText, Image, MessageCircleReply, Send, X } from 'lucide-react';
 import MentionText from '@/components/MentionText';
 import { useToast } from '@/components/ui/Toast';
 import { ariNoteBody, stripMentions } from '@/lib/mentions';
 import { exportAriDeliverable, type AriOutputFormat } from '@/lib/ariExport';
+import AriAvatar from '@/components/AriAvatar';
 
 interface AriNote {
   id: string;
@@ -64,7 +65,7 @@ export default function AriNoteCard({ note, contextTitle, preparedFor, disabled,
   return (
     <div className="p-3 bg-brand-500/5 rounded-lg border border-brand-500/30">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-400"><Bot className="w-3.5 h-3.5" />Ari — Sales Assistant</span>
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-400"><AriAvatar size="xs" />Ari — Sales Assistant</span>
         <div className="flex flex-wrap items-center justify-end gap-0.5">
           <button onClick={() => setReplyOpen(open => !open)} disabled={disabled} className={actionClass} aria-label="Reply to Ari here">
             <MessageCircleReply className="w-3 h-3" />Reply

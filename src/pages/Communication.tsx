@@ -1,4 +1,4 @@
-import { Search, Phone, Mail, Send, Paperclip, MoreVertical, Users, MessageSquare, Plus, UserPlus, Hash, Bot } from 'lucide-react';
+import { Search, Phone, Mail, Send, Paperclip, MoreVertical, Users, MessageSquare, Plus, UserPlus, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
 import { useTeamChat, type TeamThread } from '@/hooks/useTeamChat';
@@ -8,6 +8,7 @@ import { useState, useRef, useEffect } from 'react';
 import MentionInput from '@/components/MentionInput';
 import SmsApprovals from '@/components/SmsApprovals';
 import MentionText from '@/components/MentionText';
+import AriAvatar from '@/components/AriAvatar';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 type Tab = 'team' | 'customers';
@@ -227,9 +228,7 @@ function TeamChatPanel() {
                 return (
                   <div key={msg.id} className={cn("flex gap-3", isMe ? "flex-row-reverse" : "flex-row")}>
                     {!isMe && (isAriMsg ? (
-                      <div className="shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-brand-400" />
-                      </div>
+                      <AriAvatar size="sm" />
                     ) : (
                       <Avatar initials={initials} color={colorForId(msg.sender_id || '')} small />
                     ))}
@@ -254,9 +253,7 @@ function TeamChatPanel() {
               })}
               {ariThinking && (
                 <div className="flex gap-3">
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-brand-400" />
-                  </div>
+                  <AriAvatar size="sm" />
                   <div className="bg-brand-500/10 border border-brand-500/30 rounded-2xl rounded-tl-md px-4 py-3">
                     <div className="flex space-x-1.5">
                       <div className="w-2 h-2 bg-brand-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { useState, useRef, useEffect } from 'react';
 import MentionInput from '@/components/MentionInput';
+import SmsApprovals from '@/components/SmsApprovals';
 import MentionText from '@/components/MentionText';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
@@ -305,7 +306,7 @@ function TeamChatPanel() {
 
 // âââ Customer Messages Panel (original) âââ
 function CustomerPanel() {
-  const { threads, activeThread, setActiveThreadId, messages, isLoading, sendMessage } = useConversations();
+  const { threads, activeThread, setActiveThreadId, messages, isLoading, sendMessage, refresh } = useConversations();
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -334,6 +335,8 @@ function CustomerPanel() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
+          {/* Ari's queued texts — one-tap approve, then Twilio fires */}
+          <SmsApprovals onSent={refresh} />
           {threads.length === 0 ? (
             <p className="text-sm text-ink-500 text-center py-8">No customer conversations yet</p>
           ) : threads.map(thread => (

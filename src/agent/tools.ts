@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { queueSmsForApproval } from '@/agent/smsOutbox';
 
 export interface ToolDefinition {
   name: string;
@@ -296,6 +297,41 @@ export const agentTools: ToolDefinition[] = [
         .lte('scheduled_at', `${today}T23:59:59`)
         .order('scheduled_at');
       return data ?? [];
+    },
+  },
+  {
+    name: 'request_sms_send',
+    description: 'Queue a text message to a customer for HUMAN APPROVAL. This never sends directly — a staff member reviews and taps Approve, and only then does the SMS go out from the business number. Use after the user asks you to text a customer. Confirm the wording with the user before calling. Report the result as "queued for approval", never as "sent".',
+    parameters: {
+      type: 'object',
+      properties: {
+        contact_id: { type: 'string', description: 'UUID of the customer (look them up first with search_contacts)' },
+        body: { type: 'string', description: 'The exact SMS text. Short, warm, personal — signed style per the playbook.' },
+      },
+      required: ['contact_id', 'body'],
+    },
+    execute: async ({ contact_id, body }) => {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone')
+        .eq('id', contact_id)
+        .single();
+      if (!contact) return { error: 'Contact not found.' };
+      if (!contact.phone) return { error: `${contact.first_name} ${contact.last_name} has no phone number on file.` };
+      const result = await queueSmsForApproval({
+        contactId: contact.id,
+        contactName: `${contact.first_name} ${contact.last_name}`,
+        toPhone: contact.phone,
+        body,
+        request: `Text ${contact.first_name} ${contact.last_name}`,
+      });
+      if ('error' in result) return result;
+      return {
+        queued: true,
+        requires_human_approval: true,
+        outbox_id: result.outboxId,
+        instruction: 'Tell the user the text is QUEUED and waiting for their one-tap approval in Comms → Customers (they also got a notification). Do NOT say it was sent.',
+      };
     },
   },
   {

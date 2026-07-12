@@ -5,6 +5,7 @@ import { ToastProvider } from './components/ui/Toast';
 import AppLayout from './components/layout/AppLayout';
 
 const Login = lazy(() => import('./pages/Login'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Deals = lazy(() => import('./pages/Deals'));
 const Service = lazy(() => import('./pages/Service'));
@@ -105,12 +106,21 @@ function AuthGate() {
   );
 }
 
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/reset-password" element={<Suspense fallback={<PageLoader />}><ResetPassword /></Suspense>} />
+      <Route path="*" element={<AuthGate />} />
+    </Routes>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <Router>
-          <AuthGate />
+          <AppRoutes />
         </Router>
       </ToastProvider>
     </AuthProvider>

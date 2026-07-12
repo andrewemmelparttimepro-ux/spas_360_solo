@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 export default function Login() {
   const { signIn, signUp } = useAuth();
@@ -10,6 +11,24 @@ export default function Login() {
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function handlePasswordReset() {
+    setError(null);
+    setResetSent(false);
+    const address = email.trim();
+    if (!address) {
+      setError('Enter your work email first.');
+      return;
+    }
+    setLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(address, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (resetError) setError(resetError.message);
+    else setResetSent(true);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -107,6 +126,12 @@ export default function Login() {
               </div>
             )}
 
+            {resetSent && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm px-4 py-3 rounded-lg" role="status">
+                If that login exists, a secure reset link is on its way.
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -124,7 +149,18 @@ export default function Login() {
           </form>
 
           <div className="mt-6 text-center">
+            {!isSignUp && (
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                disabled={loading}
+                className="block w-full mb-3 text-sm font-medium text-brand-400 hover:text-brand-300 disabled:opacity-50 transition-colors"
+              >
+                Forgot password?
+              </button>
+            )}
             <button
+              type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
               className="text-sm text-ink-500 hover:text-brand-400 transition-colors"
             >

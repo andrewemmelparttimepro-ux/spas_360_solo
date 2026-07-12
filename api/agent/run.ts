@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   createAgentTools,
@@ -89,7 +90,10 @@ async function queueSmsWith(
     })
     .select('id')
     .single();
-  if (error || !row?.id) return { error: error?.message ?? 'Could not queue the text.' };
+  if (error || !row?.id) {
+    if (deliverable?.id) await client.from('agent_deliverables').delete().eq('id', deliverable.id);
+    return { error: error?.message ?? 'Could not queue the text.' };
+  }
 
   await client.from('notifications').insert({
     user_id: userId,
@@ -106,6 +110,7 @@ async function callAri(token: string, messages: ApiMessage[], tools: unknown[]):
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ messages, tools }),
+    signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) {
     const raw = await response.text();
@@ -118,6 +123,8 @@ async function callAri(token: string, messages: ApiMessage[], tools: unknown[]):
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const requestId = randomUUID();
+  res.setHeader('X-Request-ID', requestId);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!SUPABASE_URL || !SUPABASE_ANON) return res.status(500).json({ error: 'Agent runtime is not configured' });
 
@@ -253,6 +260,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tool_rounds: rounds,
     });
   } catch (error) {
-    return res.status(500).json({ error: (error as Error).message });
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error('agent/run failed', { requestId, userId, requestedThreadId, detail });
+    if (/too many actions/i.test(detail)) {
+      return res.status(422).json({ error: 'That command is too broad for one run. Split it into smaller commands and try again.', request_id: requestId });
+    }
+    if (/timeout|timed out|abort/i.test(detail)) {
+      return res.status(504).json({ error: 'Ari took too long to finish. Review Approvals before retrying the command.', request_id: requestId });
+    }
+    return res.status(500).json({
+      error: 'Ari hit a temporary runtime problem. Your command history is safe; review Approvals before retrying.',
+      request_id: requestId,
+    });
   }
 }

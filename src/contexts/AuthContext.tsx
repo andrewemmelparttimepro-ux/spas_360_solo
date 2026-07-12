@@ -109,6 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await supabase.rpc('record_app_activity', {
+      p_event_type: 'session_ended',
+      p_label: 'Signed out of SPAS 360',
+      p_source: 'SPAS 360',
+    });
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);

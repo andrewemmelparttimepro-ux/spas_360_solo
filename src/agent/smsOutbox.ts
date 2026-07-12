@@ -83,71 +83,19 @@ export async function approveSms(item: PendingSms): Promise<{ error: string | nu
   if (!auth.user) return { error: 'Not signed in.' };
 
   const session = await supabase.auth.getSession();
-  const resp = await fetch('/api/sms', {
+  const resp = await fetch('/api/sms/approve', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.data.session?.access_token}`,
     },
-    body: JSON.stringify({ to: item.to_phone, body: item.body }),
+    body: JSON.stringify({ outbox_id: item.id }),
   });
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'Send failed' }));
-    const message = (err as { error?: string }).error ?? 'Send failed';
-    // Twilio-not-configured stays pending (it can succeed later); real rejects mark failed.
-    const isConfigGap = /not configured/i.test(message);
-    if (!isConfigGap) {
-      await supabase
-        .from('sms_outbox')
-        .update({ status: 'failed', error: message, decided_by: auth.user.id, decided_at: new Date().toISOString() })
-        .eq('id', item.id);
-    }
-    return { error: message };
+    return { error: (err as { error?: string }).error ?? 'Send failed' };
   }
-
-  // Record into the customer's sms thread so history reads like any other text.
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, org_id')
-    .eq('id', auth.user.id)
-    .single();
-  let threadId: string | null = null;
-  const { data: existing } = await supabase
-    .from('communication_threads')
-    .select('id')
-    .eq('contact_id', item.contact_id)
-    .eq('thread_type', 'sms')
-    .limit(1)
-    .maybeSingle();
-  if (existing?.id) {
-    threadId = existing.id;
-  } else if (profile?.org_id) {
-    const { data: created } = await supabase
-      .from('communication_threads')
-      .insert({ org_id: profile.org_id, contact_id: item.contact_id, thread_type: 'sms' })
-      .select('id')
-      .single();
-    threadId = created?.id ?? null;
-  }
-  if (threadId) {
-    await supabase.from('messages').insert({
-      thread_id: threadId,
-      sender_type: 'agent',
-      sender_id: auth.user.id,
-      body: item.body,
-    });
-    await supabase
-      .from('communication_threads')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', threadId);
-  }
-
-  await supabase
-    .from('sms_outbox')
-    .update({ status: 'sent', decided_by: auth.user.id, decided_at: new Date().toISOString() })
-    .eq('id', item.id);
-
   return { error: null };
 }
 

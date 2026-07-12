@@ -35,18 +35,28 @@ CREATE INDEX idx_agent_messages_created ON agent_messages(created_at);
 ALTER TABLE agent_threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_messages ENABLE ROW LEVEL SECURITY;
 
--- Threads: users see their own + team threads they're in
-CREATE POLICY at_read ON agent_threads FOR SELECT USING (
-  user_id = auth.uid() 
-  OR (thread_type = 'team' AND auth.uid() = ANY(participants))
-  OR (org_id = (SELECT org_id FROM profiles WHERE id = auth.uid()) AND thread_type = 'team')
+-- Threads: always stay inside the signed-in user's organization.
+CREATE POLICY at_read ON agent_threads FOR SELECT TO authenticated USING (
+  org_id = auth_org() AND (
+    user_id = (SELECT auth.uid())
+    OR (thread_type = 'team' AND ((SELECT auth.uid()) = ANY(participants) OR org_id = auth_org()))
+  )
 );
-CREATE POLICY at_insert ON agent_threads FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY at_update ON agent_threads FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY at_insert ON agent_threads FOR INSERT TO authenticated
+  WITH CHECK (org_id = auth_org() AND user_id = (SELECT auth.uid()));
+CREATE POLICY at_update ON agent_threads FOR UPDATE TO authenticated
+  USING (org_id = auth_org() AND user_id = (SELECT auth.uid()))
+  WITH CHECK (org_id = auth_org() AND user_id = (SELECT auth.uid()));
 
 -- Messages: can read messages from threads they can see
-CREATE POLICY am_read ON agent_messages FOR SELECT USING (
+CREATE POLICY am_read ON agent_messages FOR SELECT TO authenticated USING (
   EXISTS (SELECT 1 FROM agent_threads t WHERE t.id = agent_messages.thread_id 
-    AND (t.user_id = auth.uid() OR auth.uid() = ANY(t.participants) OR t.thread_type = 'team'))
+    AND t.org_id = auth_org()
+    AND (t.user_id = (SELECT auth.uid()) OR (t.thread_type = 'team' AND ((SELECT auth.uid()) = ANY(t.participants) OR t.org_id = auth_org()))))
 );
-CREATE POLICY am_insert ON agent_messages FOR INSERT WITH CHECK (TRUE);
+CREATE POLICY am_insert ON agent_messages FOR INSERT TO authenticated WITH CHECK (
+  (sender_id IS NULL OR sender_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM agent_threads t WHERE t.id = agent_messages.thread_id
+    AND t.org_id = auth_org()
+    AND (t.user_id = (SELECT auth.uid()) OR (t.thread_type = 'team' AND ((SELECT auth.uid()) = ANY(t.participants) OR t.org_id = auth_org()))))
+);

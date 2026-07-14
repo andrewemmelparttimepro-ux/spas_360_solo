@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -30,6 +30,7 @@ export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name:
     tone: null,
     items: [
       { name: 'Comms', path: '/communication', icon: MessageSquare },
+      { name: 'Citadel', path: '/citadel', icon: Building2 },
       { name: 'Reports', path: '/reports', icon: BarChart3 },
     ],
   },

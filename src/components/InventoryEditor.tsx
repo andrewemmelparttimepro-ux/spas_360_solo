@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
-import { X, Trash2, BadgeDollarSign, Package } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { X, Trash2, BadgeDollarSign, Package, ImagePlus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useToast } from '@/components/ui/Toast';
 import type { InventoryItem } from '@/types/database';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Inventory editor — slide-over drawer, create + edit. Same guided-clicks
@@ -80,10 +81,36 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
     date_sold: item?.date_sold ?? '',
     warranty_info: item?.warranty_info ?? '',
     notes: item?.notes ?? '',
+    primary_image_storage_path: item?.primary_image_storage_path ?? '',
+    primary_image_mime_type: item?.primary_image_mime_type ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (patch: Partial<typeof v>) => setV(prev => ({ ...prev, ...patch }));
+
+  useEffect(() => {
+    if (!v.primary_image_storage_path) { setPhotoPreview(null); return; }
+    supabase.storage.from('ari-assets').createSignedUrl(v.primary_image_storage_path, 3600)
+      .then(({ data }) => setPhotoPreview(data?.signedUrl ?? null));
+  }, [v.primary_image_storage_path]);
+
+  const uploadProductPhoto = async (file: File) => {
+    if (!profile || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      toast('Use a JPG, PNG, or WebP product photo', 'error');
+      return;
+    }
+    setUploadingPhoto(true);
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${profile.org_id}/inventory/${item?.id ?? 'staged'}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from('ari-assets').upload(path, file, { contentType: file.type, upsert: false });
+    setUploadingPhoto(false);
+    if (error) { toast(`Photo upload failed: ${error.message}`, 'error'); return; }
+    set({ primary_image_storage_path: path, primary_image_mime_type: file.type });
+    setPhotoPreview(URL.createObjectURL(file));
+    toast('Approved product photo attached', 'success');
+  };
 
   // Live margin — the number Brandon actually cares about
   const margin = useMemo(() => {
@@ -115,6 +142,8 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
       date_sold: v.date_sold || null,
       warranty_info: v.warranty_info.trim() || null,
       notes: v.notes.trim() || null,
+      primary_image_storage_path: v.primary_image_storage_path || null,
+      primary_image_mime_type: v.primary_image_mime_type || null,
     };
     const ok = await onSave(payload, item?.id);
     setSaving(false);
@@ -160,6 +189,29 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
           </div>
           <div><label className={labelClass}>Product *</label><input value={v.product} onChange={e => set({ product: e.target.value })} className={inputClass} placeholder="Nova 7L" /></div>
           <div><label className={labelClass}>Color / Finish</label><input value={v.color_finish} onChange={e => set({ color_finish: e.target.value })} className={inputClass} placeholder="Grey/Platinum" /></div>
+
+          <div>
+            <label className={labelClass}>Approved product photo</label>
+            <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-600 bg-ink-950 p-3 transition-colors hover:border-brand-500/60 hover:bg-brand-500/5">
+              {photoPreview ? (
+                <img src={photoPreview} alt="Approved inventory" className="h-16 w-20 rounded-lg object-cover" />
+              ) : (
+                <span className="flex h-16 w-20 items-center justify-center rounded-lg bg-ink-800 text-ink-500"><ImagePlus className="h-6 w-6" /></span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-ink-200">{photoPreview ? 'Replace product photo' : 'Attach product photo'}</span>
+                <span className="mt-1 block text-[10px] text-ink-500">Used by Ari in verified one-pagers and sales PDFs.</span>
+              </span>
+              {uploadingPhoto && <Loader2 className="h-4 w-4 animate-spin text-brand-400" />}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={uploadingPhoto}
+                onChange={event => { const file = event.target.files?.[0]; if (file) uploadProductPhoto(file); event.currentTarget.value = ''; }}
+              />
+            </label>
+          </div>
 
           {/* Brand chips + free text */}
           <div>

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import MentionInput from '@/components/MentionInput';
 import MentionText from '@/components/MentionText';
 import AriAvatar from '@/components/AriAvatar';
+import AriArtifactCard from '@/components/AriArtifactCard';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 /**
@@ -111,12 +112,6 @@ export default function ChatWidget() {
     pickedRef.current = [];
     setDraft('');
     if (isAri) {
-      if (!agent.activeThreadId) {
-        const id = await agent.createThread('agent');
-        if (!id) return;
-        setTimeout(() => agent.sendMessage(msg), 200);
-        return;
-      }
       await agent.sendMessage(msg);
     } else {
       if (!team.activeThreadId) return;
@@ -400,23 +395,29 @@ export default function ChatWidget() {
                   </div>
                 )}
 
-                {agent.messages.filter(m => m.role !== 'tool' && m.role !== 'system').map(msg => (
-                  <div key={msg.id} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                    <div className={cn(
-                      'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                      msg.role === 'user'
-                        ? 'bg-brand-500 text-white rounded-br-md'
-                        : 'bg-ink-900 border border-ink-700 text-ink-100 rounded-bl-md shadow-sm'
-                    )}>
-                      {msg.role === 'assistant' && msg.tool_calls && (
-                        <div className="flex items-center text-[10px] text-brand-400 mb-1.5 font-medium">
-                          <Sparkles className="w-3 h-3 mr-1" /> Using tools...
+                {agent.messages.filter(m => m.role !== 'tool' && m.role !== 'system').map(msg => {
+                  const artifact = msg.deliverable_id ? agent.deliverables[msg.deliverable_id] : undefined;
+                  return (
+                    <div key={msg.id} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <div className={cn('max-w-[88%]', msg.role === 'assistant' && artifact ? 'w-full' : '')}>
+                        <div className={cn(
+                          'rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+                          msg.role === 'user'
+                            ? 'bg-brand-500 text-white rounded-br-md'
+                            : 'bg-ink-900 border border-ink-700 text-ink-100 rounded-bl-md shadow-sm'
+                        )}>
+                          {msg.role === 'assistant' && msg.tool_calls && (
+                            <div className="flex items-center text-[10px] text-brand-400 mb-1.5 font-medium">
+                              <Sparkles className="w-3 h-3 mr-1" /> Using tools...
+                            </div>
+                          )}
+                          <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
                         </div>
-                      )}
-                      <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
+                        {artifact && <AriArtifactCard artifact={artifact} className="mt-2" />}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {agent.isSending && (
                   <div className="flex justify-start">

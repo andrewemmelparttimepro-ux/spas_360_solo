@@ -1,16 +1,28 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { getOpenAITools, executeTool } from '@/agent/tools';
-import { archiveAriOutput } from '@/agent/citadel';
 import { toAgentText } from '@/lib/mentions';
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   tool_calls?: { id: string; function: { name: string; arguments: string } }[];
   tool_name?: string;
+  deliverable_id?: string | null;
+  created_at: string;
+}
+
+export interface AgentDeliverable {
+  id: string;
+  title: string;
+  kind: string;
+  status: 'draft' | 'blocked' | 'rendering' | 'ready' | 'failed';
+  artifact_format: 'pdf' | 'jpg' | 'png' | null;
+  file_name: string | null;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  missing_fields: { field: string; reason: string; record_id?: string }[];
   created_at: string;
 }
 
@@ -27,6 +39,7 @@ export function useAgentChat() {
   const [threads, setThreads] = useState<AgentThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [deliverables, setDeliverables] = useState<Record<string, AgentDeliverable>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const activeThreadRef = useRef<string | null>(null);
@@ -48,19 +61,31 @@ export function useAgentChat() {
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
   // Fetch messages for active thread
-  const fetchMessages = useCallback(async () => {
-    if (!activeThreadId) { setMessages([]); return; }
+  const fetchMessages = useCallback(async (threadOverride?: string) => {
+    const threadId = threadOverride || activeThreadRef.current;
+    if (!threadId) { setMessages([]); setDeliverables({}); return; }
     setIsLoading(true);
     const { data } = await supabase
       .from('agent_messages')
       .select('*')
-      .eq('thread_id', activeThreadId)
+      .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
-    setMessages(data ?? []);
+    const rows = (data ?? []) as ChatMessage[];
+    setMessages(rows);
+    const ids = [...new Set(rows.map(row => row.deliverable_id).filter((id): id is string => Boolean(id)))];
+    if (ids.length > 0) {
+      const { data: artifactRows } = await supabase
+        .from('agent_deliverables')
+        .select('id, title, kind, status, artifact_format, file_name, mime_type, file_size_bytes, missing_fields, created_at')
+        .in('id', ids);
+      setDeliverables(Object.fromEntries(((artifactRows ?? []) as AgentDeliverable[]).map(item => [item.id, item])));
+    } else {
+      setDeliverables({});
+    }
     setIsLoading(false);
-  }, [activeThreadId]);
+  }, []);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => { fetchMessages(); }, [fetchMessages, activeThreadId]);
 
   // Real-time messages
   useEffect(() => {
@@ -100,132 +125,34 @@ export function useAgentChat() {
   // Send message to AI agent
   const sendMessage = useCallback(async (content: string) => {
     const threadId = activeThreadRef.current;
-    if (!threadId || !user || isSending) return;
+    if (!user || isSending) return;
     setIsSending(true);
-
-    // Save user message
-    await supabase.from('agent_messages').insert({
-      thread_id: threadId,
-      role: 'user',
-      content,
-      sender_id: user.id,
-    });
-
-    // Build message history for LLM (the system prompt/rails are injected
-    // server-side in /api/chat — the client never carries them). Mention
-    // tokens become plain text; @customer tokens carry the UUID so Ari can
-    // hit get_contact_details without searching.
-    const history = [
-      ...messages.filter(m => m.role !== 'tool').map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: toAgentText(m.content),
-      })),
-      { role: 'user' as const, content: toAgentText(content) },
-    ];
 
     try {
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
+      if (!token) throw new Error('No active session');
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/agent/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          messages: history,
-          tools: getOpenAITools(),
+          message: toAgentText(content),
+          ...(threadId ? { thread_id: threadId } : {}),
         }),
       });
 
       if (!response.ok) {
-        const err = await response.text();
-        throw new Error(err);
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || `Ari returned HTTP ${response.status}`);
       }
-
-      const data = await response.json();
-      let assistantMessage = data.choices?.[0]?.message;
-      let conversation = [...history];
-
-      // Tool-calling loop: keep executing tools until the model returns a plain answer.
-      // Capped to avoid runaway loops. Supports multi-step chains (e.g. find contact → create deal → move stage).
-      let guard = 0;
-      while ((assistantMessage?.tool_calls?.length ?? 0) > 0 && guard < 5) {
-        guard++;
-
-        // Persist the assistant turn that requested tools
-        await supabase.from('agent_messages').insert({
-          thread_id: threadId,
-          role: 'assistant',
-          content: assistantMessage.content || 'Using tools...',
-          tool_calls: assistantMessage.tool_calls,
-        });
-
-        // Execute each requested tool and collect results
-        const toolResults = [];
-        for (const tc of assistantMessage.tool_calls) {
-          const args = JSON.parse(tc.function.arguments || '{}');
-          const result = await executeTool(tc.function.name, args);
-          toolResults.push({
-            role: 'tool' as const,
-            tool_call_id: tc.id,
-            content: JSON.stringify(result),
-          });
-          await supabase.from('agent_messages').insert({
-            thread_id: threadId,
-            role: 'tool',
-            content: JSON.stringify(result),
-            tool_name: tc.function.name,
-          });
-        }
-
-        conversation = [...conversation, assistantMessage, ...toolResults];
-
-        // Ask the model again, now with the tool results in context
-        const next = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ messages: conversation, tools: getOpenAITools() }),
-        });
-        if (!next.ok) throw new Error(await next.text());
-        const nextData = await next.json();
-        assistantMessage = nextData.choices?.[0]?.message;
-      }
-
-      // Save final assistant response
-      if (assistantMessage?.content) {
-        // The Citadel is the canonical copy. Archive first so a response is
-        // never presented as successfully delivered while its main copy is missing.
-        await archiveAriOutput({
-          content: assistantMessage.content,
-          request: content,
-          title: `Ari chat · ${content}`,
-          threadId,
-          deliveryChannels: ['ari_chat'],
-        });
-        await supabase.from('agent_messages').insert({
-          thread_id: threadId,
-          role: 'assistant',
-          content: assistantMessage.content,
-        });
-      } else if (guard >= 5) {
-        await supabase.from('agent_messages').insert({
-          thread_id: threadId,
-          role: 'assistant',
-          content: "I went through several steps but couldn't wrap that up cleanly. Want me to try again?",
-        });
-      }
-
-      // Update thread title + timestamp
-      if (messages.length === 0) {
-        const title = content.length > 40 ? content.slice(0, 40) + '...' : content;
-        await supabase.from('agent_threads').update({ title, last_message_at: new Date().toISOString() }).eq('id', threadId);
-      } else {
-        await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
-      }
-
-      await fetchMessages();
+      const data = await response.json() as { thread_id: string };
+      setActiveThreadId(data.thread_id);
+      activeThreadRef.current = data.thread_id;
+      await fetchMessages(data.thread_id);
       await fetchThreads();
     } catch (err) {
       console.error('Agent error:', err);
@@ -235,16 +162,18 @@ export function useAgentChat() {
       if (/429|rate.?limit|quota|retryDelay/i.test(raw)) friendly = "I'm being rate-limited right now — give me ~30 seconds and ask again.";
       else if (/401|403|api.?key|unauthorized/i.test(raw)) friendly = "My AI connection isn't authorized — tell a manager to check the API key setup.";
       else if (/timeout|timed out|network|fetch/i.test(raw)) friendly = "Connection hiccup — try that once more.";
-      await supabase.from('agent_messages').insert({
-        thread_id: threadId,
-        role: 'assistant',
-        content: friendly,
-      });
-      await fetchMessages();
+      if (threadId) {
+        setMessages(previous => [...previous, {
+          id: `local-error-${Date.now()}`,
+          role: 'assistant',
+          content: friendly,
+          created_at: new Date().toISOString(),
+        }]);
+      }
     } finally {
       setIsSending(false);
     }
-  }, [user, messages, isSending, fetchMessages, fetchThreads]);
+  }, [user, isSending, fetchMessages, fetchThreads]);
 
   // Delete a conversation (RLS: own threads only; messages cascade)
   const deleteThread = useCallback(async (threadId: string) => {
@@ -272,6 +201,7 @@ export function useAgentChat() {
     activeThreadId,
     setActiveThreadId,
     messages,
+    deliverables,
     isLoading,
     isSending,
     createThread,

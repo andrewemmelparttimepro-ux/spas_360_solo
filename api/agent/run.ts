@@ -7,6 +7,13 @@ import {
   getOpenAITools,
   type AgentToolQueueSms,
 } from '../../src/agent/toolFactory.js';
+import {
+  artifactInstruction,
+  detectArtifactIntent,
+  loadArtifactContext,
+  renderSalesPdf,
+  type MissingField,
+} from '../_lib/artifacts.js';
 
 type ApiMessage = {
   role: 'user' | 'assistant' | 'tool';
@@ -23,6 +30,7 @@ type ToolCall = {
 
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_ANON = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const SUPABASE_SERVICE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const CHAT_ORIGIN = (process.env.AGENT_API_BASE_URL || 'https://spas360solo.vercel.app').replace(/\/$/, '');
 
 function bearer(req: VercelRequest): string | null {
@@ -38,6 +46,18 @@ function clientFor(token: string): SupabaseClient {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
+}
+
+function serviceClient(): SupabaseClient {
+  if (!SUPABASE_SERVICE) throw new Error('Artifact storage is not configured');
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
+function blockedArtifactMessage(missing: MissingField[]): string {
+  const list = missing.map(item => `• ${item.field}: ${item.reason}`).join('\n');
+  return `I stopped this before making a customer-facing file because the source data is incomplete.\n\n${list}\n\nThe blocked draft is saved in Citadel. Fill those fields, then ask me to rebuild it.`;
 }
 
 function inferKind(request: string, content: string): string {
@@ -151,6 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single();
   if (!profile?.org_id) return res.status(403).json({ error: 'No SPAS 360 profile is attached to this login' });
   const orgId = profile.org_id as string;
+  const artifactIntent = detectArtifactIntent(message);
 
   try {
     let threadId = requestedThreadId;
@@ -191,7 +212,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sender_id: userId,
     });
     if (insertError) throw new Error(insertError.message);
-    conversation.push({ role: 'user', content: message });
+    conversation.push({
+      role: 'user',
+      content: artifactIntent ? `${message}${artifactInstruction()}` : message,
+    });
 
     const tools = createAgentTools(
       client,
@@ -236,16 +260,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const answer = assistant.content?.trim();
     if (!answer) throw new Error('Ari completed actions but did not return a final answer.');
 
-    const { data: saved, error: savedError } = await client.from('agent_messages').insert({
-      thread_id: threadId,
-      role: 'assistant',
-      content: answer,
-    }).select('id, created_at').single();
-    if (savedError) throw new Error(savedError.message);
+    let responseContent = answer;
+    let artifact: Record<string, unknown> | null = null;
 
-    await Promise.all([
-      client.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId),
-      client.from('agent_deliverables').insert({
+    if (artifactIntent) {
+      const context = await loadArtifactContext(client, orgId, message, answer);
+      const blocked = context.missing.length > 0;
+      const { data: deliverable, error: deliverableError } = await client
+        .from('agent_deliverables')
+        .insert({
+          org_id: orgId,
+          thread_id: threadId,
+          requested_by: userId,
+          kind: artifactIntent.kind,
+          title: artifactIntent.title,
+          content: answer,
+          content_format: 'markdown',
+          artifact_format: artifactIntent.format,
+          status: blocked ? 'blocked' : 'rendering',
+          missing_fields: context.missing,
+          source_snapshot: {
+            request: message,
+            inventory_id: context.inventory?.id ?? null,
+            inventory_sku: context.inventory?.sku ?? null,
+            business_name: context.profile?.business_name ?? null,
+          },
+          delivery_channels: ['citadel', 'agent-os', 'native-share'],
+        })
+        .select('id, title, kind, status, artifact_format, file_name, mime_type, missing_fields, created_at')
+        .single();
+      if (deliverableError || !deliverable?.id) {
+        throw new Error(deliverableError?.message ?? 'Could not create the artifact record');
+      }
+
+      if (blocked) {
+        responseContent = blockedArtifactMessage(context.missing);
+        artifact = deliverable as Record<string, unknown>;
+      } else {
+        try {
+          const service = serviceClient();
+          const rendered = await renderSalesPdf(service, artifactIntent, answer, context);
+          const storagePath = `${orgId}/${deliverable.id}/v1/${rendered.fileName}`;
+          const { error: uploadError } = await service.storage
+            .from('ari-deliverables')
+            .upload(storagePath, rendered.bytes, {
+              contentType: 'application/pdf',
+              cacheControl: '3600',
+              upsert: false,
+            });
+          if (uploadError) throw new Error(uploadError.message);
+
+          const { data: ready, error: readyError } = await client
+            .from('agent_deliverables')
+            .update({
+              status: 'ready',
+              storage_bucket: 'ari-deliverables',
+              storage_path: storagePath,
+              mime_type: 'application/pdf',
+              file_name: rendered.fileName,
+              file_size_bytes: rendered.bytes.byteLength,
+              missing_fields: [],
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', deliverable.id)
+            .select('id, title, kind, status, artifact_format, file_name, mime_type, file_size_bytes, missing_fields, created_at')
+            .single();
+          if (readyError || !ready) throw new Error(readyError?.message ?? 'Could not finalize the artifact');
+          artifact = ready as Record<string, unknown>;
+          responseContent = `Your PDF is ready and saved in Citadel. Preview, download, or share it from the artifact card below.`;
+        } catch (artifactError) {
+          const reason = artifactError instanceof Error ? artifactError.message : String(artifactError);
+          await client
+            .from('agent_deliverables')
+            .update({ status: 'failed', missing_fields: [{ field: 'Rendering', reason }], updated_at: new Date().toISOString() })
+            .eq('id', deliverable.id);
+          artifact = { ...deliverable, status: 'failed', missing_fields: [{ field: 'Rendering', reason }] };
+          responseContent = 'I saved the draft in Citadel, but the PDF renderer could not finish the file. Nothing was sent. Try rebuilding it once the connection is stable.';
+        }
+      }
+    } else {
+      const { error: archiveError } = await client.from('agent_deliverables').insert({
         org_id: orgId,
         thread_id: threadId,
         requested_by: userId,
@@ -254,12 +348,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content: answer,
         content_format: 'markdown',
         delivery_channels: ['citadel', 'agent-os'],
-      }),
-    ]);
+      });
+      if (archiveError) throw new Error(archiveError.message);
+    }
+
+    const { data: saved, error: savedError } = await client.from('agent_messages').insert({
+      thread_id: threadId,
+      role: 'assistant',
+      content: responseContent,
+      deliverable_id: artifact?.id ?? null,
+    }).select('id, created_at, deliverable_id').single();
+    if (savedError) throw new Error(savedError.message);
+
+    await client.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
 
     return res.status(200).json({
       thread_id: threadId,
-      message: { id: saved?.id, role: 'assistant', content: answer, created_at: saved?.created_at },
+      message: {
+        id: saved?.id,
+        role: 'assistant',
+        content: responseContent,
+        created_at: saved?.created_at,
+        deliverable_id: saved?.deliverable_id,
+      },
+      artifact,
       tool_rounds: rounds,
     });
   } catch (error) {

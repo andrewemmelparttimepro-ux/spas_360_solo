@@ -81,6 +81,7 @@ export interface InventoryItem {
   deal_id: string | null; job_id: string | null;
   date_received: string | null; date_sold: string | null;
   date_delivered: string | null; warranty_info: string | null;
+  primary_image_storage_path: string | null; primary_image_mime_type: string | null;
   notes: string | null; created_at: string; updated_at: string;
 }
 

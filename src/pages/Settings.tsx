@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/Toast';
-import { LogOut, User, MapPin, Shield, Users, MailPlus, X, BellRing } from 'lucide-react';
+import { LogOut, User, MapPin, Shield, Users, MailPlus, X, BellRing, ImagePlus, Loader2, CheckCircle2 } from 'lucide-react';
 import type { Profile } from '@/types/database';
 import { pushSupported, pushPermission, pushEnabledHere, enablePush, disablePush } from '@/lib/push';
 
@@ -245,6 +245,95 @@ function NotificationsPanel() {
   );
 }
 
+function BrandAssetsPanel() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+  const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const loadLogo = useCallback(async () => {
+    if (!profile) return;
+    const { data } = await supabase
+      .from('business_profile')
+      .select('logo_storage_path')
+      .eq('org_id', profile.org_id)
+      .maybeSingle();
+    const path = data?.logo_storage_path as string | null | undefined;
+    setLogoPath(path ?? null);
+    if (path) {
+      const { data: signed } = await supabase.storage.from('ari-assets').createSignedUrl(path, 3600);
+      setPreview(signed?.signedUrl ?? null);
+    } else {
+      setPreview(null);
+    }
+  }, [profile]);
+
+  useEffect(() => { loadLogo(); }, [loadLogo]);
+
+  const upload = async (file: File) => {
+    if (!profile || !/^image\/(jpeg|png)$/.test(file.type)) {
+      toast('Use a transparent PNG or high-resolution JPG logo', 'error');
+      return;
+    }
+    setUploading(true);
+    const extension = file.type === 'image/png' ? 'png' : 'jpg';
+    const path = `${profile.org_id}/brand/logo-${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from('ari-assets').upload(path, file, { contentType: file.type, upsert: false });
+    if (uploadError) {
+      setUploading(false);
+      toast(`Logo upload failed: ${uploadError.message}`, 'error');
+      return;
+    }
+    const { error: updateError } = await supabase
+      .from('business_profile')
+      .update({ logo_storage_path: path, updated_at: new Date().toISOString() })
+      .eq('org_id', profile.org_id);
+    setUploading(false);
+    if (updateError) {
+      await supabase.storage.from('ari-assets').remove([path]);
+      toast(`Could not attach logo: ${updateError.message}`, 'error');
+      return;
+    }
+    if (logoPath) await supabase.storage.from('ari-assets').remove([logoPath]);
+    setLogoPath(path);
+    setPreview(URL.createObjectURL(file));
+    toast('Brand logo attached to Ari sales tools', 'success');
+  };
+
+  if (profile?.role !== 'owner_manager') return null;
+  return (
+    <div className="rounded-xl border border-ink-700 bg-ink-900 p-6 shadow-sm">
+      <h2 className="mb-1 flex items-center text-sm font-semibold uppercase tracking-wider text-ink-400">
+        <ImagePlus className="mr-2 h-4 w-4" /> Sales Tool Branding
+      </h2>
+      <p className="mb-4 text-xs text-ink-500">This approved logo follows every Ari PDF across the web app, Agent OS, and Citadel.</p>
+      <label className="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-ink-600 bg-ink-950 p-4 transition-colors hover:border-brand-500/60 hover:bg-brand-500/5">
+        {preview ? (
+          <span className="flex h-20 w-28 items-center justify-center rounded-lg bg-white p-2"><img src={preview} alt="Approved business logo" className="max-h-full max-w-full object-contain" /></span>
+        ) : (
+          <span className="flex h-20 w-28 items-center justify-center rounded-lg bg-ink-800 text-ink-500"><ImagePlus className="h-7 w-7" /></span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink-100">
+            {preview ? 'Replace approved logo' : 'Upload approved logo'}
+            {preview && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+          </span>
+          <span className="mt-1 block text-xs text-ink-500">PNG or JPG · 10 MB maximum · private organization storage</span>
+        </span>
+        {uploading && <Loader2 className="h-5 w-5 animate-spin text-brand-400" />}
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          className="hidden"
+          disabled={uploading}
+          onChange={event => { const file = event.target.files?.[0]; if (file) upload(file); event.currentTarget.value = ''; }}
+        />
+      </label>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { profile, locations, signOut } = useAuth();
 
@@ -277,6 +366,9 @@ export default function Settings() {
 
       {/* Push notifications for this device */}
       <NotificationsPanel />
+
+      {/* Canonical brand asset used by server-rendered Ari artifacts */}
+      <BrandAssetsPanel />
 
       {/* Team & permissions — owner/manager only */}
       <TeamPanel />

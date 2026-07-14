@@ -49,6 +49,14 @@ function cleanTitle(value: string): string {
   return (first.length > 92 ? `${first.slice(0, 89)}...` : first) || 'Ari sales tool';
 }
 
+function artifactTitle(request: string): string {
+  const titled = request.match(/\btitled\s+["“]?(.+?)["”]?(?=[.!?]|$)/i)?.[1]?.trim();
+  if (titled) return cleanTitle(titled);
+  const subject = request.match(/\b(?:for|about)\s+(?:the\s+)?(.+?)(?=\s+(?:using|with|based on|including)\b|[.!?]|$)/i)?.[1]?.trim();
+  if (subject && subject.length >= 4) return cleanTitle(subject);
+  return cleanTitle(request);
+}
+
 export function detectArtifactIntent(request: string): ArtifactIntent | null {
   if (!ARTIFACT_RE.test(request)) return null;
   const lower = request.toLowerCase();
@@ -61,7 +69,7 @@ export function detectArtifactIntent(request: string): ArtifactIntent | null {
         : /one[- ]?pager|sell sheet|sales sheet|handout|leave[- ]?behind|brochure/.test(lower)
           ? 'one_pager'
           : 'sales_tool';
-  return { format: 'pdf', kind, title: cleanTitle(request) };
+  return { format: 'pdf', kind, title: artifactTitle(request) };
 }
 
 export function artifactInstruction(): string {

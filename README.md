@@ -15,6 +15,6 @@ View your app in AI Studio: https://ai.studio/apps/671fa885-23fc-4d45-a87b-acb11
 
 1. Install dependencies:
    `npm install`
-2. Set the server-side assistant provider in [.env.local](.env.local): `AI_PROVIDER=glm`, `GLM_API_KEY`, `GLM_MODEL=glm-5.2`, and `GLM_BASE_URL=https://api.z.ai/api/paas/v4`
+2. Set the server-side assistant provider in [.env.local](.env.local). Production supports `glm` (`GLM_API_KEY`, `GLM_MODEL`, `GLM_BASE_URL`) and `meta` (`MODEL_API_KEY`, `META_MODEL=muse-spark-1.1`, `META_BASE_URL=https://api.meta.ai/v1`) without changing client code.
 3. Run the app:
    `npm run dev`

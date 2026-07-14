@@ -18,6 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const provider = envValue(process.env.AI_PROVIDER, 'gemini').toLowerCase();
   const model = provider === 'glm' || provider === 'zai'
     ? envValue(process.env.GLM_MODEL, 'glm-5.2')
+    : provider === 'meta' || provider === 'spark' || provider === 'muse'
+      ? envValue(process.env.META_MODEL, 'muse-spark-1.1')
     : provider === 'anthropic'
       ? envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6')
       : provider === 'openai'

@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { SALES_AGENT_PROMPT } from './_lib/system-prompt.js';
 
-// Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, or GLM via Z.AI.
+// Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, GLM via Z.AI,
+// or Muse Spark via Meta Model API.
 // The frontend always speaks the OpenAI message/tool shape; each handler translates
 // to/from its provider so the client never has to change.
 // Switch providers with AI_PROVIDER.
@@ -11,11 +12,14 @@ const ANTHROPIC_API_KEY = envValue(process.env.ANTHROPIC_API_KEY) || undefined;
 const GEMINI_API_KEY = envValue(process.env.GEMINI_API_KEY) || undefined;
 const OPENAI_API_KEY = envValue(process.env.OPENAI_API_KEY) || undefined;
 const GLM_API_KEY = envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY) || undefined;
+const META_MODEL_API_KEY = envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY) || undefined;
 const ANTHROPIC_MODEL = envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6');
 const GEMINI_MODEL = envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
 const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
 const GLM_MODEL = envValue(process.env.GLM_MODEL, 'glm-5.2');
 const GLM_BASE_URL = envValue(process.env.GLM_BASE_URL, 'https://api.z.ai/api/paas/v4');
+const META_MODEL = envValue(process.env.META_MODEL, 'muse-spark-1.1');
+const META_BASE_URL = envValue(process.env.META_BASE_URL, 'https://api.meta.ai/v1');
 const ARI_FORWARD_SECRET = envValue(process.env.ARI_FORWARD_SECRET) || undefined;
 const SUPABASE_SERVICE_ROLE_KEY = envValue(process.env.SUPABASE_SERVICE_ROLE_KEY) || undefined;
 
@@ -216,6 +220,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         apiKey: GLM_API_KEY,
         model: GLM_MODEL,
         baseUrl: GLM_BASE_URL,
+        messages,
+        tools: allowedTools,
+        res,
+      });
+    } else if (PROVIDER === 'meta' || PROVIDER === 'spark' || PROVIDER === 'muse') {
+      return await handleOpenAICompatible({
+        providerName: 'Meta Model API',
+        apiKey: META_MODEL_API_KEY,
+        model: META_MODEL,
+        baseUrl: META_BASE_URL,
         messages,
         tools: allowedTools,
         res,
@@ -495,8 +509,8 @@ async function handleOpenAICompatible({
       tools: tools?.length > 0 ? tools : undefined,
       tool_choice: tools?.length > 0 ? 'auto' : undefined,
       temperature: 0.7,
-      // GLM 5.2 spends reasoning tokens out of this budget before writing — a 1k cap
-      // truncated long deliverables (proposals). 4k covers a 1-pager with room to think.
+      // Reasoning models spend reasoning tokens out of this budget before writing. A 1k cap
+      // truncated long deliverables (proposals); 4k covers a 1-pager with room to think.
       max_tokens: 4096,
     }),
   });

@@ -210,6 +210,8 @@ the salesperson. This is Brandon's "Wyant – Sundance – delivery" ritual, aut
 
 Set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (dedicated project), `AI_PROVIDER=glm`,
 `GLM_API_KEY`, `GLM_MODEL=glm-5.2`, and `GLM_BASE_URL=https://api.z.ai/api/paas/v4`.
+For the reversible Muse Spark experiment, use `AI_PROVIDER=meta`, `MODEL_API_KEY`,
+`META_MODEL=muse-spark-1.1`, and `META_BASE_URL=https://api.meta.ai/v1`; retain the GLM variables for rollback.
 Documented in `.env.example`. Gemini, Anthropic, and OpenAI remain available fallback providers
 through `AI_PROVIDER`.
 

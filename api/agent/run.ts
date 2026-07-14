@@ -114,6 +114,9 @@ async function callAri(token: string, messages: ApiMessage[], tools: unknown[]):
   });
   if (!response.ok) {
     const raw = await response.text();
+    if (raw.includes('content_policy_violation')) {
+      throw new Error('Ari content policy response');
+    }
     throw new Error(raw.slice(0, 1000) || `Ari returned HTTP ${response.status}`);
   }
   const data = await response.json() as { choices?: { message?: ApiMessage }[] };
@@ -264,6 +267,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('agent/run failed', { requestId, userId, requestedThreadId, detail });
     if (/too many actions/i.test(detail)) {
       return res.status(422).json({ error: 'That command is too broad for one run. Split it into smaller commands and try again.', request_id: requestId });
+    }
+    if (/content policy/i.test(detail)) {
+      return res.status(422).json({
+        error: 'Ari could not process that exact wording. Rephrase it in plain business terms and try again.',
+        request_id: requestId,
+      });
     }
     if (/timeout|timed out|abort/i.test(detail)) {
       return res.status(504).json({ error: 'Ari took too long to finish. Review Approvals before retrying the command.', request_id: requestId });

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, Mic, Square, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVoiceDictation } from '@/hooks/useVoiceDictation';
 import { cn } from '@/lib/utils';
 import type { PickedMention } from '@/lib/mentions';
 
@@ -34,13 +35,15 @@ interface Props {
   className?: string;
   menuDirection?: 'up' | 'down';
   autoFocus?: boolean;
+  /** Realtime clean dictation. Enabled by default on every SPAS 360 composer. */
+  voiceEnabled?: boolean;
 }
 
 export default function MentionInput({
   value, onValueChange, picked, onSubmit,
   allowAri = true, placeholder, disabled, rows = 1,
   autoSize = false, maxHeight = 100, className,
-  menuDirection = 'up', autoFocus,
+  menuDirection = 'up', autoFocus, voiceEnabled = true,
 }: Props) {
   const { profile } = useAuth();
   const [team, setTeam] = useState<{ id: string; first_name: string; last_name: string; role: string }[]>([]);
@@ -50,6 +53,7 @@ export default function MentionInput({
   const [selected, setSelected] = useState(0);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voice = useVoiceDictation({ value, onValueChange, disabled: !!disabled || !voiceEnabled });
 
   useEffect(() => {
     if (!profile?.org_id) return;
@@ -157,6 +161,32 @@ export default function MentionInput({
 
   return (
     <div className="relative flex-1 min-w-0">
+      {voiceEnabled && (voice.active || voice.error) && (
+        <div className={cn(
+          'absolute right-0 bottom-full mb-1.5 z-[60] flex items-center gap-2 rounded-xl border px-3 py-2 shadow-2xl backdrop-blur-md',
+          voice.error
+            ? 'border-red-500/40 bg-red-950/95 text-red-100'
+            : 'border-brand-500/35 bg-ink-900/95 text-ink-100'
+        )} role="status" aria-live="polite">
+          {!voice.error && (
+            <span className="voice-live-bars" aria-hidden="true"><i /><i /><i /></span>
+          )}
+          <span className="text-[11px] font-semibold whitespace-nowrap">
+            {voice.error
+              ? voice.error
+              : voice.state === 'connecting'
+                ? 'Starting microphone…'
+                : voice.state === 'finalizing'
+                  ? 'Finishing your thought…'
+                  : 'Listening · speak naturally'}
+          </span>
+          {voice.error ? (
+            <button type="button" onClick={voice.clearError} className="p-0.5 text-red-300 hover:text-white" aria-label="Dismiss voice error"><X className="w-3.5 h-3.5" /></button>
+          ) : (
+            <button type="button" onClick={voice.cancel} className="text-[10px] font-bold uppercase tracking-wide text-ink-400 hover:text-white">Cancel</button>
+          )}
+        </div>
+      )}
       {query !== null && items.length > 0 && (
         <div
           className={cn(
@@ -211,9 +241,30 @@ export default function MentionInput({
         onBlur={() => setTimeout(closeMenu, 150)}
         placeholder={placeholder}
         disabled={disabled}
+        readOnly={voice.active}
         autoFocus={autoFocus}
-        className={className}
+        className={cn(className, voiceEnabled && 'voice-composer-input')}
       />
+      {voiceEnabled && (
+        <button
+          type="button"
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => { void (voice.active ? voice.stop() : voice.start()); }}
+          disabled={disabled || voice.state === 'connecting' || voice.state === 'finalizing'}
+          className={cn(
+            'absolute right-1.5 bottom-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-lg border transition-all disabled:cursor-wait',
+            voice.state === 'listening'
+              ? 'border-red-400/60 bg-red-500 text-white shadow-[0_0_0_4px_rgba(239,68,68,0.14)]'
+              : voice.error
+                ? 'border-red-500/40 bg-red-500/10 text-red-300'
+                : 'border-ink-700 bg-ink-900 text-ink-400 hover:border-brand-500/50 hover:bg-brand-500/10 hover:text-brand-300'
+          )}
+          aria-label={voice.state === 'listening' ? 'Stop voice dictation' : 'Start voice dictation'}
+          title={voice.state === 'listening' ? 'Stop dictation' : 'Talk instead of typing'}
+        >
+          {voice.state === 'listening' ? <Square className="h-3.5 w-3.5 fill-current" /> : <Mic className="h-4 w-4" />}
+        </button>
+      )}
     </div>
   );
 }

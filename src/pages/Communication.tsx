@@ -9,6 +9,7 @@ import MentionInput from '@/components/MentionInput';
 import SmsApprovals from '@/components/SmsApprovals';
 import MentionText from '@/components/MentionText';
 import AriAvatar from '@/components/AriAvatar';
+import VoiceDictationControl from '@/components/VoiceDictationControl';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 type Tab = 'team' | 'customers';
@@ -382,6 +383,7 @@ function CustomerPanel() {
             <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-ink-700 bg-ink-900 shrink-0">
               <div className="flex items-end space-x-2">
                 <button className="p-3 text-ink-500 hover:text-ink-300 hover:bg-ink-800 rounded-lg transition-colors shrink-0"><Paperclip className="w-5 h-5" /></button>
+                <VoiceDictationControl value={draft} onValueChange={setDraft} disabled={sending} />
                 <div className="flex-1 bg-ink-950 rounded-xl border border-transparent focus-within:border-brand-500 focus-within:bg-ink-900 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
                   <textarea
                     rows={2} value={draft} onChange={e => setDraft(e.target.value)}

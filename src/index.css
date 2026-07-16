@@ -149,6 +149,11 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 20px 42px -32px rgba(15, 23, 42, 0.5);
 }
 
+/* Status labels sit on pale cards in the working canvas; keep Warranty legible. */
+.app-main .text-orange-200 {
+  color: #9A3412 !important;
+}
+
 /* Quiet scrollbars for the light application shell. */
 * {
   scrollbar-width: thin;

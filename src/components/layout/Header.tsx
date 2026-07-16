@@ -9,31 +9,19 @@ import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 
-// Nav is organized around the three pillars: the people (CRM), and the two
-// sides of the business that serve them — Sales and Service.
+// Each destination is its own plainly named tab. The previous CRM / Sales /
+// Service group labels made the navigation read like compound tab names.
 export type NavTone = 'sales' | 'service' | 'customers' | null;
 
 export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
   { label: null, tone: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
-  { label: 'CRM', tone: 'customers', items: [{ name: 'Customers', path: '/customers', icon: Users }] },
-  {
-    label: 'Sales',
-    tone: 'sales',
-    items: [
-      { name: 'Deals', path: '/deals', icon: Handshake },
-      { name: 'Inventory', path: '/inventory', icon: Package },
-    ],
-  },
-  { label: 'Service', tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
-  {
-    label: null,
-    tone: null,
-    items: [
-      { name: 'Comms', path: '/communication', icon: MessageSquare },
-      { name: 'Citadel', path: '/citadel', icon: Building2 },
-      { name: 'Reports', path: '/reports', icon: BarChart3 },
-    ],
-  },
+  { label: null, tone: 'customers', items: [{ name: 'Customers', path: '/customers', icon: Users }] },
+  { label: null, tone: 'sales', items: [{ name: 'Deals', path: '/deals', icon: Handshake }] },
+  { label: null, tone: 'sales', items: [{ name: 'Inventory', path: '/inventory', icon: Package }] },
+  { label: null, tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
+  { label: null, tone: null, items: [{ name: 'Inbox', path: '/communication', icon: MessageSquare }] },
+  { label: null, tone: null, items: [{ name: 'Citadel', path: '/citadel', icon: Building2 }] },
+  { label: null, tone: null, items: [{ name: 'Reports', path: '/reports', icon: BarChart3 }] },
 ];
 
 // Customer cards dragged from the CRM can land on these pills (spring-loaded
@@ -137,8 +125,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </span>
       </NavLink>
 
-      {/* Nav (desktop) — Sales / Service grouped pill clusters, OMP style */}
-      <nav className="hidden lg:flex items-center gap-2">
+      {/* Nav (desktop) — every destination is a separate tab. */}
+      <nav className="hidden lg:flex items-center gap-1">
         {NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
@@ -159,7 +147,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     {...(isDropNav ? { 'data-cdrop': 'nav', 'data-cdrop-nav': item.path } : {})}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-semibold transition-all',
+                        'flex items-center gap-1.5 px-2.5 py-[7px] rounded-lg text-[12px] font-semibold transition-all',
                         isActive ? tone.active : tone.idle,
                         // A customer card is in flight — light up the landing zones
                         dragging && isDropNav && 'ring-2 ring-violet-400/50',
@@ -168,8 +156,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     }
                   >
                     <item.icon className="w-[15px] h-[15px]" />
-                    {/* Neutral pills go icon-only below xl so the three colored groups always fit */}
-                    <span className={cn(!section.tone && 'hidden xl:inline')}>{item.name}</span>
+                    <span>{item.name}</span>
                   </NavLink>
                 );
               })}

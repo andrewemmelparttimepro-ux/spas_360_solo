@@ -184,10 +184,10 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Identity */}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelClass}>SKU / Serial *</label><input value={v.sku} onChange={e => set({ sku: e.target.value })} className={inputClass} placeholder="101039194" /></div>
+            <div><label className={labelClass}>Serial Number *</label><input value={v.sku} onChange={e => set({ sku: e.target.value })} className={inputClass} placeholder="101039194" /></div>
             <div><label className={labelClass}>Model</label><input value={v.model} onChange={e => set({ model: e.target.value })} className={inputClass} /></div>
           </div>
-          <div><label className={labelClass}>Product *</label><input value={v.product} onChange={e => set({ product: e.target.value })} className={inputClass} placeholder="Nova 7L" /></div>
+          <div><label className={labelClass}>Model *</label><input value={v.product} onChange={e => set({ product: e.target.value })} className={inputClass} placeholder="Nova 7L" /></div>
           <div><label className={labelClass}>Color / Finish</label><input value={v.color_finish} onChange={e => set({ color_finish: e.target.value })} className={inputClass} placeholder="Grey/Platinum" /></div>
 
           <div>

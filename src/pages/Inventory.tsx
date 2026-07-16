@@ -1,4 +1,4 @@
-import { Search, Filter, Plus, Package, ArrowRightLeft, X, Check, Pencil } from 'lucide-react';
+import { Search, Plus, Package, ArrowRightLeft, X, Check, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
@@ -150,11 +150,13 @@ function EditableStatus({ value, itemId, onSave }: { value: string; itemId: stri
 
 // --------------- Category options ---------------
 const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
+const BRAND_OPTIONS = ['Sundance Spas', 'Master Spas', 'Platinum Spas', 'Eco Spas'];
 
 // =============== Main page component ===============
 export default function Inventory() {
   const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, deleteItem } = useInventory();
   const { locations } = useAuth();
+  const [brandFilter, setBrandFilter] = useState('All Brands');
   // Editor drawer: null = closed, 'new' = create, item = edit
   const [editorTarget, setEditorTarget] = useState<'new' | InventoryItem | null>(null);
 
@@ -169,6 +171,7 @@ export default function Inventory() {
     { label: 'On Order', value: onOrder, color: 'bg-purple-500/15 text-purple-400' },
     { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-500/15 text-red-400' },
   ];
+  const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
@@ -206,19 +209,30 @@ export default function Inventory() {
       </div>
 
       <div className="flex-1 bg-ink-900 rounded-xl border border-ink-700 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-ink-700 flex items-center justify-between bg-ink-950">
+        <div className="p-4 border-b border-ink-700 flex flex-wrap items-center justify-between gap-3 bg-ink-950">
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search SKU, product, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search serial number, model, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
           </div>
-          <button className="flex items-center text-sm font-medium text-ink-300 hover:text-ink-100"><Filter className="w-4 h-4 mr-2" />More Filters</button>
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-400">
+            Brand
+            <select
+              value={brandFilter}
+              onChange={event => setBrandFilter(event.target.value)}
+              className="bg-ink-900 border border-ink-700 text-ink-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              aria-label="Filter inventory by brand"
+            >
+              <option>All Brands</option>
+              {BRAND_OPTIONS.map(brand => <option key={brand}>{brand}</option>)}
+            </select>
+          </label>
         </div>
         <div className="flex-1 overflow-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0">
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">SKU</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Product</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Category</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Status</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider text-right">Price</th>
@@ -226,9 +240,9 @@ export default function Inventory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
-              {items.length === 0 ? (
+              {visibleItems.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
-              ) : items.map(item => (
+              ) : visibleItems.map(item => (
                 <tr key={item.id} className="hover:bg-ink-800/60 transition-colors">
                   <td className="p-4 text-sm font-medium">
                     <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">{item.sku}</Link>

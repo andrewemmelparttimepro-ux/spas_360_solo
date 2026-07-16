@@ -10,7 +10,7 @@ const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
   { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
-  { key: 'overduePartsCount', title: 'Parts Overdue', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/inventory' },
+  { key: 'overduePartsCount', title: 'Parts On Order', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/inventory' },
 ] as const;
 
 type ActionType = 'task' | 'part' | 'invoice' | 'lead';

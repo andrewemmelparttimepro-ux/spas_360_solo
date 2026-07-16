@@ -14,7 +14,7 @@ type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string } | null };
 
 // Statuses shown in the legend/filter (Cancelled is hidden from boards anyway)
-const LEGEND_STATUSES: JobStatus[] = ['Pending Confirm', 'Delivery', 'Warranty', 'Parts on Order', 'In Progress', 'Ready for Pickup', 'Completed'];
+const LEGEND_STATUSES: JobStatus[] = ['Delivery', 'Warranty', 'Parts on Order'];
 
 const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
 
@@ -263,7 +263,7 @@ export default function Service() {
               )}
             >
               <span className={cn('w-2 h-2 rounded-full shrink-0', statusDotColors[s])} />
-              {s}
+              {s === 'Parts on Order' ? 'Parts On Order' : s}
               <span className="font-mono text-[10px] opacity-70">{legendCounts[s] ?? 0}</span>
             </button>
           );

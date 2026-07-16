@@ -124,7 +124,10 @@ export default function DealDetail() {
       <div className="flex items-center space-x-4">
         <Link to="/deals" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400 mt-1 inline-block">{contact.first_name} {contact.last_name} Â· {contact.phone}</Link>}</div>
-        <EditablePriority value={deal.priority} onSave={saveDeal} />
+        <div className="flex flex-col items-start gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Priority</span>
+          <EditablePriority value={deal.priority} onSave={saveDeal} />
+        </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6 space-y-5">

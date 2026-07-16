@@ -39,13 +39,13 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
 
   const tiles = [
     {
-      icon: TrendingUp, label: 'Open Pipeline', big: money(board.pipeline.value), featured: true,
+      icon: TrendingUp, label: 'Active Deals', big: money(board.pipeline.value), featured: true,
       sub: board.cold.count > 0
         ? `${board.pipeline.count} active · ${money(board.cold.value)} sitting idle 7d+`
         : `${board.pipeline.count} active deal${board.pipeline.count === 1 ? '' : 's'}`,
     },
     { icon: Trophy, label: 'Won This Month', big: money(board.won.value), sub: `${board.won.count} closed`, accent: 'text-emerald-400' },
-    { icon: CalendarClock, label: 'Closing This Week', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'expected closes', accent: 'text-amber-400' },
+    { icon: CalendarClock, label: 'Overdue Sales Tasks', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'expected closes', accent: 'text-amber-400' },
     { icon: Flame, label: 'Hot Leads', big: String(board.hot.count), sub: 'close within a week', accent: 'text-red-400' },
   ];
 
@@ -65,7 +65,7 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
             className={cn(
               'rounded-xl border p-4 flex flex-col justify-between min-h-[104px]',
               t.featured
-                ? 'border-brand-500/40 bg-gradient-to-br from-brand-900/60 via-ink-900 to-ink-900'
+                ? 'border-brand-500/40 bg-gradient-to-br from-brand-500/10 via-ink-900 to-ink-900'
                 : 'border-ink-700 bg-ink-900'
             )}
           >

@@ -37,7 +37,7 @@ const ACTIONS: Action[] = [
   { label: 'Go to Deals', sub: 'Pipeline board', icon: Handshake, keywords: 'deals pipeline kanban sales', run: n => n('/deals') },
   { label: 'Go to Inventory', sub: 'Tubs, saunas, stock', icon: Package, keywords: 'inventory stock units tubs', run: n => n('/inventory') },
   { label: 'Go to Schedule', sub: 'Service calendar', icon: Wrench, keywords: 'schedule service calendar jobs', run: n => n('/service') },
-  { label: 'Go to Comms', sub: 'Team chat + customer texts', icon: MessageSquare, keywords: 'comms communication messages chat sms texts', run: n => n('/communication') },
+  { label: 'Go to Inbox', sub: 'Team chat + customer texts', icon: MessageSquare, keywords: 'inbox comms communication messages chat sms texts', run: n => n('/communication') },
   { label: 'Go to Reports', sub: 'Revenue, pipeline, aging', icon: BarChart3, keywords: 'reports analytics revenue', run: n => n('/reports') },
   { label: 'Go to Settings', sub: 'Profile, team, notifications', icon: Settings, keywords: 'settings team invite notifications profile', run: n => n('/settings') },
 ];

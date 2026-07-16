@@ -74,6 +74,7 @@ export const SPAS360_RAILS: RailsConfig = {
     'Product knowledge for the categories the store sells',
     'Service jobs, scheduling, deliveries, parts, and inventory questions',
     'Logging notes and creating follow-up tasks',
+    'Product feedback and confirmed SPAS 360 change requests routed to the Fix-It Feed',
   ],
   redirect:
     "I'm here to help you sell and serve — let's get back to your customers. Want me to pull up your open deals?",

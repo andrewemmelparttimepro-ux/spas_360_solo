@@ -62,6 +62,7 @@
   --color-amber-200: #78350F;
   --color-amber-300: #92400E;
   --color-amber-400: #B45309;
+  --color-orange-200: #9A3412;
   --color-red-200: #991B1B;
   --color-red-300: #B91C1C;
   --color-red-400: #DC2626;
@@ -110,6 +111,7 @@ body {
   --color-amber-200: #FDE68A;
   --color-amber-300: #FCD34D;
   --color-amber-400: #FBBF24;
+  --color-orange-200: #FED7AA;
   --color-red-200: #FECACA;
   --color-red-300: #FCA5A5;
   --color-red-400: #F87171;

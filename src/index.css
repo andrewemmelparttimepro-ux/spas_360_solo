@@ -33,17 +33,18 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Light application ramp — Brandon's #D1D5DB canvas with white working surfaces. */
-  --color-ink-950: #D1D5DB; /* page background */
-  --color-ink-900: #FFFFFF; /* surface / cards */
-  --color-ink-850: #F8FAFC; /* surface raised */
-  --color-ink-800: #E5E7EB; /* hover */
-  --color-ink-700: #CBD5E1; /* border */
-  --color-ink-600: #94A3B8; /* border strong */
-  --color-ink-500: #64748B; /* muted-2 */
-  --color-ink-400: #475569; /* muted */
-  --color-ink-300: #334155; /* soft text */
-  --color-ink-100: #111827; /* text */
+  /* Light application ramp — layered like the original dark system, not inverted. */
+  --color-ink-950: #EEF3F8; /* application canvas */
+  --color-ink-900: #FFFFFF; /* primary surface */
+  --color-ink-850: #F8FAFC; /* raised / secondary surface */
+  --color-ink-800: #E9EFF5; /* hover / inset surface */
+  --color-ink-700: #D5DEE8; /* border */
+  --color-ink-600: #B7C3D1; /* border strong */
+  --color-ink-500: #6B7789; /* muted-2 */
+  --color-ink-400: #4D5B70; /* muted */
+  --color-ink-300: #2F3B4D; /* soft text */
+  --color-ink-200: #1F2A3A; /* body text */
+  --color-ink-100: #101827; /* primary text */
 
   /* Brand — Magic City Home Leisure blue */
   --color-brand-300: #075985;
@@ -77,6 +78,63 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * The original product got its structure from a dark operational frame.
+ * Keep that strength in light mode while the working canvas and records stay light.
+ */
+.app-header,
+.admin-rail {
+  --color-ink-950: #08111F;
+  --color-ink-900: #0D1726;
+  --color-ink-850: #142033;
+  --color-ink-800: #1B2A3F;
+  --color-ink-700: #2A3A50;
+  --color-ink-600: #3C4E65;
+  --color-ink-500: #7F8EA3;
+  --color-ink-400: #A9B5C5;
+  --color-ink-300: #D2DAE5;
+  --color-ink-200: #E3E8EF;
+  --color-ink-100: #F7F9FC;
+  --color-brand-300: #7CC4F4;
+  --color-brand-400: #45ACF2;
+  --color-emerald-300: #6EE7B7;
+  --color-emerald-400: #34D399;
+  --color-amber-300: #FCD34D;
+  --color-amber-400: #FBBF24;
+  --color-red-300: #FCA5A5;
+  --color-red-400: #F87171;
+  --color-violet-300: #C4B5FD;
+  --color-violet-400: #A78BFA;
+  --color-purple-300: #D8B4FE;
+  --color-purple-400: #C084FC;
+  color-scheme: dark;
+}
+
+.app-header {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px rgba(8, 17, 31, 0.18);
+}
+
+.admin-rail {
+  box-shadow: -12px 0 32px -24px rgba(8, 17, 31, 0.72);
+}
+
+.app-main :is(div, section, article, a).bg-ink-900.border-ink-700 {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 32px -26px rgba(15, 23, 42, 0.42);
+}
+
+.dashboard-stat-card {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 24px -20px rgba(15, 23, 42, 0.55);
+}
+
+.dashboard-stat-card:hover {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08), 0 18px 32px -22px rgba(16, 117, 184, 0.4);
+  transform: translateY(-1px);
+}
+
+.dashboard-panel {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 20px 42px -32px rgba(15, 23, 42, 0.5);
+}
+
 /* Quiet scrollbars for the light application shell. */
 * {
   scrollbar-width: thin;
@@ -101,8 +159,11 @@ button:not(:disabled) {
   transition-duration: 150ms;
 }
 button:not(:disabled):hover {
-  filter: brightness(0.94) contrast(1.08);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.16);
+  filter: brightness(0.96) saturate(1.08);
+}
+.app-header button:not(:disabled):hover,
+.admin-rail button:not(:disabled):hover {
+  filter: brightness(1.12) saturate(1.08);
 }
 
 /* Accessible, on-brand keyboard focus */

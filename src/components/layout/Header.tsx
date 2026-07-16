@@ -28,33 +28,32 @@ export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name:
 // navigation lives in CustomerDragContext).
 const NAV_DROP_PATHS = new Set(['/deals', '/service']);
 
-// Each side of the business wears its own color: Sales = MCHL brand blue
-// (the money side), Service = emerald (the go/field side), Customers = violet
-// (the people pillar both sides share). Neutral stays ink.
+// The dark operational header restores the original hierarchy. Only the active
+// destination carries a strong color; idle destinations share one quiet style.
 export const NAV_TONE = {
   sales: {
-    container: 'bg-brand-500/[0.07] ring-1 ring-inset ring-brand-500/25',
+    container: 'bg-transparent',
     label: 'text-brand-400',
-    active: 'bg-brand-500/20 text-brand-300',
-    idle: 'text-ink-400 hover:text-brand-300 hover:bg-brand-500/10',
+    active: 'bg-brand-500 text-white shadow-sm',
+    idle: 'text-ink-400 hover:text-ink-100 hover:bg-ink-800',
   },
   service: {
-    container: 'bg-emerald-500/[0.07] ring-1 ring-inset ring-emerald-500/25',
+    container: 'bg-transparent',
     label: 'text-emerald-400',
-    active: 'bg-emerald-500/20 text-emerald-300',
-    idle: 'text-ink-400 hover:text-emerald-300 hover:bg-emerald-500/10',
+    active: 'bg-emerald-600 text-white shadow-sm',
+    idle: 'text-ink-400 hover:text-ink-100 hover:bg-ink-800',
   },
   customers: {
-    container: 'bg-violet-500/[0.07] ring-1 ring-inset ring-violet-500/25',
+    container: 'bg-transparent',
     label: 'text-violet-400',
-    active: 'bg-violet-500/20 text-violet-300',
-    idle: 'text-ink-400 hover:text-violet-300 hover:bg-violet-500/10',
+    active: 'bg-violet-600 text-white shadow-sm',
+    idle: 'text-ink-400 hover:text-ink-100 hover:bg-ink-800',
   },
   neutral: {
-    container: 'bg-ink-950',
+    container: 'bg-transparent',
     label: 'text-ink-500',
-    active: 'bg-brand-500/15 text-brand-400',
-    idle: 'text-ink-500 hover:text-ink-300 hover:bg-ink-800',
+    active: 'bg-brand-500 text-white shadow-sm',
+    idle: 'text-ink-400 hover:text-ink-100 hover:bg-ink-800',
   },
 } as const;
 
@@ -107,7 +106,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   }, []);
 
   return (
-    <header className="h-14 bg-ink-900 border-b border-ink-700 flex items-center px-3 sm:px-5 gap-3 sm:gap-4 shrink-0 z-40">
+    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-3 sm:px-5 gap-3 sm:gap-4 shrink-0 z-40">
       {/* Mobile menu */}
       <button
         onClick={onMenuClick}
@@ -170,12 +169,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Global search */}
       <button
         onClick={() => setSearchOpen(true)}
-        className="flex items-center gap-2 text-[13px] text-ink-500 bg-ink-950 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors shrink-0"
+        className="flex items-center gap-2 text-[13px] text-ink-400 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors shrink-0"
         aria-label="Search everything"
       >
         <Search className="w-3.5 h-3.5" />
         <span className="hidden md:inline">Search</span>
-        <kbd className="hidden md:inline text-[10px] font-mono bg-ink-900 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
+        <kbd className="hidden md:inline text-[10px] font-mono bg-ink-800 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
       </button>
       {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
 
@@ -183,7 +182,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="relative shrink-0" ref={locRef}>
         <button
           onClick={() => setLocOpen(!locOpen)}
-          className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-950 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors"
+          className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors"
         >
           <MapPin className="w-3.5 h-3.5 mr-1.5 text-brand-400" />
           <span className="hidden sm:inline">{locationLabel}</span>

@@ -65,7 +65,7 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
             className={cn(
               'rounded-xl border p-4 flex flex-col justify-between min-h-[104px]',
               t.featured
-                ? 'border-brand-500/40 bg-gradient-to-br from-brand-500/10 via-ink-900 to-ink-900'
+                ? 'border-brand-500/40 bg-brand-500/[0.08] shadow-sm'
                 : 'border-ink-700 bg-ink-900'
             )}
           >

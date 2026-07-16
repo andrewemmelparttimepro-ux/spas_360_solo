@@ -51,7 +51,7 @@ export default function AdminRail() {
   return (
     <aside
       className={cn(
-        'hidden lg:flex flex-col border-l border-ink-700 bg-ink-900 shrink-0 transition-[width] duration-200 ease-out overflow-hidden',
+        'admin-rail hidden lg:flex flex-col border-l border-ink-700 bg-ink-900 shrink-0 transition-[width] duration-200 ease-out overflow-hidden',
         open ? (activePanel === 'fixit' ? 'w-[420px]' : 'w-[300px]') : 'w-12'
       )}
     >

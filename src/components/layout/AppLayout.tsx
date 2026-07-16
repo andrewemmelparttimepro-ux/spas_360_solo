@@ -9,7 +9,7 @@ import WidgetBoundary from '../ui/WidgetBoundary';
 import { CustomerDragProvider } from '@/contexts/CustomerDragContext';
 import ActivityTracker from '../ActivityTracker';
 
-/** OMP-style shell: dark topbar with grouped nav pills; contacts admin rail on the right; mobile gets a drawer.
+/** OMP-style shell: dark operational frame, light working canvas, admin rail on the right; mobile gets a drawer.
  *  CustomerDragProvider wraps the whole shell so a customer card can be dragged
  *  from any page onto the Deals/Schedule pills in the topbar. */
 export default function AppLayout() {
@@ -27,7 +27,7 @@ export default function AppLayout() {
         <Header onMenuClick={() => setDrawerOpen(true)} />
         <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-4 sm:p-5">
+          <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
           </main>
           <WidgetBoundary>

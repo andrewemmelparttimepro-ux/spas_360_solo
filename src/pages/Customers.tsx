@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical } from 'lucide-react';
+import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/useCustomerCards';
@@ -27,6 +27,9 @@ const SORTS: { value: CustomerSort; label: string }[] = [
   { value: 'name', label: 'Name A–Z' },
 ];
 
+type ViewMode = 'cards' | 'list';
+const VIEW_KEY = 'spas360.customersView';
+
 export default function Customers() {
   const { cards, countsByType, isLoading, refresh } = useCustomerCards();
   const { dragging } = useCustomerDrag();
@@ -34,6 +37,8 @@ export default function Customers() {
   const [quickDealFor, setQuickDealFor] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<CustomerSort>('recent');
+  // List is the default; once someone chooses cards, remember that choice locally.
+  const [view, setView] = useState<ViewMode>(() => (localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list'));
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -45,6 +50,11 @@ export default function Customers() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
+
+  const switchView = (nextView: ViewMode) => {
+    setView(nextView);
+    localStorage.setItem(VIEW_KEY, nextView);
+  };
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -105,7 +115,7 @@ export default function Customers() {
         />
       )}
 
-      {/* One customer list, controlled only by search and the selected sort. */}
+      {/* One default customer list, with the previously built cards retained as an optional view. */}
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
         <span className="text-sm font-medium text-ink-400">{countsByType.All ?? cards.length} customers</span>
         <div className="flex-1" />
@@ -126,6 +136,28 @@ export default function Customers() {
         >
           {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        <div className="flex items-center bg-ink-900 border border-ink-700 rounded-lg p-0.5" aria-label="Customer view">
+          <button
+            type="button"
+            onClick={() => switchView('cards')}
+            className={cn('p-1.5 rounded-md transition-colors', view === 'cards' ? 'bg-violet-500/20 text-violet-300' : 'text-ink-500 hover:text-ink-300')}
+            title="Card view"
+            aria-label="Card view"
+            aria-pressed={view === 'cards'}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => switchView('list')}
+            className={cn('p-1.5 rounded-md transition-colors', view === 'list' ? 'bg-violet-500/20 text-violet-300' : 'text-ink-500 hover:text-ink-300')}
+            title="List view"
+            aria-label="List view"
+            aria-pressed={view === 'list'}
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {cards.length === 0 ? (
@@ -144,7 +176,15 @@ export default function Customers() {
       ) : visible.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-ink-500">
           <Search className="w-10 h-10 mb-3" />
-          <p className="text-sm">Nothing matches — try a different search or filter</p>
+          <p className="text-sm">Nothing matches — try a different search</p>
+        </div>
+      ) : view === 'cards' ? (
+        <div className={cn('flex-1 overflow-y-auto pb-4 transition-opacity', dragging && 'opacity-80')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {visible.map(c => (
+              <CustomerCardView key={c.id} customer={c} onNewDeal={() => setQuickDealFor(c.id)} />
+            ))}
+          </div>
         </div>
       ) : (
         <div className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}>

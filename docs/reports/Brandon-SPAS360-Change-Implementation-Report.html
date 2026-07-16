@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPAS 360 — Brandon Change Implementation Report</title>
+  <meta name="description" content="Brandon Solem's requested SPAS 360 interface changes mapped to the production implementation and verification evidence." />
+  <style>
+    :root {
+      --navy-950: #08111f;
+      --navy-900: #0d1726;
+      --navy-800: #17243a;
+      --blue-600: #0d629b;
+      --blue-500: #1075b8;
+      --blue-100: #e5f3fb;
+      --canvas: #eef3f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #d5dee8;
+      --text: #101827;
+      --muted: #58677b;
+      --green: #047857;
+      --green-soft: #ecfdf5;
+      --amber: #9a5b08;
+      --amber-soft: #fff8e6;
+      --shadow: 0 18px 52px -38px rgba(8, 17, 31, 0.55);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--blue-600); }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 85% 0%, rgba(16, 117, 184, 0.28), transparent 34%),
+        linear-gradient(145deg, var(--navy-950), var(--navy-900));
+      color: #fff;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -8% -160px 36%;
+      height: 250px;
+      border-radius: 50%;
+      background: rgba(69, 172, 242, 0.08);
+      filter: blur(40px);
+      pointer-events: none;
+    }
+
+    .hero-inner,
+    main,
+    footer {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .hero-inner { padding: 46px 0 42px; position: relative; z-index: 1; }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 42px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand img {
+      width: 56px;
+      height: 36px;
+      object-fit: contain;
+      filter: brightness(1.16);
+    }
+
+    .brand span span { color: #45acf2; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid rgba(110, 231, 183, 0.28);
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.12);
+      color: #a7f3d0;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #7cc4f4;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 850px;
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.02;
+      letter-spacing: -0.045em;
+    }
+
+    .lede {
+      max-width: 760px;
+      margin: 20px 0 0;
+      color: #c7d2e0;
+      font-size: 17px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 34px;
+    }
+
+    .meta {
+      min-height: 74px;
+      padding: 13px 14px;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.045);
+    }
+
+    .meta-label {
+      display: block;
+      margin-bottom: 4px;
+      color: #7f8ea3;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .meta-value { color: #f7f9fc; font-size: 13px; font-weight: 700; }
+
+    main { padding: 36px 0 64px; }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1.35fr 0.65fr;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .summary-copy { padding: 24px 26px; }
+
+    .summary h2,
+    .section-heading h2 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+    }
+
+    .summary p { margin: 10px 0 0; color: var(--muted); }
+
+    .scorecard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+
+    .score {
+      padding: 20px;
+      border-right: 1px solid var(--border);
+    }
+
+    .score:last-child { border-right: 0; }
+    .score strong { display: block; font-size: 30px; line-height: 1; letter-spacing: -0.04em; }
+    .score span { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.09em; }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin: 34px 0 14px;
+    }
+
+    .section-heading p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .changes { display: grid; gap: 14px; }
+
+    .change {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .change-number {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 22px;
+      background: var(--navy-900);
+      color: #7cc4f4;
+      font-size: 18px;
+      font-weight: 850;
+    }
+
+    .change-body { padding: 20px 22px 22px; }
+
+    .change-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .change-title { margin: 0; font-size: 16px; letter-spacing: -0.015em; }
+
+    .implemented {
+      flex: none;
+      padding: 5px 9px;
+      border: 1px solid #a7f3d0;
+      border-radius: 999px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .implemented.refined {
+      border-color: #f3d28c;
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .mapping {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .quote,
+    .delivery {
+      margin: 0;
+      padding: 15px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .quote {
+      border: 1px solid #c9dce9;
+      border-left: 4px solid var(--blue-500);
+      background: #f3f8fc;
+      color: #243348;
+    }
+
+    .delivery {
+      border: 1px solid #cbe8dc;
+      border-left: 4px solid #10b981;
+      background: #f6fdf9;
+      color: #193b31;
+    }
+
+    .mapping-label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 850;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .scope-note {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid #f0d7a6;
+      border-radius: 10px;
+      background: #fffbf1;
+      color: #755013;
+      font-size: 12px;
+    }
+
+    code {
+      padding: 2px 5px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface-soft);
+      color: #273b55;
+      font: 600 0.92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    figure { margin: 0; overflow: hidden; }
+    figure img { display: block; width: 100%; height: 260px; object-fit: cover; object-position: top left; background: #e5ebf2; }
+    figcaption { padding: 12px 14px 14px; color: var(--muted); font-size: 12px; }
+    figcaption strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+
+    .verification {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .verify-card { padding: 19px 20px; }
+    .verify-card h3 { margin: 0 0 8px; font-size: 14px; }
+    .verify-card p { margin: 0; color: var(--muted); font-size: 12px; }
+
+    .closeout {
+      margin-top: 18px;
+      padding: 22px 24px;
+      border-color: rgba(16, 117, 184, 0.32);
+      background: linear-gradient(135deg, #f8fcff, #edf7fd);
+    }
+
+    .closeout-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .closeout h3 { margin: 0; font-size: 17px; }
+    .closeout p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+
+    .live-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 10px;
+      background: var(--blue-500);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 10px 24px -14px rgba(16, 117, 184, 0.9);
+    }
+
+    footer {
+      padding: 0 0 36px;
+      color: #6b7789;
+      font-size: 11px;
+    }
+
+    footer .rule { height: 1px; margin-bottom: 16px; background: var(--border); }
+
+    @media (max-width: 820px) {
+      .meta-grid { grid-template-columns: 1fr 1fr; }
+      .summary { grid-template-columns: 1fr; }
+      .mapping { grid-template-columns: 1fr; }
+      .evidence-grid { grid-template-columns: 1fr; }
+      .verification { grid-template-columns: 1fr; }
+      .closeout-grid { grid-template-columns: 1fr; }
+      figure img { height: auto; }
+    }
+
+    @media (max-width: 560px) {
+      .hero-inner, main, footer { width: min(100% - 24px, 1120px); }
+      .hero-inner { padding-top: 26px; }
+      .brand-row { align-items: flex-start; margin-bottom: 32px; }
+      .meta-grid { grid-template-columns: 1fr; }
+      .change { grid-template-columns: 40px minmax(0, 1fr); }
+      .change-number { font-size: 14px; }
+      .change-body { padding: 16px; }
+      .change-topline { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .hero { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      main { padding-top: 24px; }
+      .panel { box-shadow: none; }
+      .change, figure, .verify-card { break-inside: avoid; }
+      .live-link { border: 1px solid var(--blue-500); color: var(--blue-600); background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="brand-row">
+        <div class="brand">
+          <img src="../../public/logo-mark.png" alt="SPAS 360 logo" />
+          <span>SPAS <span>360</span></span>
+        </div>
+        <div class="status-pill">Implemented and production verified</div>
+      </div>
+
+      <p class="eyebrow">Change implementation report</p>
+      <h1>Brandon's requested changes, mapped to what shipped.</h1>
+      <p class="lede">A direct “his words / what was implemented” record of the confirmed SPAS 360 interface specifications and the final production result.</p>
+
+      <div class="meta-grid">
+        <div class="meta"><span class="meta-label">Requested by</span><span class="meta-value">Brandon Solem</span></div>
+        <div class="meta"><span class="meta-label">Implemented by</span><span class="meta-value">NDAI Agent</span></div>
+        <div class="meta"><span class="meta-label">Production state</span><span class="meta-value">Live on Vercel</span></div>
+        <div class="meta"><span class="meta-label">Final build</span><span class="meta-value">Commit 5ab9143</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="summary">
+      <div class="panel summary-copy">
+        <h2>Executive summary</h2>
+        <p>All 12 confirmed interface requests were implemented. The first light-theme treatment was then refined under Andrew's direction to restore the product's stronger original hierarchy. The Customers page now honors the requested single-list default without discarding the previously built customer-card view.</p>
+      </div>
+      <div class="panel scorecard" aria-label="Implementation totals">
+        <div class="score"><strong>12/12</strong><span>requested changes</span></div>
+        <div class="score"><strong>12</strong><span>proof attachments</span></div>
+      </div>
+    </section>
+
+    <div class="section-heading">
+      <div><p class="eyebrow">Line-by-line reconciliation</p><h2>His words → what was implemented</h2></div>
+      <p>Source: live SPAS 360 Fix-It card</p>
+    </div>
+
+    <section class="changes">
+      <article class="panel change">
+        <div class="change-number">01</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Light application surfaces</h3><span class="implemented refined">Implemented + refined</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Use #D1D5DB for the site-wide page background and keep working cards/surfaces white.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The requested light canvas and white working surfaces were implemented. After the first pass was reviewed, the flat gray was refined to <code>#EEF3F8</code>, with white primary surfaces and a restored dark navy header/Admin rail for stronger visual hierarchy.</p>
+          </div>
+          <div class="scope-note">Final-state note: the exact initial gray was superseded by Andrew's direction to produce a better light mode; the underlying requirement for a light canvas and white work surfaces remains intact.</div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">02</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Button hover contrast</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Increase button hover contrast site-wide.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>A global hover treatment now changes brightness and saturation on every enabled button. Buttons inside the dark header and Admin rail receive a brighter hover response calibrated for those darker surfaces.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">03</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Simplified primary navigation</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Simplify the header to separate Dashboard, Customers, Deals, Inventory, Schedule, Inbox, Citadel, and Reports tabs; remove CRM, Sales, and Service group labels; rename Comms to Inbox.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The grouped CRM, Sales, and Service labels were removed. All eight destinations are now independent, plainly named tabs, including <strong>Inbox</strong> in place of Comms. The active tab is emphasized while inactive tabs remain quiet.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">04</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Dashboard parts label</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Rename Dashboard ‘Parts Overdue’ to ‘Parts On Order’ without changing its underlying count.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The dashboard tile now reads <strong>Parts On Order</strong>. It still uses the existing <code>overduePartsCount</code> value, so only the customer-facing label changed.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">05</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">One customer list</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Customers must be one list with search and sort controls; remove Prospect, Lead, and Past Customer filter tabs; default sort is Recent activity.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The lifecycle filter tabs were removed and <strong>List view is the default</strong>. Search covers name, phone, and email; Recent activity remains the default sort. The existing customer-card view and Cards/List selector were preserved as an optional user choice because they do not conflict with the requested default.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">06</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Active Deals terminology</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Rename Deals ‘Open Pipeline’ to ‘Active Deals.’”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The Deals summary tile now reads <strong>Active Deals</strong>. The existing pipeline value and active-deal count remain unchanged.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">07</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Overdue Sales Tasks terminology</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Rename Deals ‘Closing This Week’ to ‘Overdue Sales Tasks.’”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The Deals tile now reads <strong>Overdue Sales Tasks</strong>. The existing count and value source were preserved.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">08</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Inventory brand filtering</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Add an Inventory brand dropdown for All Brands, Sundance Spas, Master Spas, Platinum Spas, and Eco Spas.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>A brand dropdown was added with the five requested choices. <strong>All Brands</strong> shows the full inventory; each named brand filters the list against the inventory item's brand value.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">09</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Serial Number terminology</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Rename Inventory ‘SKU’ to ‘Serial Number.’”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>Inventory list, detail, and editor labels now use <strong>Serial Number</strong>. The internal <code>sku</code> field remains unchanged to preserve stored data and integration compatibility.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">10</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Model terminology</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“Rename Inventory ‘Product’ to ‘Model.’”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>Customer-facing Inventory list, detail, and editor labels now use <strong>Model</strong>. Existing internal product/model values were preserved rather than migrating or rewriting inventory records.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">11</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Service status headers</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“On Service/Schedule, show only Delivery, Warranty, and Parts On Order status filter headers; do not delete or rewrite underlying jobs.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>The Schedule header now exposes only <strong>Delivery</strong>, <strong>Warranty</strong>, and <strong>Parts On Order</strong>. The change is limited to the visible legend/filter headers; underlying service jobs and statuses were not deleted or rewritten.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel change">
+        <div class="change-number">12</div>
+        <div class="change-body">
+          <div class="change-topline"><h3 class="change-title">Deal priority heading</h3><span class="implemented">Implemented</span></div>
+          <div class="mapping">
+            <blockquote class="quote"><span class="mapping-label">Brandon's words</span>“On deal detail, show a ‘Priority’ heading above the Low/Medium/High dropdown.”</blockquote>
+            <p class="delivery"><span class="mapping-label">What was implemented</span>A visible uppercase <strong>Priority</strong> label now sits directly above the inline editable priority control. Low, Medium, and High options continue to use the existing deal priority field.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <div class="section-heading">
+      <div><p class="eyebrow">Production evidence</p><h2>Final verified screens</h2></div>
+      <p>Captured from the live Vercel deployment</p>
+    </div>
+
+    <section class="evidence-grid">
+      <figure class="panel">
+        <img src="evidence/light-theme-recovery-20260716T1850Z/03-corrected-production-wide.png" alt="Final SPAS 360 manager dashboard in the restored light theme" />
+        <figcaption><strong>Dashboard and navigation</strong>Dark operational header, clean light workspace, separate tabs, and Parts On Order.</figcaption>
+      </figure>
+      <figure class="panel">
+        <img src="evidence/light-theme-recovery-20260716T1850Z/05-customers-production.png" alt="Final SPAS 360 customer list" />
+        <figcaption><strong>Customers</strong>One searchable, sortable customer list with Recent activity as the default.</figcaption>
+      </figure>
+      <figure class="panel">
+        <img src="evidence/light-theme-recovery-20260716T1850Z/06-inventory-production.png" alt="Final SPAS 360 inventory list" />
+        <figcaption><strong>Inventory</strong>Requested brand filter with Serial Number and Model terminology.</figcaption>
+      </figure>
+      <figure class="panel">
+        <img src="evidence/light-theme-recovery-20260716T1850Z/08-service-final.png" alt="Final SPAS 360 service schedule" />
+        <figcaption><strong>Schedule</strong>Delivery, Warranty, and Parts On Order headers with readable status treatment.</figcaption>
+      </figure>
+    </section>
+
+    <div class="section-heading">
+      <div><p class="eyebrow">Closeout</p><h2>Testing, deployment, and handoff</h2></div>
+    </div>
+
+    <section class="verification">
+      <div class="panel verify-card">
+        <h3>Code verification</h3>
+        <p><code>npm run lint</code> passed and the production Vite build completed successfully.</p>
+      </div>
+      <div class="panel verify-card">
+        <h3>Production verification</h3>
+        <p>Dashboard, Deals, Customers, Inventory, and Schedule were checked in the live signed-in application. No browser console errors were present.</p>
+      </div>
+      <div class="panel verify-card">
+        <h3>Human-review handoff</h3>
+        <p>The Fix-It item is <strong>Validation complete</strong>, has 12 validation-proof attachments, and remains unarchived for human review.</p>
+      </div>
+    </section>
+
+    <section class="panel closeout">
+      <div class="closeout-grid">
+        <div>
+          <h3>Final production result</h3>
+          <p>Initial specification commit <code>114ccb0</code>; final light-mode recovery and contrast work through <code>5ab9143</code>.</p>
+        </div>
+        <a class="live-link" href="https://spas360solo.vercel.app">Open live SPAS 360</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    Prepared July 16, 2026 · SPAS 360 implementation record · Source wording preserved from the live Fix-It item.
+  </footer>
+</body>
+</html>

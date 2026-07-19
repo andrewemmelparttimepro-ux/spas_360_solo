@@ -13,3 +13,7 @@ coverage/
 # Fix-It Feed proof artifacts + supabase CLI temp stay local
 docs/reports/evidence/
 supabase/.temp/
+.env*.local
+
+# Local scratch / agent temp (Product Sentinel hygiene)
+tmp/

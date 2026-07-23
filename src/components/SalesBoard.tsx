@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { TrendingUp, Trophy, CalendarClock, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Deal, PipelineStage } from '@/types/database';
+import { getFollowUpState, type DealFollowUp } from '@/lib/followUp';
 
 /**
  * The live sales board — the modern version of the whiteboard in the old
@@ -11,7 +12,15 @@ import type { Deal, PipelineStage } from '@/types/database';
 
 const money = (v: number) => v >= 10000 ? `$${Math.round(v / 1000)}k` : `$${v.toLocaleString()}`;
 
-export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: PipelineStage[] }) {
+export default function SalesBoard({
+  deals,
+  stages,
+  followUpsByDeal = new Map(),
+}: {
+  deals: Deal[];
+  stages: PipelineStage[];
+  followUpsByDeal?: Map<string, DealFollowUp>;
+}) {
   const board = useMemo(() => {
     const wonId = stages.find(s => s.name === 'Closed - Won')?.id;
     const lostId = stages.find(s => s.name === 'Closed - Lost')?.id;
@@ -19,23 +28,27 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const in7 = new Date(now); in7.setDate(in7.getDate() + 7);
 
     const won = deals.filter(d => d.stage_id === wonId && new Date(d.updated_at) >= monthStart);
     const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const cold = open.filter(d => new Date(d.updated_at) < sevenDaysAgo);
-    const closing = open.filter(d => d.expected_close_date && new Date(d.expected_close_date) <= in7);
     const hot = open.filter(d => d.priority === 'High');
+    const overdueFollowUps = open.filter(d => getFollowUpState(followUpsByDeal.get(d.id), now) === 'overdue');
+    const missingFollowUps = open.filter(d => !followUpsByDeal.has(d.id));
     const sum = (arr: Deal[]) => arr.reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
     return {
       pipeline: { value: sum(open), count: open.length },
       cold: { value: sum(cold), count: cold.length },
       won: { value: sum(won), count: won.length },
-      closing: { value: sum(closing), count: closing.length },
       hot: { count: hot.length },
+      followUpGaps: {
+        count: overdueFollowUps.length + missingFollowUps.length,
+        overdue: overdueFollowUps.length,
+        missing: missingFollowUps.length,
+      },
     };
-  }, [deals, stages]);
+  }, [deals, stages, followUpsByDeal]);
 
   const tiles = [
     {
@@ -45,7 +58,13 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
         : `${board.pipeline.count} active deal${board.pipeline.count === 1 ? '' : 's'}`,
     },
     { icon: Trophy, label: 'Won This Month', big: money(board.won.value), sub: `${board.won.count} closed`, accent: 'text-emerald-400' },
-    { icon: CalendarClock, label: 'Overdue Sales Tasks', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'expected closes', accent: 'text-amber-400' },
+    {
+      icon: CalendarClock,
+      label: 'Follow-Up Gaps',
+      big: String(board.followUpGaps.count),
+      sub: `${board.followUpGaps.overdue} overdue · ${board.followUpGaps.missing} missing`,
+      accent: board.followUpGaps.count > 0 ? 'text-red-400' : 'text-emerald-400',
+    },
     { icon: Flame, label: 'Hot Leads', big: String(board.hot.count), sub: 'close within a week', accent: 'text-red-400' },
   ];
 

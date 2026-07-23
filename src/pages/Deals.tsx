@@ -1,5 +1,5 @@
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, MoreHorizontal, Calendar, AlertTriangle, User, Snowflake, Link2, X } from 'lucide-react';
+import { Plus, MoreHorizontal, CalendarClock, AlertTriangle, User, Snowflake, Link2, X, Search, UsersRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { usePipeline, type PipelineDeal } from '@/hooks/usePipeline';
+import { formatFollowUpDue, getFollowUpState, type DealFollowUp, type FollowUpState } from '@/lib/followUp';
 import { useCustomerDrag, type DragCustomer } from '@/contexts/CustomerDragContext';
 import SalesBoard from '@/components/SalesBoard';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
@@ -14,7 +15,7 @@ import QuickDealModal from '@/components/QuickDealModal';
 import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
 
 export default function Deals() {
-  const { stages, deals, dealsWithTasks, isLoading, getDealsForStage, moveDeal, refresh } = usePipeline();
+  const { stages, deals, salespeople, followUpsByDeal, isLoading, moveDeal, refresh } = usePipeline();
   const { profile } = useAuth();
   const { toast } = useToast();
   const { dragging, activeTarget, setDropHandler } = useCustomerDrag();
@@ -24,8 +25,15 @@ export default function Deals() {
   const [quickDeal, setQuickDeal] = useState<{ contactId: string; stageId?: string } | null>(null);
   // IKEA effect: spotlight the customer card the salesperson just built
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [dealSearch, setDealSearch] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
+
+  useEffect(() => {
+    if (profile && !isManager) setOwnerFilter(profile.id);
+  }, [profile, isManager]);
 
   // Created from the dashboard's "+ New" → arrive here with the new card pulsing.
   // A customer card dropped straight on the Deals pill arrives as customerDrop.
@@ -93,6 +101,32 @@ export default function Deals() {
   }
 
   const attachDeal = attach ? deals.find(d => d.id === attach.dealId) : null;
+  const searchNeedle = dealSearch.trim().toLowerCase();
+  const matchesOwnerAndSearch = (deal: PipelineDeal) => {
+    if (ownerFilter !== 'all' && deal.assigned_to !== ownerFilter) return false;
+    if (!searchNeedle) return true;
+    const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : '';
+    const ownerName = deal.assigned ? `${deal.assigned.first_name} ${deal.assigned.last_name}` : '';
+    return `${deal.title} ${contactName} ${ownerName}`.toLowerCase().includes(searchNeedle);
+  };
+  const visibleDeals = deals.filter(matchesOwnerAndSearch);
+  const closedStageIds = new Set(stages.filter(stage => stage.name.startsWith('Closed')).map(stage => stage.id));
+  const activeDeals = visibleDeals
+    .filter(deal => !closedStageIds.has(deal.stage_id))
+    .sort((a, b) => {
+      const stateRank: Record<FollowUpState, number> = { overdue: 0, missing: 1, today: 2, scheduled: 3 };
+      const aFollowUp = followUpsByDeal.get(a.id);
+      const bFollowUp = followUpsByDeal.get(b.id);
+      const stateDifference = stateRank[getFollowUpState(aFollowUp)] - stateRank[getFollowUpState(bFollowUp)];
+      if (stateDifference !== 0) return stateDifference;
+      const aDue = aFollowUp ? new Date(aFollowUp.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDue = bFollowUp ? new Date(bFollowUp.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+      if (aDue !== bDue) return aDue - bDue;
+      return Number(b.amount ?? 0) - Number(a.amount ?? 0);
+    });
+  const missingFollowUps = activeDeals.filter(deal => !followUpsByDeal.has(deal.id)).length;
+  const overdueFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'overdue').length;
+  const dueToday = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'today').length;
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
@@ -159,14 +193,121 @@ export default function Deals() {
         </div>
       )}
 
-      {/* The live board — realtime scoreboard above the pipeline */}
-      <SalesBoard deals={deals} stages={stages} />
+      <div className="mb-5 overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/90 shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-950/80 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-300">Sales follow-up control</p>
+            <h2 className="mt-1 text-lg font-semibold text-ink-100">Active leads and their next activity</h2>
+            <p className="mt-1 text-sm text-ink-400">Every open lead needs a dated next step. Missing and overdue follow-ups rise to the top automatically.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[220px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+              <input
+                value={dealSearch}
+                onChange={(event) => setDealSearch(event.target.value)}
+                placeholder="Search active deals"
+                aria-label="Search active deals"
+                className="w-full rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-3 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+              />
+            </label>
+            {isManager ? (
+              <label className="relative">
+                <UsersRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                <select
+                  value={ownerFilter}
+                  onChange={(event) => setOwnerFilter(event.target.value)}
+                  aria-label="Filter by salesperson"
+                  className="appearance-none rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-8 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                >
+                  <option value="all">All salespeople</option>
+                  {salespeople.map(person => (
+                    <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-300">
+                <UsersRound className="h-4 w-4 text-ink-500" /> My deals
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-ink-800 border-b border-ink-800 bg-ink-950/40 sm:grid-cols-4">
+          <FollowUpStat label="Active leads" value={activeDeals.length} tone="neutral" />
+          <FollowUpStat label="No next activity" value={missingFollowUps} tone={missingFollowUps ? 'danger' : 'good'} />
+          <FollowUpStat label="Overdue" value={overdueFollowUps} tone={overdueFollowUps ? 'danger' : 'good'} />
+          <FollowUpStat label="Due today" value={dueToday} tone={dueToday ? 'warning' : 'neutral'} />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-ink-800 text-sm">
+            <thead className="bg-ink-950/70 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+              <tr>
+                <th className="px-5 py-3">Deal</th>
+                <th className="px-5 py-3">Customer</th>
+                <th className="px-5 py-3">Stage</th>
+                <th className="px-5 py-3">Deal owner</th>
+                <th className="px-5 py-3">Next activity</th>
+                <th className="px-5 py-3">Amount</th>
+                <th className="px-5 py-3">Priority</th>
+                <th className="px-5 py-3">Expected close</th>
+                <th className="px-5 py-3">Open tasks</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-800/80">
+              {activeDeals.map((deal) => {
+                const stage = stages.find((entry) => entry.id === deal.stage_id);
+                const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : 'Unassigned';
+                const ownerName = deal.assigned ? `${deal.assigned.first_name} ${deal.assigned.last_name}` : 'Unassigned';
+                const followUp = followUpsByDeal.get(deal.id);
+                const followUpState = getFollowUpState(followUp);
+                return (
+                  <tr key={deal.id} className="bg-ink-900/70 hover:bg-brand-500/5">
+                    <td className="px-5 py-3">
+                      <Link to={`/deals/${deal.id}`} className="font-medium text-ink-100 hover:text-brand-400">{deal.title}</Link>
+                    </td>
+                    <td className="px-5 py-3 text-ink-300">{contactName}</td>
+                    <td className="px-5 py-3 text-ink-400">{stage?.name ?? 'Unknown stage'}</td>
+                    <td className="px-5 py-3 text-ink-300">{ownerName}</td>
+                    <td className="min-w-[210px] px-5 py-3">
+                      {followUp ? (
+                        <Link to={`/deals/${deal.id}`} className={cn('block rounded-lg border px-3 py-2 transition hover:brightness-110', followUpTone[followUpState])}>
+                          <span className="block text-xs font-semibold">{formatFollowUpDue(followUp)}</span>
+                          <span className="mt-0.5 block max-w-[220px] truncate text-[11px] opacity-80">{followUp.title}</span>
+                        </Link>
+                      ) : (
+                        <Link to={`/deals/${deal.id}`} className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/15">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Set next task
+                        </Link>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 font-mono text-ink-100">${(Number(deal.amount) || 0).toLocaleString()}</td>
+                    <td className="px-5 py-3"><span className="rounded-full border border-ink-700 bg-ink-950 px-2.5 py-1 text-xs font-medium text-ink-300">{deal.priority}</span></td>
+                    <td className="px-5 py-3 text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : 'Open-ended'}</td>
+                    <td className="px-5 py-3 text-center font-mono text-ink-300">{followUp?.openTaskCount ?? 0}</td>
+                  </tr>
+                );
+              })}
+              {activeDeals.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-ink-500">
+                    No active deals match this salesperson and search.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* The live board, realtime scoreboard above the pipeline */}
+      <SalesBoard deals={visibleDeals} stages={stages} followUpsByDeal={followUpsByDeal} />
 
       <div className="flex-1 overflow-x-auto pb-4" data-cdrop-scroll>
         <DragDropContext onDragEnd={moveDeal}>
           <div className="flex space-x-4 h-full items-start">
             {stages.map(stage => {
-              const stageDeals = getDealsForStage(stage.id);
+              const stageDeals = visibleDeals.filter(deal => deal.stage_id === stage.id);
               const closed = stage.name.startsWith('Closed');
               // Closed stages don't take customer drops — new deals start live
               const stageDropProps = !closed ? { 'data-cdrop': 'stage', 'data-cdrop-stage': stage.id } : {};
@@ -197,7 +338,7 @@ export default function Deals() {
                             key={deal.id}
                             deal={deal}
                             index={index}
-                            hasTask={dealsWithTasks.has(deal.id)}
+                            followUp={followUpsByDeal.get(deal.id)}
                             closed={closed}
                             highlight={deal.id === highlightId}
                           />
@@ -222,13 +363,37 @@ const priorityEdge: Record<string, string> = {
   Low: 'border-l-brand-500',
 };
 
-function DealCard({ deal, index, hasTask, closed, highlight }: { deal: PipelineDeal; index: number; hasTask: boolean; closed?: boolean; highlight?: boolean }) {
+const followUpTone: Record<FollowUpState, string> = {
+  missing: 'border-red-500/30 bg-red-500/10 text-red-300',
+  overdue: 'border-red-500/30 bg-red-500/10 text-red-300',
+  today: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  scheduled: 'border-brand-500/30 bg-brand-500/10 text-brand-300',
+};
+
+function FollowUpStat({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'danger' | 'warning' | 'good' }) {
+  const tones = {
+    neutral: 'text-ink-100',
+    danger: 'text-red-300',
+    warning: 'text-amber-300',
+    good: 'text-emerald-300',
+  };
+
+  return (
+    <div className="px-4 py-3">
+      <p className={cn('font-mono text-xl font-bold', tones[tone])}>{value}</p>
+      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">{label}</p>
+    </div>
+  );
+}
+
+function DealCard({ deal, index, followUp, closed, highlight }: { deal: PipelineDeal; index: number; followUp?: DealFollowUp; closed?: boolean; highlight?: boolean }) {
   const { activeTarget } = useCustomerDrag();
   const daysInStage = Math.floor((Date.now() - new Date(deal.updated_at).getTime()) / (1000 * 60 * 60 * 24));
   const goingCold = !closed && daysInStage > 7; // loss framing: idle deals are money walking away
   const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : null;
   const interests = (deal.product_interest ?? []).slice(0, 3);
   const customerIsOver = activeTarget === `deal:${deal.id}`;
+  const followUpState = getFollowUpState(followUp);
 
   return (
     <Draggable draggableId={deal.id} index={index}>
@@ -275,13 +440,13 @@ function DealCard({ deal, index, hasTask, closed, highlight }: { deal: PipelineD
             ) : (
               <span className="text-ink-500">{daysInStage}d in stage</span>
             )}
-            {!hasTask ? (
+            {!closed && !followUp ? (
               <span className="flex items-center gap-1 text-red-400 font-semibold">
                 <AlertTriangle className="w-3 h-3" />No follow-up
               </span>
-            ) : deal.expected_close_date ? (
-              <span className="flex items-center text-ink-500">
-                <Calendar className="w-3 h-3 mr-1" />{new Date(deal.expected_close_date).toLocaleDateString()}
+            ) : !closed && followUp ? (
+              <span className={cn('flex items-center gap-1 font-semibold', followUpState === 'overdue' ? 'text-red-400' : followUpState === 'today' ? 'text-amber-400' : 'text-brand-300')}>
+                <CalendarClock className="w-3 h-3" />{formatFollowUpDue(followUp)}
               </span>
             ) : null}
           </div>

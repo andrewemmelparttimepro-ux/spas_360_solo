@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Calendar, User, AlertCircle, Plus, Save, X, Pencil, Bot } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3 } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
@@ -15,6 +15,12 @@ import { runAriMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
 import AriNoteCard from '@/components/AriNoteCard';
 import type { AriOutputFormat } from '@/lib/ariExport';
+import {
+  defaultFollowUpInputValue,
+  formatFollowUpDue,
+  getFollowUpState,
+  summarizeDealFollowUps,
+} from '@/lib/followUp';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
 
@@ -55,6 +61,9 @@ export default function DealDetail() {
   const [ariBusy, setAriBusy] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDueAt, setNewTaskDueAt] = useState(() => defaultFollowUpInputValue());
+  const [newTaskPriority, setNewTaskPriority] = useState<DealPriority>('Medium');
+  const taskSectionRef = useRef<HTMLDivElement>(null);
 
   const saveDeal = async (updates: Partial<Deal>) => { await updateDeal(updates); toast('Deal updated'); };
 
@@ -62,6 +71,14 @@ export default function DealDetail() {
   if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
 
   const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
+  const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
+  const nextFollowUpState = getFollowUpState(nextFollowUp);
+  const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
+
+  const openTaskComposer = () => {
+    setShowTaskForm(true);
+    window.requestAnimationFrame(() => taskSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !profile) return;
@@ -117,7 +134,46 @@ export default function DealDetail() {
       setAriBusy(false);
     }
   };
-  const handleAddTask = async () => { if (!newTaskTitle.trim()) return; await createTask({ title: newTaskTitle, deal_id: deal.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' }); setNewTaskTitle(''); setShowTaskForm(false); };
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim() || !newTaskDueAt) {
+      toast('Add a follow-up label and due date', 'error');
+      return;
+    }
+
+    const dueAt = new Date(newTaskDueAt);
+    if (Number.isNaN(dueAt.getTime())) {
+      toast('Choose a valid follow-up date', 'error');
+      return;
+    }
+
+    const title = newTaskTitle.trim();
+    const created = await createTask({
+      title,
+      description: `Next activity for ${deal.title}`,
+      deal_id: deal.id,
+      contact_id: deal.contact_id,
+      assigned_to: deal.assigned_to,
+      due_at: dueAt.toISOString(),
+      priority: newTaskPriority,
+      status: 'Pending',
+      task_type: 'Sales Follow-Up',
+    });
+
+    if (!created) {
+      toast('Follow-up could not be scheduled', 'error');
+      return;
+    }
+
+    await createNote(
+      `📅 Next task set: ${title}\nDue ${dueAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`,
+      { dealId: deal.id },
+    );
+    setNewTaskTitle('');
+    setNewTaskDueAt(defaultFollowUpInputValue());
+    setNewTaskPriority('Medium');
+    setShowTaskForm(false);
+    toast('Next activity scheduled', 'success');
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -135,13 +191,41 @@ export default function DealDetail() {
           <div className="space-y-4">
             <EditableField label="Amount" value={deal.amount} field="amount" onSave={saveDeal} icon={DollarSign} type="number" prefix="$" bold color="text-ink-100" />
             <EditableField label="Expected Close" value={deal.expected_close_date} field="expected_close_date" onSave={saveDeal} icon={Calendar} type="date" />
+            <div className={cn(
+              'rounded-xl border p-3',
+              nextFollowUpState === 'missing' || nextFollowUpState === 'overdue'
+                ? 'border-red-500/30 bg-red-500/10'
+                : nextFollowUpState === 'today'
+                  ? 'border-amber-500/30 bg-amber-500/10'
+                  : 'border-brand-500/30 bg-brand-500/10',
+            )}>
+              <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">
+                <CalendarClock className="h-3.5 w-3.5" /> Next activity
+              </p>
+              <p className={cn(
+                'mt-2 text-sm font-semibold',
+                nextFollowUpState === 'missing' || nextFollowUpState === 'overdue'
+                  ? 'text-red-300'
+                  : nextFollowUpState === 'today'
+                    ? 'text-amber-300'
+                    : 'text-brand-300',
+              )}>
+                {formatFollowUpDue(nextFollowUp)}
+              </p>
+              <p className="mt-1 truncate text-xs text-ink-400">{nextFollowUp?.title ?? 'This lead needs a dated next step.'}</p>
+            </div>
             <div className="flex items-center text-sm text-ink-300"><User className="w-4 h-4 mr-2 text-ink-500" />Source: {deal.lead_source}</div>
             {deal.product_interest && deal.product_interest.length > 0 && <div><p className="text-xs text-ink-500 mb-1">Products of Interest</p><div className="flex flex-wrap gap-1">{deal.product_interest.map(p => <span key={p} className="px-2 py-0.5 bg-ink-950 text-ink-300 rounded text-xs">{p}</span>)}</div></div>}
           </div>
         </div>
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Notes & Activity</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Notes & Activity</h2>
+              <button onClick={openTaskComposer} className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-600">
+                <CalendarClock className="h-4 w-4" /> Set next task
+              </button>
+            </div>
             <div className="flex items-start space-x-3 mb-4">
               <MentionInput
                 value={newNote}
@@ -181,10 +265,91 @@ export default function DealDetail() {
               </div>
             ))}</div>
           </div>
-          <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Follow-Up Tasks</h2><button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-400 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button></div>
-            {showTaskForm && <div className="flex space-x-3 mb-4"><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Follow-up task..." className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" autoFocus /><button onClick={handleAddTask} className="px-3 py-2 bg-brand-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button><button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-ink-500"><X className="w-4 h-4" /></button></div>}
-            <div className="space-y-2">{tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No follow-up tasks</p> : tasks.map(t => <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800"><input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" /><span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-ink-500' : 'text-ink-100'}`}>{t.title}</span><span className="text-xs text-ink-500">{new Date(t.due_at).toLocaleDateString()}</span></div>)}</div>
+          <div ref={taskSectionRef} className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Follow-Up Tasks</h2>
+                <p className="mt-1 text-xs text-ink-500">{openTaskCount} open · earliest due date drives Next activity</p>
+              </div>
+              <button onClick={openTaskComposer} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
+            </div>
+            {showTaskForm && (
+              <div id="follow-up-task-form" className="mb-5 rounded-xl border border-brand-500/30 bg-brand-500/5 p-4">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_210px_130px]">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-ink-400">What should happen next?</span>
+                    <input
+                      value={newTaskTitle}
+                      onChange={event => setNewTaskTitle(event.target.value)}
+                      onKeyDown={event => event.key === 'Enter' && handleAddTask()}
+                      placeholder="Call, text, send quote, schedule visit…"
+                      className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500"
+                      autoFocus
+                    />
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-ink-400">Due date & time</span>
+                    <input
+                      type="datetime-local"
+                      value={newTaskDueAt}
+                      onChange={event => setNewTaskDueAt(event.target.value)}
+                      className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500"
+                    />
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-ink-400">Priority</span>
+                    <select
+                      value={newTaskPriority}
+                      onChange={event => setNewTaskPriority(event.target.value as DealPriority)}
+                      className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500"
+                    >
+                      <option>High</option>
+                      <option>Medium</option>
+                      <option>Low</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button onClick={() => setShowTaskForm(false)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-ink-400 hover:text-ink-200">
+                    <X className="h-4 w-4" /> Cancel
+                  </button>
+                  <button onClick={handleAddTask} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-600">
+                    <Save className="h-4 w-4" /> Schedule follow-up
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {tasks.length === 0 ? (
+                <button onClick={openTaskComposer} className="w-full rounded-xl border border-dashed border-red-500/30 bg-red-500/5 px-4 py-5 text-center text-sm font-medium text-red-300 transition hover:bg-red-500/10">
+                  No next activity scheduled — set the salesperson’s next step
+                </button>
+              ) : tasks.map(task => {
+                const completed = task.status === 'Completed';
+                const overdue = !completed && new Date(task.due_at).getTime() < Date.now();
+                return (
+                  <div key={task.id} className={cn(
+                    'flex items-center gap-3 rounded-lg border p-3',
+                    completed ? 'border-ink-800 bg-ink-950/60' : overdue ? 'border-red-500/30 bg-red-500/5' : 'border-ink-800 bg-ink-950',
+                  )}>
+                    <input
+                      type="checkbox"
+                      checked={completed}
+                      onChange={() => !completed && completeTask(task.id)}
+                      className="h-4 w-4 rounded border-ink-600 text-brand-400"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className={cn('truncate text-sm', completed ? 'line-through text-ink-500' : 'font-medium text-ink-100')}>{task.title}</p>
+                      <p className={cn('mt-1 flex items-center gap-1 text-xs', overdue ? 'text-red-300' : 'text-ink-500')}>
+                        <Clock3 className="h-3 w-3" />
+                        {overdue ? 'Overdue · ' : ''}{new Date(task.due_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-400">{task.priority}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

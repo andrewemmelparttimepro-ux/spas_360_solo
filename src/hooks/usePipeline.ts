@@ -3,28 +3,39 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import type { DropResult } from '@hello-pangea/dnd';
-import type { Deal, PipelineStage } from '@/types/database';
+import type { Deal, PipelineStage, Profile } from '@/types/database';
+import {
+  summarizeDealFollowUps,
+  type DealFollowUp,
+  type FollowUpTaskLike,
+} from '@/lib/followUp';
 
 export interface PipelineView {
   stages: PipelineStage[];
   dealsByStage: Record<string, Deal[]>;
 }
 
-export type PipelineDeal = Deal & { contacts?: { first_name: string; last_name: string } | null };
+export type PipelineDeal = Deal & {
+  contacts?: { first_name: string; last_name: string } | null;
+  assigned?: { first_name: string; last_name: string; role: Profile['role'] } | null;
+};
+
+export type SalespersonOption = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'role'>;
 
 export function usePipeline() {
   const { profile, activeLocationId } = useAuth();
   const { toast } = useToast();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
-  const [dealsWithTasks, setDealsWithTasks] = useState<Set<string>>(new Set());
+  const [salespeople, setSalespeople] = useState<SalespersonOption[]>([]);
+  const [followUpsByDeal, setFollowUpsByDeal] = useState<Map<string, DealFollowUp>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPipeline = useCallback(async () => {
     if (!profile) return;
     setIsLoading(true);
 
-    const [stageRes, dealRes] = await Promise.all([
+    const [stageRes, dealRes, taskRes, peopleRes] = await Promise.all([
       supabase
         .from('pipeline_stages')
         .select('*')
@@ -32,23 +43,34 @@ export function usePipeline() {
         .order('position'),
       supabase
         .from('deals')
-        .select('*, contacts:contact_id(first_name, last_name)')
+        .select('*, contacts:contact_id(first_name, last_name), assigned:assigned_to(first_name, last_name, role)')
         .eq('org_id', profile.org_id)
         .order('position'),
+      supabase
+        .from('tasks')
+        .select('id, deal_id, assigned_to, title, due_at, priority, status')
+        .eq('org_id', profile.org_id)
+        .in('status', ['Pending', 'In Progress', 'Overdue'])
+        .not('deal_id', 'is', null)
+        .order('due_at', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('org_id', profile.org_id)
+        .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .order('first_name'),
     ]);
 
     if (stageRes.data) setStages(stageRes.data);
+    if (peopleRes.data) setSalespeople(peopleRes.data as SalespersonOption[]);
+    setFollowUpsByDeal(summarizeDealFollowUps((taskRes.data ?? []) as FollowUpTaskLike[]));
 
-    // Which deals have an open follow-up task? (a lead with no task is a no-no)
-    const { data: openTasks } = await supabase
-      .from('tasks')
-      .select('deal_id')
-      .eq('org_id', profile.org_id)
-      .in('status', ['Pending', 'In Progress'])
-      .not('deal_id', 'is', null);
-    setDealsWithTasks(new Set((openTasks ?? []).map(t => t.deal_id as string)));
+    if (stageRes.error) console.error('Error fetching pipeline stages:', stageRes.error);
+    if (dealRes.error) console.error('Error fetching deals:', dealRes.error);
+    if (taskRes.error) console.error('Error fetching deal follow-ups:', taskRes.error);
+    if (peopleRes.error) console.error('Error fetching salespeople:', peopleRes.error);
 
-    let filteredDeals = dealRes.data ?? [];
+    let filteredDeals = (dealRes.data ?? []) as PipelineDeal[];
     if (activeLocationId) {
       filteredDeals = filteredDeals.filter(d => d.location_id === activeLocationId);
     }
@@ -64,6 +86,9 @@ export function usePipeline() {
     const channel = supabase
       .channel(`deals-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchPipeline();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         fetchPipeline();
       })
       .subscribe();
@@ -188,7 +213,8 @@ export function usePipeline() {
   return {
     stages,
     deals,
-    dealsWithTasks,
+    salespeople,
+    followUpsByDeal,
     isLoading,
     getDealsForStage,
     moveDeal,

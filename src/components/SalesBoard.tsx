@@ -45,7 +45,7 @@ export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: P
         : `${board.pipeline.count} active deal${board.pipeline.count === 1 ? '' : 's'}`,
     },
     { icon: Trophy, label: 'Won This Month', big: money(board.won.value), sub: `${board.won.count} closed`, accent: 'text-emerald-400' },
-    { icon: CalendarClock, label: 'Overdue Sales Tasks', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'expected closes', accent: 'text-amber-400' },
+    { icon: CalendarClock, label: 'Overdue Sales Tasks', big: String(board.closing.count), sub: board.closing.value > 0 ? `${money(board.closing.value)} on the line` : 'No overdue tasks', accent: 'text-amber-400' },
     { icon: Flame, label: 'Hot Leads', big: String(board.hot.count), sub: 'close within a week', accent: 'text-red-400' },
   ];
 

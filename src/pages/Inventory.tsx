@@ -149,7 +149,6 @@ function EditableStatus({ value, itemId, onSave }: { value: string; itemId: stri
 }
 
 // --------------- Category options ---------------
-const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
 const BRAND_OPTIONS = ['Sundance Spas', 'Master Spas', 'Platinum Spas', 'Eco Spas'];
 
 // =============== Main page component ===============
@@ -172,6 +171,12 @@ export default function Inventory() {
     { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-500/15 text-red-400' },
   ];
   const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
+  const customerOrStock = (item: InventoryItem) => item.customer_id ? 'Customer' : 'Stock';
+  const deliveryDate = (item: InventoryItem) => item.date_delivered
+    ? new Date(`${item.date_delivered}T12:00:00`).toLocaleDateString()
+    : '—';
+  const isOnHand = (item: InventoryItem) =>
+    item.status === 'In Stock' || item.status === 'Sold' ? 'Y' : 'N';
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
@@ -228,52 +233,40 @@ export default function Inventory() {
           </label>
         </div>
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0">
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Category</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Status</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider text-right">Price</th>
-                <th className="p-2 w-10"></th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Color Combination</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Inventory Flooring Status</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Customer/Stock</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Delivery Date</th>
+                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">On Hand Y/N</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
               {visibleItems.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
               ) : visibleItems.map(item => (
-                <tr key={item.id} className="hover:bg-ink-800/60 transition-colors">
-                  <td className="p-4 text-sm font-medium">
-                    <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">{item.sku}</Link>
-                  </td>
+                <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className="hover:bg-ink-800/60 transition-colors">
                   <td className="p-4 text-sm text-ink-300">
-                    <EditableCell value={item.product} field="product" itemId={item.id} onSave={updateItem} />
+                    <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
+                      {item.model || item.product}
+                    </Link>
                   </td>
                   <td className="p-4 text-sm text-ink-400">
-                    <EditableCell value={item.category} field="category" itemId={item.id} onSave={updateItem} type="select" options={CATEGORY_OPTIONS} />
+                    <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
+                  </td>
+                  <td className="p-4 text-sm text-ink-300">
+                    <EditableCell value={item.sku} field="sku" itemId={item.id} onSave={updateItem} />
                   </td>
                   <td className="p-4">
                     <EditableStatus value={item.status} itemId={item.id} onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm font-medium text-ink-100 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {item.msrp != null && item.sale_price != null && Number(item.msrp) > Number(item.sale_price) && (
-                        <span className="text-[11px] text-ink-500 line-through shrink-0" title="MSRP">${Number(item.msrp).toLocaleString()}</span>
-                      )}
-                      <EditableCell value={item.sale_price ?? item.msrp ?? 0} field="sale_price" itemId={item.id} onSave={updateItem} type="number" prefix="$" className="justify-end" />
-                    </div>
-                  </td>
-                  <td className="p-2 text-right">
-                    <button
-                      onClick={() => setEditorTarget(item)}
-                      className="p-1.5 text-ink-500 hover:text-brand-400 hover:bg-ink-800 rounded-lg transition-colors"
-                      title="Open full editor"
-                      aria-label={`Edit ${item.product}`}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
+                  <td className="p-4 text-sm text-ink-300">{customerOrStock(item)}</td>
+                  <td className="p-4 text-sm text-ink-300">{deliveryDate(item)}</td>
+                  <td className="p-4 text-sm font-semibold text-ink-200">{isOnHand(item)}</td>
                 </tr>
               ))}
             </tbody>

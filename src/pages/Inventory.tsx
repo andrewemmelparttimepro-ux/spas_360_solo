@@ -5,7 +5,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import InventoryEditor from '@/components/InventoryEditor';
-import type { InventoryItem, InventoryStatus } from '@/types/database';
+import type { InventoryItem } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 // --------------- Inline editable cell ---------------
@@ -23,7 +23,7 @@ function EditableCell({
   field: string;
   itemId: string;
   onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
-  type?: 'text' | 'number' | 'select';
+  type?: 'text' | 'number' | 'date' | 'select';
   options?: string[];
   prefix?: string;
   className?: string;
@@ -97,55 +97,59 @@ function EditableCell({
   );
 }
 
-// --------------- Status badge (editable) ---------------
-const STATUS_OPTIONS: InventoryStatus[] = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'];
-const STATUS_COLORS: Record<string, string> = {
-  'In Stock': 'bg-emerald-500/15 text-emerald-300',
-  'Sold': 'bg-amber-500/15 text-amber-300',
-  'On Order': 'bg-brand-500/15 text-brand-300',
-  'In Transit': 'bg-purple-500/15 text-purple-300',
-  'Delivered': 'bg-ink-950 text-ink-300',
-  'Returned': 'bg-red-500/15 text-red-300',
+const splitSerialAndFlooring = (sku: string | null) => {
+  const value = (sku ?? '').trim();
+  const quoted = value.match(/^(.*?)\s*["“](.+?)["”]\s*$/);
+  if (quoted) return { serial: quoted[1].trim(), flooring: quoted[2].trim() };
+
+  const knownFlooring = value.match(/^(.*?)\s+(Wells Fargo|WF|TCCU(?:\s+Minot)?|MCHL(?:\s+TCCU)?|Consignment(?:\s+from\s+\w+)?|Paid Off(?:\s+by\s+\w+)?|Spas Etc(?:\s+TCCU)?|Spas TCCU)$/i);
+  return knownFlooring
+    ? { serial: knownFlooring[1].trim(), flooring: knownFlooring[2].trim() }
+    : { serial: value, flooring: '' };
 };
 
-function EditableStatus({ value, itemId, onSave }: { value: string; itemId: string; onSave: (id: string, u: Partial<InventoryItem>) => Promise<boolean> }) {
-  const [editing, setEditing] = useState(false);
-  const ref = useRef<HTMLSelectElement>(null);
+const joinSerialAndFlooring = (serial: string, flooring: string) =>
+  flooring.trim() ? `${serial.trim()} "${flooring.trim()}"`.trim() : serial.trim();
 
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-
-  const commit = async (v: string) => {
-    if (v !== value) await onSave(itemId, { status: v as InventoryStatus });
-    setEditing(false);
+function InventoryTextCell({
+  item,
+  part,
+  onSave,
+}: {
+  item: InventoryItem;
+  part: 'serial' | 'flooring';
+  onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
+}) {
+  const parsed = splitSerialAndFlooring(item.sku);
+  const handleSave = (id: string, updates: Partial<InventoryItem>) => {
+    const nextValue = String((updates as Record<string, unknown>)[part] ?? '');
+    return onSave(id, {
+      sku: joinSerialAndFlooring(
+        part === 'serial' ? nextValue : parsed.serial,
+        part === 'flooring' ? nextValue : parsed.flooring,
+      ),
+    });
   };
 
-  if (editing) {
-    return (
-      <select
-        ref={ref}
-        value={value}
-        onChange={e => commit(e.target.value)}
-        onBlur={() => setEditing(false)}
-        className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30"
-      >
-        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    );
-  }
+  return <EditableCell value={parsed[part]} field={part} itemId={item.id} onSave={handleSave} />;
+}
 
-  return (
-    <span
-      onClick={() => setEditing(true)}
-      className={cn(
-        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group gap-1",
-        STATUS_COLORS[value] ?? 'bg-ink-950 text-ink-100'
-      )}
-      title="Click to change status"
-    >
-      {value}
-      <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-    </span>
-  );
+function OnHandCell({
+  item,
+  onSave,
+}: {
+  item: InventoryItem;
+  onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
+}) {
+  const value = item.status === 'In Stock' || item.status === 'Sold' ? 'Yes' : 'No';
+  const handleSave = (id: string, updates: Partial<InventoryItem>) => {
+    const nextValue = (updates as Record<string, unknown>).on_hand === 'Yes';
+    return onSave(id, {
+      status: nextValue ? 'In Stock' : 'On Order',
+    } as Partial<InventoryItem>);
+  };
+
+  return <EditableCell value={value} field="on_hand" itemId={item.id} onSave={handleSave} type="select" options={['Yes', 'No']} />;
 }
 
 // --------------- Category options ---------------
@@ -172,12 +176,6 @@ export default function Inventory() {
   ];
   const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
   const customerOrStock = (item: InventoryItem) => item.customer_id ? 'Customer' : 'Stock';
-  const deliveryDate = (item: InventoryItem) => item.date_delivered
-    ? new Date(`${item.date_delivered}T12:00:00`).toLocaleDateString()
-    : '—';
-  const isOnHand = (item: InventoryItem) =>
-    item.status === 'In Stock' || item.status === 'Sold' ? 'Y' : 'N';
-
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -259,14 +257,18 @@ export default function Inventory() {
                     <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
                   </td>
                   <td className="p-4 text-sm text-ink-300">
-                    <EditableCell value={item.sku} field="sku" itemId={item.id} onSave={updateItem} />
+                    <InventoryTextCell item={item} part="serial" onSave={updateItem} />
                   </td>
-                  <td className="p-4">
-                    <EditableStatus value={item.status} itemId={item.id} onSave={updateItem} />
+                  <td className="p-4 text-sm text-ink-300">
+                    <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
                   <td className="p-4 text-sm text-ink-300">{customerOrStock(item)}</td>
-                  <td className="p-4 text-sm text-ink-300">{deliveryDate(item)}</td>
-                  <td className="p-4 text-sm font-semibold text-ink-200">{isOnHand(item)}</td>
+                  <td className="p-4 text-sm text-ink-300">
+                    <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
+                  </td>
+                  <td className="p-4 text-sm font-semibold text-ink-200">
+                    <OnHandCell item={item} onSave={updateItem} />
+                  </td>
                 </tr>
               ))}
             </tbody>

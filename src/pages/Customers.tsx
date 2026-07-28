@@ -60,11 +60,12 @@ export default function Customers() {
     const q = search.trim().toLowerCase();
     let list = cards;
     if (q) {
-      list = list.filter(c =>
-        `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        (c.email ?? '').toLowerCase().includes(q)
-      );
+      list = list.filter(c => {
+        const first = c.first_name.trim().toLowerCase();
+        const last = c.last_name.trim().toLowerCase();
+        const full = `${first} ${last}`;
+        return first.startsWith(q) || last.startsWith(q) || full.startsWith(q);
+      });
     }
     const sorted = [...list];
     if (sort === 'name') sorted.sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
@@ -124,7 +125,7 @@ export default function Customers() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name, phone, email…"
+            placeholder="Start typing a customer name…"
             className="w-56 sm:w-64 pl-9 pr-3 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>

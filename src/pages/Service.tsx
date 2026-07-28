@@ -28,6 +28,11 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
     if (v !== value) await onSave(jobId, { status: v as JobStatus });
     setEditing(false);
   };
+  const queueLabel: Partial<Record<JobStatus, string>> = {
+    'Parts on Order': 'Parts On Order',
+    'Pending Confirm': 'To Do',
+    'In Progress': 'Service',
+  };
 
   if (editing) {
     return (
@@ -38,7 +43,16 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
         onClick={e => e.stopPropagation()}
         className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 text-ink-100 focus:ring-2 focus:ring-brand-500/30 relative z-10"
       >
-        {JOB_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+        {(light
+          ? [
+              { value: 'Parts on Order', label: 'Parts On Order' },
+              { value: 'Delivery', label: 'Delivery' },
+              { value: 'Warranty', label: 'Warranty' },
+              { value: 'Pending Confirm', label: 'To Do' },
+              { value: 'In Progress', label: 'Service' },
+            ]
+          : JOB_STATUS_OPTIONS.map(status => ({ value: status, label: status }))
+        ).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     );
   }
@@ -48,7 +62,7 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
       className={cn('text-[10px] font-bold uppercase tracking-wider cursor-pointer inline-flex items-center gap-1 group', light ? 'opacity-90 hover:opacity-100' : 'opacity-70 hover:opacity-100')}
       title="Click to change status"
     >
-      {value}
+      {light ? (queueLabel[value] ?? value) : value}
       <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-70 transition-opacity" />
     </span>
   );
@@ -83,7 +97,7 @@ export default function Service() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<Set<JobStatus>>(new Set());
 

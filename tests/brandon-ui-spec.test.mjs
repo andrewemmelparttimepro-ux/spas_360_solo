@@ -50,6 +50,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(inventory, /Customer:\\s\*\(\.\*\?\)\(\?=\\s\*·\|\$\)/);
     assert.match(inventory, /importedCustomer\.toUpperCase\(\) === 'STOCK' \? 'Stock' : importedCustomer/);
     assert.match(inventory, /\{importedCustomerOrStock\(item\)\}/);
+    assert.doesNotMatch(inventory, /â/);
     assert.doesNotMatch(inventoryEditor, />SKU</);
     assert.match(inventoryEditor, />Serial Number \*</);
     assert.match(inventoryEditor, />Model \*</);

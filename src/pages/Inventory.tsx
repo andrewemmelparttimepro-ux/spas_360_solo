@@ -80,7 +80,7 @@ function EditableCell({
 
   const display = value != null && value !== '' && value !== 0
     ? (prefix ? `${prefix}${Number(value).toLocaleString()}` : String(value))
-    : (type === 'number' ? '$0' : 'â');
+    : (type === 'number' ? '$0' : '—');
 
   return (
     <span

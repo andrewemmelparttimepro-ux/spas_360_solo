@@ -60,10 +60,14 @@ export default function SalesBoard({
     { icon: Trophy, label: 'Won This Month', big: money(board.won.value), sub: `${board.won.count} closed`, accent: 'text-emerald-400' },
     {
       icon: CalendarClock,
-      label: 'Follow-Up Gaps',
-      big: String(board.followUpGaps.count),
-      sub: `${board.followUpGaps.overdue} overdue · ${board.followUpGaps.missing} missing`,
-      accent: board.followUpGaps.count > 0 ? 'text-red-400' : 'text-emerald-400',
+      label: 'Overdue Sales Tasks',
+      big: String(board.followUpGaps.overdue),
+      sub: board.followUpGaps.overdue > 0
+        ? `${board.followUpGaps.overdue} overdue · ${board.followUpGaps.missing} missing`
+        : board.followUpGaps.missing > 0
+          ? `${board.followUpGaps.missing} missing follow-up${board.followUpGaps.missing === 1 ? '' : 's'}`
+          : 'No overdue tasks',
+      accent: board.followUpGaps.overdue > 0 ? 'text-red-400' : 'text-emerald-400',
     },
     { icon: Flame, label: 'Hot Leads', big: String(board.hot.count), sub: 'close within a week', accent: 'text-red-400' },
   ];

@@ -7,6 +7,11 @@ import StoreSwitcher from '@/components/StoreSwitcher';
 import InventoryEditor from '@/components/InventoryEditor';
 import type { InventoryItem } from '@/types/database';
 import { cn } from '@/lib/utils';
+import {
+  joinSerialAndFlooring,
+  serialNumberForDisplay,
+  splitSerialAndFlooring,
+} from '@/lib/inventoryFields';
 
 // --------------- Inline editable cell ---------------
 function EditableCell({
@@ -97,20 +102,6 @@ function EditableCell({
   );
 }
 
-const splitSerialAndFlooring = (sku: string | null) => {
-  const value = (sku ?? '').trim();
-  const quoted = value.match(/^(.*?)\s*["“](.+?)["”]\s*$/);
-  if (quoted) return { serial: quoted[1].trim(), flooring: quoted[2].trim() };
-
-  const knownFlooring = value.match(/^(.*?)\s+(Wells Fargo|WF|TCCU(?:\s+Minot)?|MCHL(?:\s+TCCU)?|Consignment(?:\s+from\s+\w+)?|Paid Off(?:\s+by\s+\w+)?|Spas Etc(?:\s+TCCU)?|Spas TCCU)$/i);
-  return knownFlooring
-    ? { serial: knownFlooring[1].trim(), flooring: knownFlooring[2].trim() }
-    : { serial: value, flooring: '' };
-};
-
-const joinSerialAndFlooring = (serial: string, flooring: string) =>
-  flooring.trim() ? `${serial.trim()} "${flooring.trim()}"`.trim() : serial.trim();
-
 const importedCustomerOrStock = (item: InventoryItem) => {
   const importedCustomer = item.notes?.match(/(?:^|·)\s*Customer:\s*(.*?)(?=\s*·|$)/i)?.[1]?.trim();
   if (importedCustomer) {
@@ -139,7 +130,11 @@ function InventoryTextCell({
     });
   };
 
-  return <EditableCell value={parsed[part]} field={part} itemId={item.id} onSave={handleSave} />;
+  const displayValue = part === 'serial'
+    ? serialNumberForDisplay(parsed.serial)
+    : parsed.flooring;
+
+  return <EditableCell value={displayValue} field={part} itemId={item.id} onSave={handleSave} />;
 }
 
 function OnHandCell({

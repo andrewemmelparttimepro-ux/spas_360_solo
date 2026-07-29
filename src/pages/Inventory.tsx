@@ -111,6 +111,14 @@ const splitSerialAndFlooring = (sku: string | null) => {
 const joinSerialAndFlooring = (serial: string, flooring: string) =>
   flooring.trim() ? `${serial.trim()} "${flooring.trim()}"`.trim() : serial.trim();
 
+const importedCustomerOrStock = (item: InventoryItem) => {
+  const importedCustomer = item.notes?.match(/(?:^|·)\s*Customer:\s*(.*?)(?=\s*·|$)/i)?.[1]?.trim();
+  if (importedCustomer) {
+    return importedCustomer.toUpperCase() === 'STOCK' ? 'Stock' : importedCustomer;
+  }
+  return item.customer_id ? 'Customer' : 'Stock';
+};
+
 function InventoryTextCell({
   item,
   part,
@@ -175,7 +183,6 @@ export default function Inventory() {
     { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-500/15 text-red-400' },
   ];
   const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
-  const customerOrStock = (item: InventoryItem) => item.customer_id ? 'Customer' : 'Stock';
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -262,7 +269,7 @@ export default function Inventory() {
                   <td className="p-4 text-sm text-ink-300">
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">{customerOrStock(item)}</td>
+                  <td className="p-4 text-sm text-ink-300">{importedCustomerOrStock(item)}</td>
                   <td className="p-4 text-sm text-ink-300">
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
                   </td>

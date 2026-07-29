@@ -76,10 +76,11 @@
 
 :root {
   color-scheme: light;
+  --color-app-canvas: #D1D5DB;
 }
 
 body {
-  background: var(--color-ink-950);
+  background: var(--color-app-canvas);
   color: var(--color-ink-100);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -149,6 +150,12 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 20px 42px -32px rgba(15, 23, 42, 0.5);
 }
 
+/* The personalized welcome is a dark island inside the light dashboard. */
+.dashboard-welcome {
+  --color-ink-300: #D2DAE5;
+  --color-brand-200: #BAE6FD;
+}
+
 /* Status labels sit on pale cards in the working canvas; keep Warranty legible. */
 .app-main .text-orange-200 {
   color: #9A3412 !important;
@@ -178,11 +185,11 @@ button:not(:disabled) {
   transition-duration: 150ms;
 }
 button:not(:disabled):hover {
-  filter: brightness(0.96) saturate(1.08);
+  filter: brightness(0.92) saturate(1.12) contrast(1.06);
 }
 .app-header button:not(:disabled):hover,
 .admin-rail button:not(:disabled):hover {
-  filter: brightness(1.12) saturate(1.08);
+  filter: brightness(1.18) saturate(1.12) contrast(1.06);
 }
 
 /* Accessible, on-brand keyboard focus */

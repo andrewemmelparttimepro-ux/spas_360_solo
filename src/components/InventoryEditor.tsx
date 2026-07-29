@@ -174,7 +174,7 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
             <span className="p-2 rounded-[10px] bg-brand-500/15 shrink-0"><Package className="w-4 h-4 text-brand-400" /></span>
             <div className="min-w-0">
               <h2 className="text-[15px] font-bold text-ink-100 truncate">{isEdit ? v.product || 'Edit Unit' : 'Add Inventory'}</h2>
-              <p className="text-[11px] text-ink-500">{isEdit ? `SKU ${item!.sku}` : 'Defaults set — change what differs'}</p>
+              <p className="text-[11px] text-ink-500">{isEdit ? `Serial Number ${item!.sku}` : 'Defaults set — change what differs'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300 shrink-0" aria-label="Close"><X className="w-5 h-5" /></button>

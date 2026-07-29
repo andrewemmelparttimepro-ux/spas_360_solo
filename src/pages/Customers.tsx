@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { filterCustomersByNamePrefix, normalizeCustomerNameQuery } from '@/lib/customerSearch';
 import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/useCustomerCards';
 import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
@@ -56,17 +57,9 @@ export default function Customers() {
     localStorage.setItem(VIEW_KEY, nextView);
   };
 
+  const normalizedSearch = normalizeCustomerNameQuery(search);
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = cards;
-    if (q) {
-      list = list.filter(c => {
-        const first = c.first_name.trim().toLowerCase();
-        const last = c.last_name.trim().toLowerCase();
-        const full = `${first} ${last}`;
-        return first.startsWith(q) || last.startsWith(q) || full.startsWith(q);
-      });
-    }
+    const list = filterCustomersByNamePrefix(cards, search);
     const sorted = [...list];
     if (sort === 'name') sorted.sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
     else if (sort === 'value') sorted.sort((a, b) => (b.openDealValue + b.wonValue) - (a.openDealValue + a.wonValue));
@@ -119,6 +112,11 @@ export default function Customers() {
       {/* One default customer list, with the previously built cards retained as an optional view. */}
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
         <span className="text-sm font-medium text-ink-400">{countsByType.All ?? cards.length} customers</span>
+        {normalizedSearch && (
+          <span className="text-xs font-semibold text-brand-500" aria-live="polite">
+            {visible.length} exact-prefix {visible.length === 1 ? 'match' : 'matches'}
+          </span>
+        )}
         <div className="flex-1" />
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
@@ -180,7 +178,10 @@ export default function Customers() {
           <p className="text-sm">Nothing matches — try a different search</p>
         </div>
       ) : view === 'cards' ? (
-        <div className={cn('flex-1 overflow-y-auto pb-4 transition-opacity', dragging && 'opacity-80')}>
+        <div
+          key={`cards:${normalizedSearch}`}
+          className={cn('flex-1 overflow-y-auto pb-4 transition-opacity', dragging && 'opacity-80')}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             {visible.map(c => (
               <CustomerCardView key={c.id} customer={c} onNewDeal={() => setQuickDealFor(c.id)} />
@@ -188,7 +189,10 @@ export default function Customers() {
           </div>
         </div>
       ) : (
-        <div className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}>
+        <div
+          key={`list:${normalizedSearch}`}
+          className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}
+        >
           <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">

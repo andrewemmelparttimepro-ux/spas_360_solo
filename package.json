@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts"
+    "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts",
+    "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "2.58.0",

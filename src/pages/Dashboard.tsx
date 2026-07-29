@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Users, Wrench, AlertCircle, Plus, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 import QuickCreate from '@/components/QuickCreate';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
@@ -19,9 +21,31 @@ const actionDotColors: Record<ActionType, string> = { task: 'bg-amber-500', part
 const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/deals', lead: '/deals' };
 
 export default function Dashboard() {
+  const { profile } = useAuth();
   const [period, setPeriod] = useState<DashboardPeriod>('week');
   const [showCreate, setShowCreate] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const { stats, actions, revenueData, isLoading } = useDashboardStats(period);
+
+  const loadLogo = useCallback(async () => {
+    if (!profile) return;
+    const { data } = await supabase
+      .from('business_profile')
+      .select('logo_storage_path')
+      .eq('org_id', profile.org_id)
+      .maybeSingle();
+    const path = data?.logo_storage_path as string | null | undefined;
+    if (!path) {
+      setLogoUrl(null);
+      return;
+    }
+    const { data: signed } = await supabase.storage.from('ari-assets').createSignedUrl(path, 3600);
+    setLogoUrl(signed?.signedUrl ?? null);
+  }, [profile]);
+
+  useEffect(() => {
+    void loadLogo();
+  }, [loadLogo]);
 
   if (isLoading) {
     return (
@@ -60,6 +84,21 @@ export default function Dashboard() {
       </div>
 
       {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
+
+      <section className="dashboard-welcome overflow-hidden rounded-2xl border border-ink-700 bg-[radial-gradient(circle_at_top_left,_rgba(16,117,184,0.22),_transparent_45%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.86))] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-200">Spas 360</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
+              Welcome back{profile ? `, ${profile.first_name}` : ''}
+            </h2>
+            <p className="mt-2 text-sm text-ink-300">Your dealership pulse, personalized for the team.</p>
+          </div>
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center rounded-2xl bg-white p-3 shadow-sm">
+            <img src={logoUrl ?? '/logo-mark.png'} alt="Spas 360 business logo" className="max-h-full max-w-full object-contain" />
+          </div>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statMeta.map((meta) => {

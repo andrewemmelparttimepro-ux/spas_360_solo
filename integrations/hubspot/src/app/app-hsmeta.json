@@ -1,0 +1,35 @@
+{
+  "uid": "spas_360_migration_connector_app",
+  "type": "app",
+  "config": {
+    "description": "Securely imports authorized customer data from HubSpot into the SPAS 360 Migration Center.",
+    "name": "SPAS 360 Migration Connector",
+    "distribution": "marketplace",
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "https://spas360solo.vercel.app/api/migrations/callback-hubspot"
+      ],
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read",
+        "crm.objects.companies.read",
+        "crm.objects.deals.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "andrew@ndai.pro",
+      "documentationUrl": "https://spas360solo.vercel.app/settings#migration-center",
+      "supportUrl": "https://spas360solo.vercel.app/settings#migration-center"
+    }
+  }
+}

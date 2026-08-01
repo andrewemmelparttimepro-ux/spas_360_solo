@@ -13,6 +13,8 @@ const GEMINI_API_KEY = envValue(process.env.GEMINI_API_KEY) || undefined;
 const OPENAI_API_KEY = envValue(process.env.OPENAI_API_KEY) || undefined;
 const GLM_API_KEY = envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY) || undefined;
 const META_MODEL_API_KEY = envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY) || undefined;
+const XAI_API_KEY = envValue(process.env.XAI_API_KEY) || undefined;
+const XAI_MODEL = envValue(process.env.XAI_MODEL, 'grok-4.5');
 const ANTHROPIC_MODEL = envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6');
 const GEMINI_MODEL = envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
 const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
@@ -389,6 +391,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await handleClaude(messages, allowedTools, res, modelOverride);
     } else if (provider === 'gemini') {
       return await handleGemini(messages, allowedTools, res, modelOverride);
+    } else if (provider === 'grok' || provider === 'xai') {
+      return await handleOpenAICompatible({
+        providerName: 'xAI Grok',
+        apiKey: XAI_API_KEY,
+        model: modelOverride || XAI_MODEL,
+        baseUrl: 'https://api.x.ai/v1',
+        messages,
+        tools: allowedTools,
+        res,
+      });
     } else if (provider === 'glm' || provider === 'zai') {
       return await handleOpenAICompatible({
         providerName: 'GLM',

@@ -31,7 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch { /* env fallback */ }
 
   const provider = (configured.provider || envValue(process.env.AI_PROVIDER, 'gemini')).toLowerCase();
-  const envModel = provider === 'glm' || provider === 'zai'
+  const envModel = provider === 'grok' || provider === 'xai'
+    ? envValue(process.env.XAI_MODEL, 'grok-4.5')
+    : provider === 'glm' || provider === 'zai'
     ? envValue(process.env.GLM_MODEL, 'glm-5.2')
     : provider === 'meta' || provider === 'spark' || provider === 'muse'
       ? envValue(process.env.META_MODEL, 'muse-spark-1.1')

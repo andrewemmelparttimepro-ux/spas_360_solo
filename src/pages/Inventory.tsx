@@ -36,7 +36,9 @@ function EditableCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ''));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  const requiresExplicitCommit = type === 'date' || type === 'select';
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -48,38 +50,82 @@ function EditableCell({
   const commit = async () => {
     if (draft === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
+    setSaveError(null);
     const parsed = type === 'number' ? (draft ? parseFloat(draft) : null) : draft;
-    await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
-    setSaving(false);
+    try {
+      const saved = await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
+      if (saved) {
+        setEditing(false);
+        return;
+      }
+      setSaveError('Could not save. Try again.');
+    } catch {
+      setSaveError('Could not save. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => {
+    setDraft(String(value ?? ''));
+    setSaveError(null);
     setEditing(false);
   };
 
-  const cancel = () => { setDraft(String(value ?? '')); setEditing(false); };
-
   if (editing) {
-    return type === 'select' ? (
-      <select
-        ref={inputRef as React.RefObject<HTMLSelectElement>}
-        value={draft}
-        onChange={e => { setDraft(e.target.value); }}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Escape') cancel(); }}
-        disabled={saving}
-        className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 min-w-[100px] focus:ring-2 focus:ring-brand-500/30"
-      >
-        {options?.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    ) : (
-      <input
-        ref={inputRef as React.RefObject<HTMLInputElement>}
-        type={type}
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
-        disabled={saving}
-        className={cn("px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500/30 w-full max-w-[160px]", type === 'number' && 'text-right max-w-[100px]')}
-      />
+    return (
+      <span className="inline-flex flex-col items-start gap-1">
+        <span className="inline-flex items-center gap-1">
+          {type === 'select' ? (
+            <select
+              ref={inputRef as React.RefObject<HTMLSelectElement>}
+              value={draft}
+              onChange={e => { setDraft(e.target.value); setSaveError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+              disabled={saving}
+              className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 min-w-[100px] focus:ring-2 focus:ring-brand-500/30"
+            >
+              {options?.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input
+              ref={inputRef as React.RefObject<HTMLInputElement>}
+              type={type}
+              value={draft}
+              onChange={e => { setDraft(e.target.value); setSaveError(null); }}
+              onBlur={requiresExplicitCommit ? undefined : commit}
+              onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+              disabled={saving}
+              className={cn("px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500/30 w-full max-w-[160px]", type === 'number' && 'text-right max-w-[100px]')}
+            />
+          )}
+          {requiresExplicitCommit && (
+            <>
+              <button
+                type="button"
+                onClick={commit}
+                disabled={saving}
+                aria-label={`Save ${field}`}
+                title="Save"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={cancel}
+                disabled={saving}
+                aria-label={`Cancel ${field}`}
+                title="Cancel"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-ink-700 text-ink-400 hover:bg-ink-800 disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </span>
+        {saveError && <span role="alert" className="text-[11px] font-medium text-red-400">{saveError}</span>}
+      </span>
     );
   }
 
@@ -89,7 +135,7 @@ function EditableCell({
 
   return (
     <span
-      onClick={() => setEditing(true)}
+      onClick={() => { setSaveError(null); setEditing(true); }}
       className={cn(
         "cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 group inline-flex items-center gap-1",
         className

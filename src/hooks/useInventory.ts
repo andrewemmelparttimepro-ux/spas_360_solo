@@ -71,8 +71,16 @@ export function useInventory() {
   }, [profile, fetchItems]);
 
   const updateItem = useCallback(async (id: string, updates: Partial<InventoryItem>) => {
-    const { error } = await supabase.from('inventory_items').update(updates).eq('id', id);
-    if (error) { console.error('Error updating inventory item:', error); return false; }
+    // Returning the row distinguishes a real update from an RLS-filtered zero-row response.
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .update(updates)
+      .eq('id', id)
+      .select('id');
+    if (error || !data || data.length === 0) {
+      console.error('Error updating inventory item:', error ?? 'no rows updated (permissions?)');
+      return false;
+    }
     await fetchItems();
     return true;
   }, [fetchItems]);

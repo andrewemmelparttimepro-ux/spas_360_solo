@@ -15,6 +15,24 @@ const GLM_API_KEY = envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY)
 const META_MODEL_API_KEY = envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY) || undefined;
 const XAI_API_KEY = envValue(process.env.XAI_API_KEY) || undefined;
 const XAI_MODEL = envValue(process.env.XAI_MODEL, 'grok-4.5');
+const THRAWN_GATEWAY_URL = envValue(process.env.THRAWN_GATEWAY_URL).replace(/\/$/, '') || undefined;
+const THRAWN_GATEWAY_KEY = envValue(process.env.THRAWN_GATEWAY_KEY) || undefined;
+
+// Is the Thrawn Gateway answering right now? One cheap unauthenticated GET
+// with a hard 1.5s ceiling. The gateway lives on a Mac that sleeps, travels,
+// and reboots — this preflight is what makes routing through it safe: when
+// the Mac is away, Ari silently takes the direct road and nobody notices.
+async function thrawnGatewayHealthy(): Promise<boolean> {
+  if (!THRAWN_GATEWAY_URL || !THRAWN_GATEWAY_KEY) return false;
+  try {
+    const r = await fetch(`${THRAWN_GATEWAY_URL}/health`, { signal: AbortSignal.timeout(1500) });
+    if (!r.ok) return false;
+    const body = await r.json() as { ok?: boolean };
+    return body.ok === true;
+  } catch {
+    return false;
+  }
+}
 const ANTHROPIC_MODEL = envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6');
 const GEMINI_MODEL = envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
 const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
@@ -391,6 +409,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await handleClaude(messages, allowedTools, res, modelOverride);
     } else if (provider === 'gemini') {
       return await handleGemini(messages, allowedTools, res, modelOverride);
+    } else if (provider === 'thrawn') {
+      // Same brain, routed through Andrew's gateway for observability. The
+      // model name decides the actual mind (grok-4.5, glm-5.2, ollama/…).
+      // Preflight failure = direct road; a mid-call gateway error surfaces
+      // loudly rather than retrying twice (the caller can just resend).
+      const gatewayModel = modelOverride || XAI_MODEL;
+      if (await thrawnGatewayHealthy()) {
+        return await handleOpenAICompatible({
+          providerName: 'Thrawn Gateway',
+          apiKey: THRAWN_GATEWAY_KEY,
+          model: gatewayModel,
+          baseUrl: `${THRAWN_GATEWAY_URL}/v1`,
+          messages,
+          tools: allowedTools,
+          res,
+        });
+      }
+      // Direct fallback by model family — grok-4.5 still answers as
+      // grok-4.5, just without the gateway hop.
+      if (gatewayModel.startsWith('grok') && XAI_API_KEY) {
+        return await handleOpenAICompatible({
+          providerName: 'xAI Grok (gateway fallback)', apiKey: XAI_API_KEY,
+          model: gatewayModel, baseUrl: 'https://api.x.ai/v1',
+          messages, tools: allowedTools, res,
+        });
+      }
+      if (gatewayModel.startsWith('glm') && GLM_API_KEY) {
+        return await handleOpenAICompatible({
+          providerName: 'GLM (gateway fallback)', apiKey: GLM_API_KEY,
+          model: gatewayModel, baseUrl: GLM_BASE_URL,
+          messages, tools: allowedTools, res,
+        });
+      }
+      if (gatewayModel.startsWith('gemini')) {
+        return await handleGemini(messages, allowedTools, res, gatewayModel);
+      }
+      return res.status(503).json({
+        error: `The Thrawn Gateway is unreachable and no direct fallback exists for "${gatewayModel}".`,
+      });
     } else if (provider === 'grok' || provider === 'xai') {
       return await handleOpenAICompatible({
         providerName: 'xAI Grok',

@@ -31,7 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch { /* env fallback */ }
 
   const provider = (configured.provider || envValue(process.env.AI_PROVIDER, 'gemini')).toLowerCase();
-  const envModel = provider === 'grok' || provider === 'xai'
+  const envModel = provider === 'thrawn'
+    ? envValue(process.env.XAI_MODEL, 'grok-4.5')
+    : provider === 'grok' || provider === 'xai'
     ? envValue(process.env.XAI_MODEL, 'grok-4.5')
     : provider === 'glm' || provider === 'zai'
     ? envValue(process.env.GLM_MODEL, 'glm-5.2')
@@ -55,6 +57,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     glm: Boolean(envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY)),
     meta: Boolean(envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY)),
     grok: Boolean(envValue(process.env.XAI_API_KEY)),
+    // Routing through Andrew's gateway — env presence only; the runtime
+    // preflights actual liveness per request and falls back on its own.
+    thrawn: Boolean(envValue(process.env.THRAWN_GATEWAY_URL) && envValue(process.env.THRAWN_GATEWAY_KEY)),
   };
 
   return res.status(200).json({

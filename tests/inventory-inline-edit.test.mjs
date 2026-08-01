@@ -17,6 +17,9 @@ describe('inventory inline edit persistence contract', () => {
   it('awaits persistence and only closes a changed editor after a successful save', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
 
+    assert.match(inventory, /const submittedValue = inputRef\.current\?\.value \?\? draft;/);
+    assert.match(inventory, /setDraft\(submittedValue\);\s*if \(submittedValue === String\(value \?\? ''\)\)/);
+    assert.match(inventory, /const parsed = type === 'number' \? \(submittedValue \? parseFloat\(submittedValue\) : null\) : submittedValue;/);
     assert.match(inventory, /const saved = await onSave\(itemId, \{ \[field\]: parsed \} as Partial<InventoryItem>\);/);
     assert.match(inventory, /if \(saved\) \{\s*setEditing\(false\);\s*return;\s*\}/);
     assert.match(inventory, /setSaveError\('Could not save\. Try again\.'\);/);

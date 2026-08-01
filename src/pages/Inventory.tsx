@@ -48,10 +48,12 @@ function EditableCell({
   useEffect(() => { if (!editing) setDraft(String(value ?? '')); }, [value, editing]);
 
   const commit = async () => {
-    if (draft === String(value ?? '')) { setEditing(false); return; }
+    const submittedValue = inputRef.current?.value ?? draft;
+    setDraft(submittedValue);
+    if (submittedValue === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
     setSaveError(null);
-    const parsed = type === 'number' ? (draft ? parseFloat(draft) : null) : draft;
+    const parsed = type === 'number' ? (submittedValue ? parseFloat(submittedValue) : null) : submittedValue;
     try {
       const saved = await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
       if (saved) {

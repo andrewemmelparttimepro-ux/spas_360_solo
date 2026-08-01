@@ -44,12 +44,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
   const model = configured.model || envModel;
 
+  // Which providers this deployment can actually run — key presence, never
+  // key values. Admin consoles read this to enable/disable picker options,
+  // so adding a key to Vercel lights the option up everywhere on the next
+  // status poll with no client release.
+  const providers_available = {
+    anthropic: Boolean(envValue(process.env.ANTHROPIC_API_KEY)),
+    gemini: Boolean(envValue(process.env.GEMINI_API_KEY)),
+    openai: Boolean(envValue(process.env.OPENAI_API_KEY)),
+    glm: Boolean(envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY)),
+    meta: Boolean(envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY)),
+    grok: Boolean(envValue(process.env.XAI_API_KEY)),
+  };
+
   return res.status(200).json({
     ok: true,
     enabled: configured.enabled !== false,
     provider,
     model,
     config_source: configured.provider || configured.model ? 'org-config' : 'env',
+    providers_available,
     capabilities: ['tools', 'threads', 'citadel', 'sms_approval', 'service_holds'],
     server_time: new Date().toISOString(),
   });

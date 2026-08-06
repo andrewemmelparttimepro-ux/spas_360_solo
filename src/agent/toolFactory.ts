@@ -15,16 +15,11 @@ export type AgentToolQueueSms = (input: {
   request: string;
 }) => Promise<{ outboxId: string } | { error: string }>;
 
-const productChangeTaskPattern = /(^|\b)(dev|developer|code|ui|interface|site-wide|website|screen|page|tab|navigation|header|button|label|rename|remove|bug|feature)(\b|:)/i;
+const productChangeTaskPattern = /(^|\b)(dev|developer|code|product|ui|interface|app|application|data|database|workflow|site-wide|website|screen|page|tab|navigation|header|button|label|rename|remove|bug|feature|fix[- ]?it)(\b|:)/i;
 
-function normalizeFixItKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 120);
-}
+const AGENT_FORBIDDEN_TOOL_NAMES = new Set(['create_fix_it_post']);
+const HUMAN_FIX_IT_GUIDANCE =
+  'Agents cannot create or delegate Fix-It posts. A human must create the wall post in the Fix-It Feed.';
 
 /** Resolve the signed-in user's id + org/location — the safe, RLS-correct scope for writes. */
 async function currentProfile(client: SupabaseClient, getUserId: () => Promise<string | null>) {
@@ -252,91 +247,8 @@ export function createAgentTools(
     },
   },
   {
-    name: 'create_fix_it_post',
-    description: 'Submit one newly confirmed SPAS 360 product, UI, workflow, bug, or data-change request to the Fix-It Feed for a separate implementation agent. This tool never changes code or production behavior. Do not resubmit earlier requests from the conversation.',
-    parameters: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: 'Short, concrete request title visible in the Fix-It Feed' },
-        request: { type: 'string', description: 'Exact requested behavior and acceptance details, without claiming it is implemented' },
-        request_key: { type: 'string', description: 'Stable 3-8 word slug for this request, reused if the same request is discussed again' },
-      },
-      required: ['title', 'request', 'request_key'],
-    },
-    execute: async ({ title, request, request_key }) => {
-      const me = await currentProfile(client, getUserId);
-      if (!me) return { error: 'Could not resolve your account.' };
-      const cleanTitle = title?.trim();
-      const cleanRequest = request?.trim();
-      const dedupeKey = normalizeFixItKey(request_key || cleanTitle || '');
-      if (!cleanTitle || !cleanRequest || !dedupeKey) {
-        return { error: 'A title, exact request, and stable request key are required.' };
-      }
-
-      const { data: existing } = await client
-        .from('fix_it_posts')
-        .select('id,status')
-        .eq('org_id', me.org_id)
-        .eq('created_by', me.userId)
-        .eq('dedupe_key', dedupeKey)
-        .is('archived_at', null)
-        .maybeSingle();
-      if (existing?.id) {
-        return {
-          submitted: true,
-          duplicate_prevented: true,
-          fix_it_post_id: existing.id,
-          status: existing.status,
-          instruction: 'Tell the user this request is already on the Fix-It Feed. Do not say it was implemented.',
-        };
-      }
-
-      const { data, error } = await client
-        .from('fix_it_posts')
-        .insert({
-          org_id: me.org_id,
-          body: `${cleanTitle}\n\n${cleanRequest}`,
-          created_by: me.userId,
-          status: 'open',
-          source: 'ari',
-          dedupe_key: dedupeKey,
-        })
-        .select('id,status')
-        .single();
-      if (error) {
-        if (error.code === '23505') {
-          const { data: duplicate } = await client
-            .from('fix_it_posts')
-            .select('id,status')
-            .eq('org_id', me.org_id)
-            .eq('created_by', me.userId)
-            .eq('dedupe_key', dedupeKey)
-            .is('archived_at', null)
-            .maybeSingle();
-          if (duplicate?.id) {
-            return {
-              submitted: true,
-              duplicate_prevented: true,
-              fix_it_post_id: duplicate.id,
-              status: duplicate.status,
-              instruction: 'Tell the user this request is already on the Fix-It Feed. Do not say it was implemented.',
-            };
-          }
-        }
-        return { error: error.message };
-      }
-      return {
-        submitted: true,
-        duplicate_prevented: false,
-        fix_it_post_id: data?.id,
-        status: data?.status,
-        instruction: 'Tell the user the request is on the Fix-It Feed for the implementation agent. It is not implemented yet.',
-      };
-    },
-  },
-  {
     name: 'create_task',
-    description: 'Create a customer or operational follow-up task/reminder only. Never use this for product, UI, code, workflow, bug, or website changes; use create_fix_it_post for those.',
+    description: 'Create a customer or operational follow-up task/reminder only. Never use this for product, UI, code, workflow, bug, data, or website changes; a human must create those wall posts in the Fix-It Feed.',
     parameters: {
       type: 'object',
       properties: {
@@ -350,7 +262,7 @@ export function createAgentTools(
     },
     execute: async (args) => {
       if (productChangeTaskPattern.test(args.title ?? '')) {
-        return { error: 'Product and UI changes must be submitted with create_fix_it_post, not create_task.' };
+        return { error: `Product and UI changes cannot be created as tasks. ${HUMAN_FIX_IT_GUIDANCE}` };
       }
       const userId = await getUserId();
       if (!userId) return { error: 'Not signed in.' };
@@ -785,6 +697,9 @@ export function getOpenAITools(tools: ToolDefinition[]) {
 }
 
 export async function executeToolFrom(tools: ToolDefinition[], name: string, args: Record<string, string>) {
+  if (AGENT_FORBIDDEN_TOOL_NAMES.has(name)) {
+    return { error: HUMAN_FIX_IT_GUIDANCE };
+  }
   const tool = tools.find(t => t.name === name);
   if (!tool) return { error: `Unknown tool: ${name}` };
   try {

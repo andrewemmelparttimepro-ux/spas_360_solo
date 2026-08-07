@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2 } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -8,6 +8,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
+import SuggestionBox from '@/components/SuggestionBox';
 
 // Each destination is its own plainly named tab. The previous CRM / Sales /
 // Service group labels made the navigation read like compound tab names.
@@ -66,6 +67,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
   // Nudge until they decide either way; hides itself after grant/deny
   const [pushNudge, setPushNudge] = useState(() => pushSupported() && pushPermission() === 'default');
   const locRef = useRef<HTMLDivElement>(null);
@@ -165,6 +167,19 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </nav>
 
       <div className="flex-1" />
+
+      {/* Human-authored product suggestions — deliberately separate from Fix-It. */}
+      <button
+        onClick={() => setSuggestionOpen(true)}
+        className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand-400/40 bg-brand-500/10 px-2 py-1.5 text-[12px] font-semibold text-brand-200 transition-colors hover:bg-brand-500/20 sm:px-3"
+        aria-label="Open Suggestion Box"
+        title="Suggestion Box"
+      >
+        <MessageSquarePlus className="h-4 w-4" />
+        <span className="hidden xl:inline">Suggestion Box</span>
+        <span className="hidden sm:inline xl:hidden">Suggest</span>
+      </button>
+      <SuggestionBox open={suggestionOpen} onClose={() => setSuggestionOpen(false)} />
 
       {/* Global search */}
       <button

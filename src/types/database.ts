@@ -12,6 +12,7 @@ export type InventoryStatus = 'On Order' | 'In Stock' | 'Sold' | 'In Transit' | 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 export type MessageSender = 'system' | 'customer' | 'agent';
 export type FixItStatus = 'open' | 'in_progress' | 'fixed' | 'agent_done' | 'archived';
+export type SuggestionStatus = 'pending' | 'reviewed' | 'declined';
 
 // Row types (what you get back from queries)
 export interface Organization { id: string; name: string; created_at: string; }
@@ -159,6 +160,12 @@ export interface FixItAttachment {
   storage_path: string | null; url: string | null; created_at: string;
 }
 
+export interface Suggestion {
+  id: string; org_id: string; body: string; created_by: string;
+  status: SuggestionStatus; reviewed_by: string | null; reviewed_at: string | null;
+  created_at: string; updated_at: string;
+}
+
 // Simplified Database type for Supabase client generic
 // Using Record<string, unknown> for Insert/Update to avoid circular ref issues
 // The actual type safety comes from our Row interfaces above
@@ -171,7 +178,7 @@ export interface Database {
        'notes' | 'time_entries' | 'notifications' | 'audit_log' |
        'agent_threads' | 'agent_messages' | 'fix_it_posts' |
        'fix_it_comments' | 'fix_it_attachments' | 'app_invites' |
-       'push_subscriptions']: {
+       'push_subscriptions' | 'suggestions']: {
         Row: Record<string, unknown>;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

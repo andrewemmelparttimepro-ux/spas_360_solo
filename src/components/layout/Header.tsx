@@ -177,7 +177,6 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       >
         <MessageSquarePlus className="h-4 w-4" />
         <span className="hidden xl:inline">Suggestion Box</span>
-        <span className="hidden sm:inline xl:hidden">Suggest</span>
       </button>
       <SuggestionBox open={suggestionOpen} onClose={() => setSuggestionOpen(false)} />
 

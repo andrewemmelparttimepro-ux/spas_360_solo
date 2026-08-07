@@ -12,6 +12,7 @@
     "test:migration": "node --experimental-strip-types --test tests/migrationCenter.test.ts",
     "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts",
     "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs",
+    "test:customer-notes": "node --experimental-strip-types --test tests/customerNotes.test.ts",
     "test:suggestions": "node --experimental-strip-types --test tests/suggestionBox.test.ts"
   },
   "dependencies": {

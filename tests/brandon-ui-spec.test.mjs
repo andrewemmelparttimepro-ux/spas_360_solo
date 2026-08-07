@@ -29,7 +29,7 @@ describe('Brandon composite UI contract', () => {
   });
 
   it('keeps requested dashboard, deals, inventory, schedule, and priority wording', async () => {
-    const [dashboard, deals, salesBoard, customers, inventory, inventoryEditor, service, dealDetail] = await Promise.all([
+    const [dashboard, deals, salesBoard, customers, inventory, inventoryEditor, service, serviceJobs, dealDetail] = await Promise.all([
       read('src/pages/Dashboard.tsx'),
       read('src/pages/Deals.tsx'),
       read('src/components/SalesBoard.tsx'),
@@ -37,6 +37,7 @@ describe('Brandon composite UI contract', () => {
       read('src/pages/Inventory.tsx'),
       read('src/components/InventoryEditor.tsx'),
       read('src/pages/Service.tsx'),
+      read('src/hooks/useServiceJobs.ts'),
       read('src/pages/DealDetail.tsx'),
     ]);
 
@@ -62,7 +63,21 @@ describe('Brandon composite UI contract', () => {
     assert.match(inventoryEditor, />Serial Number \*</);
     assert.match(inventoryEditor, />Model \*</);
     assert.match(service, /const LEGEND_STATUSES: JobStatus\[\] = \['Delivery', 'Warranty', 'Parts on Order'\]/);
+    assert.match(service, /Created \{format\(new Date\(job\.created_at\), 'MMM d, yyyy'\)\}/);
+    assert.match(serviceJobs, /sort\(\(a, b\) => new Date\(b\.created_at\)\.getTime\(\) - new Date\(a\.created_at\)\.getTime\(\)\)/);
     assert.match(dealDetail, />Priority</);
+  });
+
+  it('keeps the calendar as a high-contrast dark surface inside the light canvas', async () => {
+    const [css, service] = await Promise.all([
+      read('src/index.css'),
+      read('src/pages/Service.tsx'),
+    ]);
+
+    assert.match(service, /className="schedule-calendar[^\"]*bg-ink-900/);
+    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-900:\s*#0D1726/i);
+    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-100:\s*#F7F9FC/i);
+    assert.match(css, /\.app-main \.schedule-calendar \.text-orange-200\s*\{\s*color:\s*var\(--color-orange-200\) !important;/i);
   });
 
   it('keeps the personalized dashboard welcome and approved-logo lookup', async () => {

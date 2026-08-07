@@ -84,7 +84,9 @@ export function useServiceJobs() {
     return () => { supabase.removeChannel(channel); };
   }, [profile, fetchJobs]);
 
-  const unscheduledJobs = jobs.filter(j => !j.scheduled_at && j.status !== 'Completed' && j.status !== 'Cancelled');
+  const unscheduledJobs = jobs
+    .filter(j => !j.scheduled_at && j.status !== 'Completed' && j.status !== 'Cancelled')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const scheduledJobs = jobs.filter(j => j.scheduled_at && j.status !== 'Cancelled');
 
   const createJob = useCallback(async (job: Partial<Job>) => {

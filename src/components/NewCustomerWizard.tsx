@@ -167,14 +167,10 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       }).select('id').single();
       if (dealErr) throw new Error(dealErr.message);
 
-      // Entered on someone else's customer → visible attribution + heads-up
+      // Entered on someone else's customer → notify the assigned salesperson.
+      // The database audit trail records who created the deal; customer Notes
+      // remain reserved for notes a teammate intentionally adds.
       if (enteredByOther && existing) {
-        const assignedName = existing.assigned ? `${existing.assigned.first_name} ${existing.assigned.last_name}` : 'the assigned salesperson';
-        await supabase.from('notes').insert({
-          contact_id: contactId, deal_id: deal.id,
-          body: `✏️ Deal entered by ${profile.first_name} ${profile.last_name} — credited to ${assignedName} (assigned salesperson).`,
-          created_by: user.id,
-        });
         await supabase.from('notifications').insert({
           user_id: creditTo, type: 'deal',
           title: `New deal on your customer: ${title}`,

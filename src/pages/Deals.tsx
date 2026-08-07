@@ -77,13 +77,6 @@ export default function Deals() {
       setAttach(null);
       return;
     }
-    const oldName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : 'no one';
-    await supabase.from('notes').insert({
-      deal_id: deal.id,
-      contact_id: customer.id,
-      body: `🔗 ${profile.first_name} ${profile.last_name} attached ${customer.first_name} ${customer.last_name} to this deal (was ${oldName}).`,
-      created_by: profile.id,
-    });
     toast(`${customer.first_name} attached to “${deal.title}”`, 'success');
     setAttach(null);
     spotlight(deal.id);

@@ -140,19 +140,11 @@ export default function ContactDetail() {
       .then(({ data }) => setTeam(data ?? []));
   }, [isManager, profile]);
 
-  // Edits are always allowed — but edits by anyone other than the assigned
-  // salesperson leave a visible trail, and the assignment (commission) stays put.
+  // Edits are always allowed. The database audit trail records the change while
+  // the Notes section remains reserved for notes a teammate intentionally adds.
   const saveContact = async (updates: Partial<Contact>) => {
     const ok = await updateContact(updates);
     toast(ok ? 'Contact updated' : 'Failed to save', ok ? 'success' : 'error');
-    if (ok && profile && contact && contact.assigned_to && contact.assigned_to !== profile.id) {
-      const fields = Object.keys(updates).join(', ').replace(/_/g, ' ');
-      await supabase.from('notes').insert({
-        contact_id: contact.id,
-        body: `✏️ ${profile.first_name} ${profile.last_name} updated ${fields} — ${assignedName ?? 'the assigned salesperson'} remains the assigned salesperson.`,
-        created_by: profile.id,
-      });
-    }
     return ok;
   };
 
@@ -162,11 +154,6 @@ export default function ContactDetail() {
     const ok = await updateContact({ assigned_to: newOwnerId });
     if (ok && newOwner) {
       toast(`Reassigned to ${newOwner.first_name} ${newOwner.last_name}`, 'success');
-      await supabase.from('notes').insert({
-        contact_id: contact.id,
-        body: `🔁 ${profile.first_name} ${profile.last_name} reassigned this customer from ${assignedName ?? 'unassigned'} to ${newOwner.first_name} ${newOwner.last_name}.`,
-        created_by: profile.id,
-      });
     }
   };
 

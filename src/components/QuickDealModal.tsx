@@ -107,12 +107,6 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
       if (dealErr) throw new Error(dealErr.message);
 
       if (enteredByOther) {
-        const assignedName = contact.assigned ? `${contact.assigned.first_name} ${contact.assigned.last_name}` : 'the assigned salesperson';
-        await supabase.from('notes').insert({
-          contact_id: contact.id, deal_id: deal.id,
-          body: `✏️ Deal entered by ${profile.first_name} ${profile.last_name} — credited to ${assignedName} (assigned salesperson).`,
-          created_by: user.id,
-        });
         await supabase.from('notifications').insert({
           user_id: creditTo, type: 'deal',
           title: `New deal on your customer: ${title.trim()}`,

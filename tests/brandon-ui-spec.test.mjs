@@ -29,8 +29,9 @@ describe('Brandon composite UI contract', () => {
   });
 
   it('keeps requested dashboard, deals, inventory, schedule, and priority wording', async () => {
-    const [dashboard, salesBoard, customers, inventory, inventoryEditor, service, dealDetail] = await Promise.all([
+    const [dashboard, deals, salesBoard, customers, inventory, inventoryEditor, service, dealDetail] = await Promise.all([
       read('src/pages/Dashboard.tsx'),
+      read('src/pages/Deals.tsx'),
       read('src/components/SalesBoard.tsx'),
       read('src/pages/Customers.tsx'),
       read('src/pages/Inventory.tsx'),
@@ -44,6 +45,12 @@ describe('Brandon composite UI contract', () => {
     assert.match(customers, /localStorage\.getItem\(VIEW_KEY\) === 'cards' \? 'cards' : 'list'/);
     assert.match(salesBoard, /label: 'Active Deals'/);
     assert.match(salesBoard, /label: 'Overdue Sales Tasks'/);
+    assert.match(deals, /value=\{activeDeals\.length\}/);
+    assert.match(deals, /\{activeDeals\.map\(\(deal\) =>/);
+    assert.match(deals, /mb-5 shrink-0 overflow-hidden/);
+    assert.match(deals, /className="max-h-\[60vh\] overflow-auto"/);
+    assert.match(deals, /aria-label="Active deals table"/);
+    assert.match(deals, />Expected close</);
     assert.match(inventory, /const BRAND_OPTIONS = \['Sundance Spas', 'Master Spas', 'Platinum Spas', 'Eco Spas'\]/);
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);

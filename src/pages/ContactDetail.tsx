@@ -52,7 +52,7 @@ function EditableTypeBadge({ value, onSave }: { value: ContactType; onSave: (u: 
     );
   }
   return (
-    <span onClick={() => setEditing(true)} className={cn('px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1', TYPE_COLORS[value] ?? 'bg-ink-950 text-ink-100')} title="Click to change type">
+    <span tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)} className={cn('px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1', TYPE_COLORS[value] ?? 'bg-ink-950 text-ink-100')} title="Click to change type">
       {value}<Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
     </span>
   );
@@ -73,7 +73,7 @@ function EditableDetailRow({ label, value, field, onSave, type = 'text' }: { lab
       {editing ? (
         <input ref={inputRef} type={type} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }} disabled={saving} className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 w-full" />
       ) : (
-        <dd onClick={() => setEditing(true)} className="text-sm text-ink-100 cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group inline-flex items-center gap-1" title="Click to edit">
+        <dd tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)} className="text-sm text-ink-100 cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group inline-flex items-center gap-1" title="Click to edit">
           {value || '\u2014'}<Pencil className="w-3 h-3 text-ink-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
         </dd>
       )}

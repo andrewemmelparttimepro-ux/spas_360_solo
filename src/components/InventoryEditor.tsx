@@ -6,6 +6,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useToast } from '@/components/ui/Toast';
 import type { InventoryItem } from '@/types/database';
 import { supabase } from '@/lib/supabase';
+import { useModal } from '@/hooks/useModal';
 
 /**
  * Inventory editor — slide-over drawer, create + edit. Same guided-clicks
@@ -56,6 +57,7 @@ interface Props {
 }
 
 export default function InventoryEditor({ item, onClose, onSave, onDelete }: Props) {
+  const { dialogRef, dialogProps } = useModal(onClose);
   const { profile, locations, activeLocationId } = useAuth();
   const { contacts } = useContacts();
   const { toast } = useToast();
@@ -165,7 +167,8 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full sm:w-[440px] h-full bg-ink-900 border-l border-ink-700 shadow-2xl flex flex-col"
+        ref={dialogRef} {...dialogProps} aria-label="Inventory editor"
+        className="w-full sm:w-[440px] h-full bg-ink-900 border-l border-ink-700 shadow-2xl flex flex-col outline-none"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

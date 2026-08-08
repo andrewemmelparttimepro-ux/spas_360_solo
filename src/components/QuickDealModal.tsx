@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import type { Contact, DealPriority, PipelineStage } from '@/types/database';
+import { useModal } from '@/hooks/useModal';
 
 // Quick deal creation for a KNOWN customer — the fast lane next to the full
 // NewCustomerWizard. Same doctrine: commission stays with the customer's
@@ -43,6 +44,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   onClose: () => void;
   onCreated?: (dealId: string) => void;
 }) {
+  const { dialogRef, dialogProps } = useModal(onClose);
   const { profile, user } = useAuth();
   const { toast } = useToast();
   const [contact, setContact] = useState<(Contact & { assigned?: { first_name: string; last_name: string } | null }) | null>(null);
@@ -146,7 +148,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+      <div ref={dialogRef} {...dialogProps} aria-label="New deal" className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col outline-none">
         <div className="px-6 pt-5 pb-4 border-b border-ink-700 shrink-0 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-ink-100 flex items-center gap-2">

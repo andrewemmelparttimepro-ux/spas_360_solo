@@ -3,6 +3,7 @@ import { useNavigate, type NavigateFunction } from 'react-router-dom';
 import { Search, Contact, Users, Wrench, Package, CornerDownLeft, Plus, LayoutDashboard, Handshake, MessageSquare, BarChart3, Settings, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 interface Hit {
   id: string;
@@ -110,6 +111,9 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(t);
   }, [query, runSearch]);
 
+  const [selected, setSelected] = useState(0);
+  useEffect(() => { setSelected(0); }, [query, hits]);
+
   const go = (hit: Hit) => { navigate(hit.link); onClose(); };
   const runAction = (a: Action) => { a.run(navigate); onClose(); };
 
@@ -122,15 +126,26 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
     .map(kind => ({ kind, items: hits.filter(h => h.kind === kind) }))
     .filter(g => g.items.length > 0);
 
+  // Keyboard selection walks the list in DISPLAY order (actions first, then
+  // hits) — Enter always runs exactly what's highlighted.
+  const visibleActions = matchedActions.slice(0, q.length === 0 ? 10 : 4);
+  const flat: { key: string; run: () => void }[] = [
+    ...visibleActions.map(a => ({ key: `action-${a.label}`, run: () => runAction(a) })),
+    ...grouped.flatMap(g => g.items.map(h => ({ key: `${h.kind}-${h.id}`, run: () => go(h) }))),
+  ];
+  const selectedKey = flat[Math.min(selected, flat.length - 1)]?.key;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-[12vh] px-4"
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onClose();
+        if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(i => flat.length ? (i + 1) % flat.length : 0); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); setSelected(i => flat.length ? (i - 1 + flat.length) % flat.length : 0); }
         if (e.key === 'Enter') {
-          if (hits[0]) go(hits[0]);
-          else if (matchedActions[0]) runAction(matchedActions[0]);
+          const item = flat[Math.min(selected, flat.length - 1)];
+          if (item) item.run();
         }
       }}
     >
@@ -154,11 +169,12 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
               <div className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-500 flex items-center gap-1">
                 <Zap className="w-3 h-3 text-brand-400" /> Actions
               </div>
-              {matchedActions.slice(0, q.length === 0 ? 10 : 4).map(a => (
+              {visibleActions.map(a => (
                 <button
                   key={a.label}
                   onClick={() => runAction(a)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-ink-800 transition-colors flex items-center gap-3 group"
+                  onMouseMove={() => setSelected(flat.findIndex(f => f.key === `action-${a.label}`))}
+                  className={cn('w-full text-left px-4 py-2.5 hover:bg-ink-800 transition-colors flex items-center gap-3 group', selectedKey === `action-${a.label}` && 'bg-ink-800')}
                 >
                   <a.icon className="w-4 h-4 text-ink-500 group-hover:text-brand-400 shrink-0" />
                   <span className="min-w-0 flex-1">
@@ -187,7 +203,8 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
                   <button
                     key={`${hit.kind}-${hit.id}`}
                     onClick={() => go(hit)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-ink-800 transition-colors flex items-center gap-3 group"
+                    onMouseMove={() => setSelected(flat.findIndex(f => f.key === `${hit.kind}-${hit.id}`))}
+                    className={cn('w-full text-left px-4 py-2.5 hover:bg-ink-800 transition-colors flex items-center gap-3 group', selectedKey === `${hit.kind}-${hit.id}` && 'bg-ink-800')}
                   >
                     <Icon className="w-4 h-4 text-ink-500 group-hover:text-brand-400 shrink-0" />
                     <span className="min-w-0 flex-1">

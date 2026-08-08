@@ -21,6 +21,8 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
       )}
 
       <aside
+        // inert: the off-screen drawer must not be tab-reachable
+        inert={!open}
         className={cn(
           'w-64 bg-ink-900 text-ink-300 flex flex-col border-r border-ink-700',
           'fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out',

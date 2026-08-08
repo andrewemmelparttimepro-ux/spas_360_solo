@@ -34,6 +34,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import type { Profile } from '@/types/database';
 import type { FixItAttachment, FixItComment, FixItPost, UseFixItFeedResult } from '@/hooks/useFixItFeed';
+import { useModal } from '@/hooks/useModal';
+import DialogKeys from '@/components/ui/DialogKeys';
 
 const FILE_ACCEPT = [
   'image/*',
@@ -119,6 +121,7 @@ function Avatar({ user, size = 'md' }: { user?: Partial<Profile> | null; size?: 
 }
 
 function FilePreviewModal({ file, onClose }: { file: PreviewFile | null; onClose: () => void }) {
+  const { dialogRef, dialogProps } = useModal(onClose, Boolean(file));
   const [objectUrl, setObjectUrl] = useState('');
   const mimeType = file?.mimeType || ('mimeType' in (file ?? {}) ? file?.mimeType : '') || '';
   const url = objectUrl || file?.url || '';
@@ -135,7 +138,7 @@ function FilePreviewModal({ file, onClose }: { file: PreviewFile | null; onClose
 
   return (
     <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-3xl w-full max-h-[84vh] bg-ink-900 border border-ink-700 rounded-lg overflow-hidden shadow-2xl" onClick={event => event.stopPropagation()}>
+      <div ref={dialogRef} {...dialogProps} aria-label="File preview" className="max-w-3xl w-full max-h-[84vh] bg-ink-900 border border-ink-700 rounded-lg overflow-hidden shadow-2xl outline-none" onClick={event => event.stopPropagation()}>
         <div className="h-12 px-4 border-b border-ink-700 flex items-center justify-between">
           <span className="text-sm font-semibold text-ink-100 truncate pr-4">{file.name}</span>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-ink-800 text-ink-400" aria-label="Close preview">
@@ -173,6 +176,7 @@ function ValidationProofModal({
   onUploadProof: (postId: string, file: File) => Promise<void>;
   onClose: () => void;
 }) {
+  const { dialogRef, dialogProps } = useModal(onClose, Boolean(post));
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -198,7 +202,7 @@ function ValidationProofModal({
 
   return (
     <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
-      <div className="max-w-3xl w-full max-h-[84vh] bg-ink-900 border border-ink-700 rounded-lg overflow-hidden shadow-2xl" onClick={event => event.stopPropagation()}>
+      <div ref={dialogRef} {...dialogProps} aria-label="Validation" className="max-w-3xl w-full max-h-[84vh] bg-ink-900 border border-ink-700 rounded-lg overflow-hidden shadow-2xl outline-none" onClick={event => event.stopPropagation()}>
         <div className="h-12 px-4 border-b border-ink-700 flex items-center gap-3">
           <button onClick={onClose} className="inline-flex items-center gap-1 text-xs font-semibold text-ink-400 hover:text-ink-100">
             <ChevronLeft className="w-4 h-4" /> Back
@@ -658,7 +662,8 @@ export default function FixItFeed({ feed }: { feed: UseFixItFeedResult }) {
 
       {deletePost && (
         <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setDeletePost(null)}>
-          <div className="w-full max-w-sm bg-ink-900 border border-ink-700 rounded-lg shadow-2xl p-4 space-y-4" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label="Delete Fix-It item" className="w-full max-w-sm bg-ink-900 border border-ink-700 rounded-lg shadow-2xl p-4 space-y-4" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+            <DialogKeys onClose={() => setDeletePost(null)} />
             <div className="flex items-center gap-2 text-red-300">
               <Trash2 className="w-5 h-5" />
               <h3 className="text-sm font-bold">Delete Fix-It item</h3>

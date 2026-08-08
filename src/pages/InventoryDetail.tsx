@@ -86,7 +86,7 @@ function EditableField({
         )
       ) : (
         <p
-          onClick={() => setEditing(true)}
+          tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
           className={cn(
             "text-sm cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group inline-flex items-center gap-1",
             bold && 'font-bold', color
@@ -121,7 +121,7 @@ function StatusBadge({ item, onSave }: { item: InventoryItem; onSave: (id: strin
   }
   return (
     <span
-      onClick={() => setEditing(true)}
+      tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
       className={cn("px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", STATUS_COLORS[item.status] ?? 'bg-ink-950')}
       title="Click to change status"
     >

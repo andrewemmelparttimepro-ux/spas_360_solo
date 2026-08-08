@@ -9,6 +9,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
+import DialogKeys from '@/components/ui/DialogKeys';
 
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string } | null };
@@ -58,6 +59,8 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
   }
   return (
     <span
+      tabIndex={0} role="button"
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setEditing(true); } }}
       onClick={e => { e.preventDefault(); e.stopPropagation(); setEditing(true); }}
       className={cn('text-[10px] font-bold uppercase tracking-wider cursor-pointer inline-flex items-center gap-1 group', light ? 'opacity-90 hover:opacity-100' : 'opacity-70 hover:opacity-100')}
       title="Click to change status"
@@ -292,7 +295,8 @@ export default function Service() {
       {/* Create Job Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-ink-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-label="New job" className="bg-ink-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto">
+            <DialogKeys onClose={() => setShowCreate(false)} />
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-ink-100">New Job</h2>
               <button onClick={() => setShowCreate(false)} className="text-ink-500 hover:text-ink-300"><X className="w-5 h-5" /></button>

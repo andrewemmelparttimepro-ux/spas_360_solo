@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { cn, toLocalInputValue } from '@/lib/utils';
 import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
+import DialogKeys from '@/components/ui/DialogKeys';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -126,7 +127,8 @@ function PhotoCard({ jobId }: { jobId: string }) {
 
       {/* Full-size viewer */}
       {viewer && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setViewer(null)}>
+        <div role="dialog" aria-modal="true" aria-label="Photo viewer" className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setViewer(null)}>
+          <DialogKeys onClose={() => setViewer(null)} />
           <img src={viewer.url} alt={viewer.photo_type} className="max-w-full max-h-[80vh] rounded-lg object-contain" />
           <div className="flex items-center gap-4 mt-4" onClick={e => e.stopPropagation()}>
             <span className="text-sm text-ink-300">{viewer.photo_type} · {new Date(viewer.created_at).toLocaleString()}</span>
@@ -204,7 +206,7 @@ function EditableField({
 
   return (
     <div
-      onClick={() => setEditing(true)}
+      tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
       className={cn(
         "flex items-center text-sm cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group",
         bold && 'text-lg font-bold', color
@@ -239,7 +241,7 @@ function EditableStatusBadge({ value, onSave }: { value: JobStatus; onSave: (u: 
 
   return (
     <span
-      onClick={() => setEditing(true)}
+      tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
       className={cn("px-3 py-1 rounded-lg text-sm font-bold border-l-4 cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", statusColors[value] ?? 'bg-ink-950')}
       title="Click to change status"
     >

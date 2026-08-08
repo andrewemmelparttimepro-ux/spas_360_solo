@@ -137,6 +137,8 @@ function EditableCell({
 
   return (
     <span
+      tabIndex={0} role="button"
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSaveError(null); setEditing(true); } }}
       onClick={() => { setSaveError(null); setEditing(true); }}
       className={cn(
         "cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 group inline-flex items-center gap-1",

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
+import { useModal } from '@/hooks/useModal';
 
 /**
  * Guided new-customer flow: chips + progressive steps, every earlier answer
@@ -65,6 +66,7 @@ function Chip({ active, onClick, children, hint }: { active: boolean; onClick: (
 const inputClass = 'w-full px-3 py-2 bg-ink-950 border border-ink-700 rounded-lg text-sm text-ink-100 placeholder-ink-500 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40 transition-all';
 
 export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () => void; onCreated?: (dealId: string | null) => void }) {
+  const { dialogRef, dialogProps } = useModal(onClose);
   const { profile, user } = useAuth();
   const { toast } = useToast();
 
@@ -213,7 +215,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col">
+      <div ref={dialogRef} {...dialogProps} aria-label="New customer" className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col outline-none">
         <div className="px-6 pt-5 pb-4 border-b border-ink-700 shrink-0">
           <div className="flex items-start justify-between">
             <div>

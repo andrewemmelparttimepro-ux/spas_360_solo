@@ -229,6 +229,7 @@ export function useTeamChat() {
     // Check for existing DM
     if (participantIds.length === 1) {
       const existing = threads.find(t => {
+        if (t.is_main) return false; // Main channel is not a DM, even with 2 members
         const parts = t.participants || [];
         return parts.length === 2 && parts.includes(user.id) && parts.includes(participantIds[0]);
       });

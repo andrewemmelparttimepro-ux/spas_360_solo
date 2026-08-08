@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Users, Wrench, ChevronRight } from 'lucide-react';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
+import { useModal } from '@/hooks/useModal';
 
 /**
  * The dashboard's "+ New" — one button, both sides of the business.
@@ -11,6 +12,7 @@ import NewCustomerWizard from '@/components/NewCustomerWizard';
  * the fresh card pulsing — attention always points at the next step.
  */
 export default function QuickCreate({ onClose }: { onClose: () => void }) {
+  const { dialogRef, dialogProps } = useModal(onClose);
   const navigate = useNavigate();
   const [mode, setMode] = useState<'choose' | 'customer'>('choose');
 
@@ -28,7 +30,7 @@ export default function QuickCreate({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} {...dialogProps} aria-label="Create" className="bg-ink-900 border border-ink-700 sm:rounded-2xl rounded-t-2xl shadow-2xl w-full max-w-md outline-none" onClick={e => e.stopPropagation()}>
         <div className="px-6 pt-5 pb-4 border-b border-ink-700 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-ink-100">Create</h2>

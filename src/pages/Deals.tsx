@@ -13,6 +13,7 @@ import SalesBoard from '@/components/SalesBoard';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 import QuickDealModal from '@/components/QuickDealModal';
 import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
+import DialogKeys from '@/components/ui/DialogKeys';
 
 export default function Deals() {
   const { stages, deals, salespeople, followUpsByDeal, isLoading, moveDeal, refresh } = usePipeline();
@@ -159,7 +160,8 @@ export default function Deals() {
       {/* Confirm before rewiring a deal to a different customer — deals always have one */}
       {attach && attachDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-ink-900 border border-ink-700 rounded-2xl shadow-2xl w-full max-w-md">
+          <div role="dialog" aria-modal="true" aria-label="Attach customer to deal" className="bg-ink-900 border border-ink-700 rounded-2xl shadow-2xl w-full max-w-md">
+            <DialogKeys onClose={() => setAttach(null)} />
             <div className="px-6 pt-5 pb-4 border-b border-ink-700 flex items-start justify-between">
               <h2 className="text-lg font-bold text-ink-100 flex items-center gap-2">
                 <Link2 className="w-5 h-5 text-violet-400" />

@@ -16,7 +16,7 @@ export function useInventory() {
 
     let query = supabase
       .from('inventory_items')
-      .select('*')
+      .select('*, locations:location_id(name)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false });
 

@@ -18,14 +18,25 @@ describe('Brandon composite UI contract', () => {
     assert.match(layout, /bg-\[var\(--color-app-canvas\)\]/);
   });
 
-  it('keeps the eight independent primary navigation destinations', async () => {
+  // Updated 2026-08-08 per Andrew: the top bar carries only the five
+  // floor-operations destinations; Inbox, Citadel, and Reports live in the
+  // drawer. All eight destinations must stay reachable.
+  it('keeps five primary destinations in the top bar and three in the drawer', async () => {
     const header = await read('src/components/layout/Header.tsx');
-    const destinations = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule', 'Inbox', 'Citadel', 'Reports'];
+    const primary = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule'];
+    const secondary = ['Inbox', 'Citadel', 'Reports'];
 
-    for (const destination of destinations) {
+    for (const destination of primary) {
       assert.match(header, new RegExp(`name: '${destination}'`));
     }
+    const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));
+    for (const destination of secondary) {
+      assert.match(secondaryBlock, new RegExp(`name: '${destination}'`));
+    }
     assert.doesNotMatch(header, /label:\s*'(CRM|Sales|Service)'/);
+
+    const sidebar = await read('src/components/layout/Sidebar.tsx');
+    assert.match(sidebar, /SECONDARY_NAV_ITEMS/);
   });
 
   it('keeps requested dashboard, deals, inventory, schedule, and priority wording', async () => {

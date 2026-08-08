@@ -10,19 +10,23 @@ import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 import SuggestionBox from '@/components/SuggestionBox';
 
-// Each destination is its own plainly named tab. The previous CRM / Sales /
-// Service group labels made the navigation read like compound tab names.
+// Hierarchy: the top bar carries only the five floor-operations destinations a
+// salesperson or tech touches every hour. Everything else (Inbox, Citadel,
+// Reports, Settings) lives in the drawer — one calm menu, on every screen size.
 export type NavTone = 'sales' | 'service' | 'customers' | null;
 
-export const NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
+export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
   { label: null, tone: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
   { label: null, tone: 'customers', items: [{ name: 'Customers', path: '/customers', icon: Users }] },
   { label: null, tone: 'sales', items: [{ name: 'Deals', path: '/deals', icon: Handshake }] },
   { label: null, tone: 'sales', items: [{ name: 'Inventory', path: '/inventory', icon: Package }] },
   { label: null, tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
-  { label: null, tone: null, items: [{ name: 'Inbox', path: '/communication', icon: MessageSquare }] },
-  { label: null, tone: null, items: [{ name: 'Citadel', path: '/citadel', icon: Building2 }] },
-  { label: null, tone: null, items: [{ name: 'Reports', path: '/reports', icon: BarChart3 }] },
+];
+
+export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof LayoutDashboard }[] = [
+  { name: 'Inbox', path: '/communication', icon: MessageSquare },
+  { name: 'Citadel', path: '/citadel', icon: Building2 },
+  { name: 'Reports', path: '/reports', icon: BarChart3 },
 ];
 
 // Customer cards dragged from the CRM can land on these pills (spring-loaded
@@ -109,11 +113,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-3 sm:px-5 gap-3 sm:gap-4 shrink-0 z-40">
-      {/* Mobile menu */}
+      {/* Menu — on desktop it holds Inbox, Citadel, Reports, Settings */}
       <button
         onClick={onMenuClick}
-        className="p-2 -ml-1 text-ink-400 hover:text-ink-100 rounded-lg hover:bg-ink-800 lg:hidden"
+        className="p-2 -ml-1 text-ink-400 hover:text-ink-100 rounded-lg hover:bg-ink-800"
         aria-label="Open menu"
+        title="Menu — Inbox, Citadel, Reports, Settings"
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -126,9 +131,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </span>
       </NavLink>
 
-      {/* Nav (desktop) — every destination is a separate tab. */}
+      {/* Nav (desktop) — the five floor-operations destinations only. */}
       <nav className="hidden lg:flex items-center gap-1">
-        {NAV_SECTIONS.map((section, i) => {
+        {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
             <div key={section.label ?? `sec-${i}`} className={cn('flex items-center gap-0.5 rounded-[10px] p-[3px]', tone.container)}>
@@ -168,15 +173,14 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex-1" />
 
-      {/* Human-authored product suggestions — deliberately separate from Fix-It. */}
+      {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. */}
       <button
         onClick={() => setSuggestionOpen(true)}
-        className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand-400/40 bg-brand-500/10 px-2 py-1.5 text-[12px] font-semibold text-brand-200 transition-colors hover:bg-brand-500/20 sm:px-3"
+        className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors"
         aria-label="Open Suggestion Box"
         title="Suggestion Box"
       >
-        <MessageSquarePlus className="h-4 w-4" />
-        <span className="hidden xl:inline">Suggestion Box</span>
+        <MessageSquarePlus className="h-5 w-5" />
       </button>
       <SuggestionBox open={suggestionOpen} onClose={() => setSuggestionOpen(false)} />
 

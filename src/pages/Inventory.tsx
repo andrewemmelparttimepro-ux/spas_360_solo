@@ -211,7 +211,9 @@ const BRAND_OPTIONS = ['Sundance Spas', 'Master Spas', 'Platinum Spas', 'Eco Spa
 // =============== Main page component ===============
 export default function Inventory() {
   const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, deleteItem } = useInventory();
-  const { locations } = useAuth();
+  const { locations, activeLocationId } = useAuth();
+  // With every store on screen, each row must say which floor it's on
+  const showStore = !activeLocationId;
   const [brandFilter, setBrandFilter] = useState('All Brands');
   // Editor drawer: null = closed, 'new' = create, item = edit
   const [editorTarget, setEditorTarget] = useState<'new' | InventoryItem | null>(null);
@@ -291,6 +293,7 @@ export default function Inventory() {
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
+                {showStore && <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Store</th>}
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Color Combination</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Inventory Flooring Status</th>
@@ -301,7 +304,7 @@ export default function Inventory() {
             </thead>
             <tbody className="divide-y divide-ink-800">
               {visibleItems.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
+                <tr><td colSpan={showStore ? 8 : 7} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
               ) : visibleItems.map(item => (
                 <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className="hover:bg-ink-800/60 transition-colors">
                   <td className="p-4 text-sm text-ink-300">
@@ -309,6 +312,13 @@ export default function Inventory() {
                       {item.model || item.product}
                     </Link>
                   </td>
+                  {showStore && (
+                    <td className="p-4 text-sm text-ink-300">
+                      <span className="inline-flex items-center rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium">
+                        {((item as unknown as { locations?: { name?: string } }).locations?.name) ?? '—'}
+                      </span>
+                    </td>
+                  )}
                   <td className="p-4 text-sm text-ink-400">
                     <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
                   </td>

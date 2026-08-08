@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NAV_SECTIONS, NAV_TONE, type NavTone } from './Header';
+import { PRIMARY_NAV_SECTIONS, SECONDARY_NAV_ITEMS, NAV_TONE, type NavTone } from './Header';
 
 const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
   const t = NAV_TONE[tone ?? 'neutral'];
@@ -11,10 +11,14 @@ const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
   );
 };
 
-/** Mobile-only nav drawer — desktop nav lives in the Header pills (OMP-style shell). */
+/**
+ * The nav drawer — every screen size. On phones it's the whole navigation;
+ * on desktop it's where the back-office destinations (Inbox, Citadel,
+ * Reports, Settings) live so the top bar stays five calm pills.
+ */
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <div className="lg:hidden">
+    <div>
       {/* Overlay */}
       {open && (
         <div onClick={onClose} className="fixed inset-0 bg-black/60 z-40" aria-hidden="true" />
@@ -37,24 +41,38 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
 
-        <div className="flex-1 py-4 px-3 space-y-4 overflow-y-auto">
-          {NAV_SECTIONS.map((section, i) => (
-            <div key={section.label ?? `sec-${i}`}>
-              {section.label && (
-                <div className={cn('px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em]', NAV_TONE[section.tone ?? 'neutral'].label)}>
-                  {section.label}
-                </div>
-              )}
-              <div className="space-y-1">
-                {section.items.map((item) => (
+        <div className="flex-1 py-4 px-3 space-y-5 overflow-y-auto">
+          {/* The floor: what the top bar shows on desktop */}
+          <div>
+            <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
+              The Floor
+            </div>
+            <div className="space-y-1">
+              {PRIMARY_NAV_SECTIONS.map((section) =>
+                section.items.map((item) => (
                   <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass(section.tone)}>
                     <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
                     {item.name}
                   </NavLink>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* The office: everything that isn't an every-hour destination */}
+          <div>
+            <div className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
+              The Office
+            </div>
+            <div className="space-y-1">
+              {SECONDARY_NAV_ITEMS.map((item) => (
+                <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass(null)}>
+                  <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
+                  {item.name}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="p-3 border-t border-ink-700 space-y-3">

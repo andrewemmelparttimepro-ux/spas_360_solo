@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -88,20 +89,18 @@ export function usePipeline() {
 
   useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
 
-  // Subscribe to real-time deal changes
+  // Subscribe to real-time deal changes. A single drag lands as a burst of row
+  // events (move + sibling renumbers) — coalesce them into one refetch.
   useEffect(() => {
     if (!profile) return;
+    const refetch = debounceRefetch(fetchPipeline);
     const channel = supabase
       .channel(`deals-realtime-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
-        fetchPipeline();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        fetchPipeline();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals', filter: `org_id=eq.${profile.org_id}` }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `org_id=eq.${profile.org_id}` }, refetch)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchPipeline]);
 
   const getDealsForStage = useCallback((stageId: string): PipelineDeal[] => {

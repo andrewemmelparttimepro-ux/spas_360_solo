@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CommunicationThread, Message, Contact } from '@/types/database';
 
@@ -84,11 +85,12 @@ export function useConversations() {
   // Real-time: new threads / inbound texts anywhere refresh the list
   useEffect(() => {
     if (!profile) return;
+    const refetch = debounceRefetch(fetchThreads); // per-thread enrichment — coalesce bursts
     const channel = supabase
       .channel(`conv-threads-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'communication_threads' }, () => fetchThreads())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'communication_threads', filter: `org_id=eq.${profile.org_id}` }, refetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchThreads]);
 
   // Real-time messages

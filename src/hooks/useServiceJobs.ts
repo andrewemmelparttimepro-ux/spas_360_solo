@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus } from '@/types/database';
 
@@ -74,14 +75,13 @@ export function useServiceJobs() {
   // Real-time updates
   useEffect(() => {
     if (!profile) return;
+    const refetch = debounceRefetch(fetchJobs);
     const channel = supabase
       .channel(`jobs-realtime-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
-        fetchJobs();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: `org_id=eq.${profile.org_id}` }, refetch)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchJobs]);
 
   const unscheduledJobs = jobs.filter(j => !j.scheduled_at && j.status !== 'Completed' && j.status !== 'Cancelled');

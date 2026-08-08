@@ -17,6 +17,22 @@ export const PHOTO_TYPES = ['General', 'Proof of Delivery', 'Damage', 'Serial Nu
 
 const BUCKET = 'job-photos';
 
+// Signed URLs are valid for an hour; cache them so realtime refetches and
+// re-renders don't hit the storage API once per photo each time.
+const photoUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+async function signedPhotoUrl(path: string): Promise<string> {
+  const cached = photoUrlCache.get(path);
+  if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.url;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+  if (error || !data?.signedUrl) {
+    console.error('Error signing job photo URL:', error);
+    return '';
+  }
+  photoUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + 60 * 60 * 1000 });
+  return data.signedUrl;
+}
+
 /**
  * Re-encode to a bandwidth-friendly JPEG (max 1600px) so a 12MP jobsite photo
  * doesn't eat the tech's data plan. Falls back to the original file if the
@@ -47,15 +63,18 @@ export function useJobPhotos(jobId: string | undefined) {
 
   const fetchPhotos = useCallback(async () => {
     if (!jobId) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('job_photos')
       .select('*')
       .eq('job_id', jobId)
       .order('created_at', { ascending: false });
-    setPhotos((data ?? []).map((p) => ({
+    if (error) { console.error('Error fetching job photos:', error); return; }
+    // The bucket is private — customer property photos are not public documents.
+    // Signed URLs are cached until near-expiry so refetches don't re-sign.
+    setPhotos(await Promise.all((data ?? []).map(async (p) => ({
       ...p,
-      url: supabase.storage.from(BUCKET).getPublicUrl(p.storage_path).data.publicUrl,
-    })));
+      url: await signedPhotoUrl(p.storage_path),
+    }))));
   }, [jobId]);
 
   useEffect(() => { fetchPhotos(); }, [fetchPhotos]);

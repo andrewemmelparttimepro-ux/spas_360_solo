@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/database';
 
@@ -157,11 +158,56 @@ function sanitizeName(name: string) {
   return (name || 'upload').replace(/[^\w.!@()+,=\-\s]/g, '_');
 }
 
+// Signed URLs are valid for an hour — re-signing every attachment on every
+// realtime refetch was one storage API call per file per event per client.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 async function signedUrl(path: string | null) {
   if (!path) return '';
+  const cached = signedUrlCache.get(path);
+  if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.url;
   const { data, error } = await supabase.storage.from('fix-it-files').createSignedUrl(path, 60 * 60);
   if (error) return '';
-  return data?.signedUrl ?? '';
+  const url = data?.signedUrl ?? '';
+  if (url) signedUrlCache.set(path, { url, expiresAt: Date.now() + 60 * 60 * 1000 });
+  return url;
+}
+
+/**
+ * Just the badge number — safe to run on every page. The full feed
+ * (posts, comments, signed attachment URLs, 3-table realtime) only runs
+ * where it's actually visible.
+ */
+export function useFixItActiveCount(enabled = true): number {
+  const { profile } = useAuth();
+  const [count, setCount] = useState(0);
+  const orgId = profile?.org_id ?? null;
+  const canRun = enabled && !UI_PREVIEW && Boolean(orgId);
+
+  const fetchCount = useCallback(async () => {
+    if (!canRun || !orgId) { setCount(0); return; }
+    const { count: n, error } = await supabase
+      .from('fix_it_posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .neq('status', 'archived');
+    if (error) { console.error('Error counting Fix-It posts:', error); return; }
+    setCount(n ?? 0);
+  }, [canRun, orgId]);
+
+  useEffect(() => { fetchCount(); }, [fetchCount]);
+
+  useEffect(() => {
+    if (!canRun) return undefined;
+    const refetch = debounceRefetch(fetchCount, 1000);
+    const channel = supabase
+      .channel(`fix-it-count-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_posts' }, refetch)
+      .subscribe();
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
+  }, [canRun, fetchCount]);
+
+  return count;
 }
 
 export function useFixItFeed(enabled = true): UseFixItFeedResult {
@@ -316,13 +362,14 @@ export function useFixItFeed(enabled = true): UseFixItFeedResult {
   useEffect(() => {
     if (!canRun) return undefined;
     const suffix = Math.random().toString(36).slice(2);
+    const refetch = debounceRefetch(fetchPosts, 800); // refetch re-signs attachment URLs — coalesce hard
     const channel = supabase
       .channel(`fix-it-feed-${suffix}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_posts' }, () => fetchPosts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_comments' }, () => fetchPosts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_attachments' }, () => fetchPosts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_posts' }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_comments' }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fix_it_attachments' }, refetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [canRun, fetchPosts]);
 
   const uploadAttachment = useCallback(async (

@@ -4,6 +4,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // must never splice into the filter expression (e.g. "Smith, John").
 const cleanTerm = (term: string) => String(term ?? '').replace(/[,()\\%]/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Staff run Ari in the dealership's own timezone — wall-clock inputs must become
+// real instants in THEIR day, not UTC's (which flips to "tomorrow" after ~6pm CT,
+// and would file a 9:00 AM follow-up at 3–4 AM local).
+const localDayBounds = (d = new Date()) => {
+  const start = new Date(d); start.setHours(0, 0, 0, 0);
+  const end = new Date(d); end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+};
+const localInstant = (s: string) => new Date(s.includes('T') ? s : `${s}T09:00:00`).toISOString();
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -365,7 +375,7 @@ export function createAgentTools(
         .from('tasks')
         .insert({
           title: args.title,
-          due_at: `${args.due_date}T09:00:00`,
+          due_at: localInstant(args.due_date),
           priority: args.priority || 'Medium',
           status: 'Pending',
           contact_id: args.contact_id || null,
@@ -410,13 +420,14 @@ export function createAgentTools(
     description: 'Get all jobs scheduled for today.',
     parameters: { type: 'object', properties: {} },
     execute: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await client
+      const today = localDayBounds();
+      const { data, error } = await client
         .from('jobs')
         .select('id, title, status, job_type, scheduled_at, contacts:contact_id(first_name, last_name)')
-        .gte('scheduled_at', `${today}T00:00:00`)
-        .lte('scheduled_at', `${today}T23:59:59`)
+        .gte('scheduled_at', today.start)
+        .lte('scheduled_at', today.end)
         .order('scheduled_at');
+      if (error) return { error: `Couldn't load today's jobs: ${error.message}` };
       return data ?? [];
     },
   },
@@ -706,15 +717,15 @@ export function createAgentTools(
         .single();
       if (!contact) return { error: 'Contact not found.' };
 
-      const when = preferred_datetime.includes('T') ? preferred_datetime : `${preferred_datetime}T09:00:00`;
-      const day = when.slice(0, 10);
+      const when = localInstant(preferred_datetime);
+      const dayBounds = localDayBounds(new Date(when));
 
       // Same-day context so the hold lands on a realistic slot
       const { data: dayJobs } = await client
         .from('jobs')
         .select('title, status, scheduled_at')
-        .gte('scheduled_at', `${day}T00:00:00`)
-        .lte('scheduled_at', `${day}T23:59:59`)
+        .gte('scheduled_at', dayBounds.start)
+        .lte('scheduled_at', dayBounds.end)
         .not('status', 'in', '("Completed","Cancelled")')
         .order('scheduled_at');
 
@@ -773,7 +784,7 @@ export function createAgentTools(
       required: ['job_id', 'scheduled_at'],
     },
     execute: async ({ job_id, scheduled_at }) => {
-      const when = scheduled_at.includes('T') ? scheduled_at : `${scheduled_at}T09:00:00`;
+      const when = localInstant(scheduled_at);
       const { data, error } = await client
         .from('jobs')
         .update({ scheduled_at: when, updated_at: new Date().toISOString() })

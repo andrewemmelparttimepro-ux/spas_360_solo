@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { sanitizeSearchTerm } from '@/lib/utils';
 import type { Contact } from '@/types/database';
 
-export function useContacts() {
+// `enabled` lets always-mounted chrome (the collapsed admin rail) skip the
+// multi-page fetch of thousands of contacts until it's actually visible.
+export function useContacts(enabled = true) {
   const { profile, activeLocationId } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,7 +22,7 @@ export function useContacts() {
   }, [searchQuery]);
 
   const fetchContacts = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || !enabled) return;
     setIsLoading(true);
     const seq = ++fetchSeq.current; // out-of-order responses must never overwrite newer ones
 
@@ -56,22 +59,21 @@ export function useContacts() {
     if (seq !== fetchSeq.current) return;
     setContacts(allContacts);
     setIsLoading(false);
-  }, [profile, activeLocationId, debouncedQuery]);
+  }, [profile, activeLocationId, debouncedQuery, enabled]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
   // Real-time updates (channel name unique per hook instance — supabase-js
   // reuses channels by topic and a second .on() after subscribe() throws)
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !enabled) return;
+    const refetch = debounceRefetch(fetchContacts, 800); // multi-page fetch — coalesce hard
     const channel = supabase
       .channel(`contacts-realtime-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => {
-        fetchContacts();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts', filter: `org_id=eq.${profile.org_id}` }, refetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [profile, fetchContacts]);
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
+  }, [profile, enabled, fetchContacts]);
 
   const createContact = useCallback(async (contact: Partial<Contact>) => {
     if (!profile) return null;

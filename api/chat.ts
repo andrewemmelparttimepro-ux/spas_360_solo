@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { SALES_AGENT_PROMPT } from './_lib/system-prompt.js';
+import { SALES_AGENT_PROMPT, PUBLIC_CONCIERGE_PROMPT } from './_lib/system-prompt.js';
+import { consumeRateLimit, clientIp } from './_lib/ratelimit.js';
 
 // Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, GLM via Z.AI,
 // or Muse Spark via Meta Model API.
@@ -78,17 +79,20 @@ function isValidForwardSecret(value: string): boolean {
 // Verify the caller's Supabase session token against the auth server.
 // Presence of a header is not authentication — an invented "Bearer test" must be rejected,
 // otherwise /api/chat is an open LLM proxy anyone can drain.
-async function verifySupabaseUser(authHeader: string): Promise<boolean> {
+// Returns the verified user id (for per-user rate keys), or null.
+async function verifySupabaseUser(authHeader: string): Promise<string | null> {
   const supabaseUrl = envValue(process.env.VITE_SUPABASE_URL);
   const anonKey = envValue(process.env.VITE_SUPABASE_ANON_KEY);
-  if (!supabaseUrl || !anonKey) return false; // fail closed — misconfig should be loud, not open
+  if (!supabaseUrl || !anonKey) return null; // fail closed — misconfig should be loud, not open
   try {
     const r = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: { apikey: anonKey, Authorization: authHeader },
     });
-    return r.ok;
+    if (!r.ok) return null;
+    const body = (await r.json().catch(() => null)) as { id?: string } | null;
+    return typeof body?.id === 'string' && body.id ? body.id : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -313,11 +317,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const isForwardFace = isValidForwardSecret(forwardedHeader(req.headers['x-ari-forward-secret']));
   const authHeader = req.headers.authorization;
+  let callerUserId: string | null = null;
   if (!isForwardFace) {
     if (!authHeader) return res.status(401).json({ error: 'Missing authorization' });
-    if (!(await verifySupabaseUser(authHeader))) {
+    callerUserId = await verifySupabaseUser(authHeader);
+    if (!callerUserId) {
       return res.status(401).json({ error: 'Invalid or expired session' });
     }
+  }
+
+  // Durable rate limits (Postgres-backed — cold starts don't reset them).
+  // Staff get room to work; anonymous shoppers get a tighter per-IP budget.
+  const rate = isForwardFace
+    ? await consumeRateLimit(`chat:ff:${clientIp(req.headers)}`, 15, 300)
+    : await consumeRateLimit(`chat:user:${callerUserId}`, 40, 300);
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(Math.max(rate.retryAfterSeconds, 1)));
+    return res.status(429).json({ error: 'Slow down a moment — too many requests. Try again shortly.' });
   }
 
   try {
@@ -347,11 +363,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await fetchBusinessProfileBlock(`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, SUPABASE_SERVICE_ROLE_KEY)
       : await fetchBusinessProfileBlock(authHeader!);
     const forwardFaceContext = isForwardFace ? await fetchForwardFaceContext(latestQuestion) : '';
+    // Shoppers get the concierge subset — the internal staff prompt (discount
+    // authority, commission policy, playbooks) never leaves the building.
+    const systemPrompt = isForwardFace
+      ? `${PUBLIC_CONCIERGE_PROMPT}${profileBlock}${FORWARD_FACE_PROMPT}${forwardFaceContext}`
+      : `${SALES_AGENT_PROMPT}${profileBlock}`;
     const messages = [
-      {
-        role: 'system',
-        content: `${SALES_AGENT_PROMPT}${profileBlock}${isForwardFace ? FORWARD_FACE_PROMPT : ''}${forwardFaceContext}`,
-      },
+      { role: 'system', content: systemPrompt },
       ...safeClientMessages,
     ];
     const allowedTools = isForwardFace ? [] : tools;

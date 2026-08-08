@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { createNotification } from '@/hooks/useNotifications';
 import { parseMentions, stripMentions, notifyMentionedUsers } from '@/lib/mentions';
@@ -75,19 +76,20 @@ export function useTeamChat() {
   const fetchThreads = useCallback(async () => {
     if (!user || !profile?.org_id) return;
     setIsLoading(true);
-    const { data } = await supabase
+    // Participation is filtered server-side — clients never download the
+    // whole org's DM metadata just to throw most of it away.
+    const { data, error } = await supabase
       .from('agent_threads')
       .select('*')
       .eq('thread_type', 'team')
       .eq('org_id', profile.org_id)
+      .or(`user_id.eq.${user.id},participants.cs.{${user.id}}`)
       .order('last_message_at', { ascending: false, nullsFirst: false });
 
+    if (error) { console.error('Error fetching team threads:', error); setIsLoading(false); return; }
     if (!data) { setThreads([]); setIsLoading(false); return; }
 
-    // Only show threads where user is a participant or creator
-    const myThreads = data.filter((t: TeamThread) =>
-      t.user_id === user.id || (t.participants && t.participants.includes(user.id))
-    );
+    const myThreads = data as TeamThread[];
 
     const enriched: TeamThread[] = myThreads.map(t => {
       const isMain = t.title === MAIN_TITLE;
@@ -152,15 +154,17 @@ export function useTeamChat() {
   // Real-time thread updates
   useEffect(() => {
     if (!profile) return;
+    const refetch = debounceRefetch(fetchThreads);
     const channel = supabase
       .channel(`team-threads-rt-${instanceId.current}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'agent_threads',
-      }, () => fetchThreads())
+        filter: `org_id=eq.${profile.org_id}`,
+      }, refetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchThreads]);
 
   // ─── Find or create Main thread (ChatWidget) ──────────

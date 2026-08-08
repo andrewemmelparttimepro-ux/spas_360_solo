@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Contact, ChevronLeft, ChevronRight, Search, Plus, ExternalLink, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useContacts } from '@/hooks/useContacts';
-import { useFixItFeed } from '@/hooks/useFixItFeed';
+import { useFixItFeed, useFixItActiveCount } from '@/hooks/useFixItFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 import FixItFeed from '@/components/FixItFeed';
@@ -26,8 +26,13 @@ export default function AdminRail() {
   ));
   const [showWizard, setShowWizard] = useState(false);
   const { profile } = useAuth();
-  const { contacts, searchQuery, setSearchQuery, refresh } = useContacts();
-  const fixItFeed = useFixItFeed(profile?.role !== 'technician');
+  const notTech = profile?.role !== 'technician';
+  // Collapsed rail = a 48px strip on every page. The heavy work (multi-page
+  // contact fetch, feed posts + signed URLs + 3-table realtime) only runs
+  // once the rail is actually open; the badge uses a head-count query.
+  const { contacts, searchQuery, setSearchQuery, refresh } = useContacts(notTech && open);
+  const fixItFeed = useFixItFeed(notTech && open);
+  const fixItCount = useFixItActiveCount(notTech);
   const navigate = useNavigate();
 
   // Techs live in the schedule — no admin chrome for them
@@ -88,9 +93,9 @@ export default function AdminRail() {
               )}
             >
               <Wrench className="w-3.5 h-3.5" /> Feed
-              {fixItFeed.activeCount > 0 && (
+              {fixItCount > 0 && (
                 <span className={cn('rounded px-1.5 py-0.5 text-[10px]', activePanel === 'fixit' ? 'bg-white/20 text-white' : 'bg-brand-500/15 text-brand-300')}>
-                  {fixItFeed.activeCount}
+                  {fixItCount}
                 </span>
               )}
             </button>
@@ -159,9 +164,9 @@ export default function AdminRail() {
         >
           <ChevronLeft className="w-4 h-4" />
           <Contact className="w-5 h-5" />
-          {fixItFeed.activeCount > 0 && (
+          {fixItCount > 0 && (
             <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-bold flex items-center justify-center">
-              {fixItFeed.activeCount}
+              {fixItCount}
             </span>
           )}
           <span className="text-[9px] font-bold uppercase tracking-[0.2em] [writing-mode:vertical-rl] mt-1">Admin</span>

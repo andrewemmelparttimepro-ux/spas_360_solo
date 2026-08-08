@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { consumeRateLimit } from './_lib/ratelimit.js';
 
 /**
  * Outbound SMS: the app posts {to, body}, we verify the caller's Supabase JWT,
@@ -65,6 +66,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${token}` },
   });
   if (!authRes.ok) return res.status(401).json({ error: 'Invalid session' });
+  const authBody = (await authRes.json().catch(() => null)) as { id?: string } | null;
+  const userId = typeof authBody?.id === 'string' ? authBody.id : 'unknown';
+
+  // Durable per-user budget on the business number
+  const rate = await consumeRateLimit(`sms:user:${userId}`, 30, 3600);
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(Math.max(rate.retryAfterSeconds, 1)));
+    return res.status(429).json({ error: 'Texting limit reached for now — try again in a bit.' });
+  }
 
   const { to, body } = req.body as { to?: string; body?: string };
   if (!to || !body?.trim()) return res.status(400).json({ error: 'Missing to/body' });

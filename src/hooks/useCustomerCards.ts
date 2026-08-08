@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Contact, ContactType } from '@/types/database';
 
@@ -123,12 +124,17 @@ export function useCustomerCards() {
   // channels by topic and a second .on() after subscribe() throws)
   useEffect(() => {
     if (!profile) return;
+    const refetch = debounceRefetch(fetchAll, 800); // 6-query aggregate — coalesce hard
+    const orgFilter = `org_id=eq.${profile.org_id}`;
     const channel = supabase
       .channel(`customer-cards-${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => fetchAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts', filter: orgFilter }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals', filter: orgFilter }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: orgFilter }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: orgFilter }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items', filter: orgFilter }, refetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchAll]);
 
   const cards: CustomerCard[] = useMemo(() => contacts.map(c => {

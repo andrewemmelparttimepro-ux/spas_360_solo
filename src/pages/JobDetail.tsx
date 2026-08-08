@@ -6,7 +6,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
 import { useJobPhotos, PHOTO_TYPES, type JobPhoto } from '@/hooks/useJobPhotos';
 import { useState, useRef, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, toLocalInputValue } from '@/lib/utils';
 import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 
@@ -167,7 +167,12 @@ function EditableField({
   const commit = async () => {
     if (draft === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
-    const parsed = (type === 'number' || numeric) ? (draft ? parseFloat(draft) : null) : (draft || null);
+    // datetime-local drafts are wall-clock local — convert to a real instant so the DB never shifts them
+    const parsed = (type === 'number' || numeric)
+      ? (draft ? parseFloat(draft) : null)
+      : type === 'datetime-local'
+        ? (draft ? new Date(draft).toISOString() : null)
+        : (draft || null);
     await onSave({ [field]: parsed } as Partial<Job>);
     setSaving(false);
     setEditing(false);
@@ -291,7 +296,7 @@ export default function JobDetail() {
         <Link to="/service" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{job.title}</h1>
-          {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400">{contact.first_name} {contact.last_name}</Link>}
+          {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
         </div>
         <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
       </div>
@@ -309,7 +314,7 @@ export default function JobDetail() {
             <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS} />
             {location && <div className="flex items-center text-sm"><MapPin className="w-4 h-4 mr-2 text-ink-500" />{location.name}</div>}
             {property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
-            <EditableField label="Scheduled" value={job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : null} field="scheduled_at" onSave={saveJob} icon={Clock} type="datetime-local" />
+            <EditableField label="Scheduled" value={job.scheduled_at ? toLocalInputValue(job.scheduled_at) : null} field="scheduled_at" onSave={saveJob} icon={Clock} type="datetime-local" />
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
             {job.description && <div className="text-sm text-ink-300 bg-ink-950 p-3 rounded-lg">{job.description}</div>}
             <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
@@ -333,7 +338,7 @@ export default function JobDetail() {
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {notes.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => (
-                <div key={n.id} className="p-3 bg-ink-950 rounded-lg border border-ink-800"><p className="text-sm text-ink-100">{n.body}</p><p className="text-xs text-ink-500 mt-1">{n.author_name} Â· {new Date(n.created_at).toLocaleDateString()}</p></div>
+                <div key={n.id} className="p-3 bg-ink-950 rounded-lg border border-ink-800"><p className="text-sm text-ink-100">{n.body}</p><p className="text-xs text-ink-500 mt-1">{n.author_name} · {new Date(n.created_at).toLocaleDateString()}</p></div>
               ))}
             </div>
           </div>
@@ -342,7 +347,7 @@ export default function JobDetail() {
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2>
-              <button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-400 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
+              <button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
             </div>
             {showTaskForm && (
               <div className="flex space-x-3 mb-4">

@@ -89,6 +89,7 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [revenueData, setRevenueData] = useState<RevenuePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
     if (!profile) return;
@@ -100,6 +101,11 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
       supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']),
       supabase.from('tasks').select('id, title, status, due_at, deal_id').eq('assigned_to', profile.id).in('status', ['Pending', 'Overdue']).order('due_at').limit(10),
     ]);
+
+    // Zeros on the money tiles must mean "zero", never "the query failed"
+    const firstError = dealsRes.error ?? jobsRes.error ?? partsRes.error ?? tasksRes.error;
+    if (firstError) console.error('Error loading dashboard:', firstError);
+    setLoadError(firstError ? firstError.message : null);
 
     const deals = dealsRes.data ?? [];
     const jobs = jobsRes.data ?? [];
@@ -182,14 +188,18 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  return { stats, actions, revenueData, isLoading, refresh: fetchStats };
+  return { stats, actions, revenueData, isLoading, loadError, refresh: fetchStats };
 }
 
 function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
+  if (diff < 0) {
+    // Due in the future — floor on a negative diff would overshoot by an hour
+    const hoursAhead = Math.floor(-diff / (1000 * 60 * 60));
+    return hoursAhead === 0 ? 'Within the hour' : `In ${hoursAhead}h`;
+  }
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 0) return `In ${Math.abs(hours)}h`;
   if (hours === 0) return 'Just now';
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);

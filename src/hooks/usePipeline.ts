@@ -3,28 +3,39 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import type { DropResult } from '@hello-pangea/dnd';
-import type { Deal, PipelineStage } from '@/types/database';
+import type { Deal, PipelineStage, Profile } from '@/types/database';
+import {
+  summarizeDealFollowUps,
+  type DealFollowUp,
+  type FollowUpTaskLike,
+} from '@/lib/followUp';
 
 export interface PipelineView {
   stages: PipelineStage[];
   dealsByStage: Record<string, Deal[]>;
 }
 
-export type PipelineDeal = Deal & { contacts?: { first_name: string; last_name: string } | null };
+export type PipelineDeal = Deal & {
+  contacts?: { first_name: string; last_name: string } | null;
+  assigned?: { first_name: string; last_name: string; role: Profile['role'] } | null;
+};
+
+export type SalespersonOption = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'role'>;
 
 export function usePipeline() {
   const { profile, activeLocationId } = useAuth();
   const { toast } = useToast();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
-  const [dealsWithTasks, setDealsWithTasks] = useState<Set<string>>(new Set());
+  const [salespeople, setSalespeople] = useState<SalespersonOption[]>([]);
+  const [followUpsByDeal, setFollowUpsByDeal] = useState<Map<string, DealFollowUp>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPipeline = useCallback(async () => {
     if (!profile) return;
     setIsLoading(true);
 
-    const [stageRes, dealRes] = await Promise.all([
+    const [stageRes, dealRes, taskRes, peopleRes] = await Promise.all([
       supabase
         .from('pipeline_stages')
         .select('*')
@@ -32,29 +43,48 @@ export function usePipeline() {
         .order('position'),
       supabase
         .from('deals')
-        .select('*, contacts:contact_id(first_name, last_name)')
+        .select('*, contacts:contact_id(first_name, last_name), assigned:assigned_to(first_name, last_name, role)')
         .eq('org_id', profile.org_id)
         .order('position'),
+      supabase
+        .from('tasks')
+        .select('id, deal_id, assigned_to, title, due_at, priority, status')
+        .eq('org_id', profile.org_id)
+        .in('status', ['Pending', 'In Progress', 'Overdue'])
+        .not('deal_id', 'is', null)
+        .order('due_at', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('org_id', profile.org_id)
+        .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .order('first_name'),
     ]);
 
     if (stageRes.data) setStages(stageRes.data);
-
-    // Which deals have an open follow-up task? (a lead with no task is a no-no)
-    const { data: openTasks } = await supabase
-      .from('tasks')
-      .select('deal_id')
-      .eq('org_id', profile.org_id)
-      .in('status', ['Pending', 'In Progress'])
-      .not('deal_id', 'is', null);
-    setDealsWithTasks(new Set((openTasks ?? []).map(t => t.deal_id as string)));
-
-    let filteredDeals = dealRes.data ?? [];
-    if (activeLocationId) {
-      filteredDeals = filteredDeals.filter(d => d.location_id === activeLocationId);
+    if (peopleRes.data) setSalespeople(peopleRes.data as SalespersonOption[]);
+    // Only repaint follow-up chips from a clean read — a transient error must not
+    // flip every deal to "No next activity" and lie on the accountability board
+    if (!taskRes.error) {
+      setFollowUpsByDeal(summarizeDealFollowUps((taskRes.data ?? []) as FollowUpTaskLike[]));
     }
-    setDeals(filteredDeals);
+
+    if (stageRes.error) console.error('Error fetching pipeline stages:', stageRes.error);
+    if (dealRes.error) console.error('Error fetching deals:', dealRes.error);
+    if (taskRes.error) console.error('Error fetching deal follow-ups:', taskRes.error);
+    if (peopleRes.error) console.error('Error fetching salespeople:', peopleRes.error);
+    const firstError = stageRes.error ?? dealRes.error ?? taskRes.error ?? peopleRes.error;
+    if (firstError) toast(`Pipeline didn't fully load: ${firstError.message}`, 'error');
+
+    if (!dealRes.error) {
+      let filteredDeals = (dealRes.data ?? []) as PipelineDeal[];
+      if (activeLocationId) {
+        filteredDeals = filteredDeals.filter(d => d.location_id === activeLocationId);
+      }
+      setDeals(filteredDeals);
+    }
     setIsLoading(false);
-  }, [profile, activeLocationId]);
+  }, [profile, activeLocationId, toast]);
 
   useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
 
@@ -64,6 +94,9 @@ export function usePipeline() {
     const channel = supabase
       .channel(`deals-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchPipeline();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         fetchPipeline();
       })
       .subscribe();
@@ -78,51 +111,71 @@ export function usePipeline() {
   // ─── Sales → Service bridge ─────────────────────────────
   // A won deal becomes a Delivery job in the unscheduled queue ("Wyant – Hot Tub – Delivery"),
   // the contact is promoted to Customer, and service managers get notified.
-  const handleDealWon = useCallback(async (deal: PipelineDeal) => {
-    if (!profile) return;
+  // Returns true only when the full handoff really happened — the caller's toast must not lie.
+  const handleDealWon = useCallback(async (deal: PipelineDeal): Promise<boolean> => {
+    if (!profile) return false;
 
-    // Guard: don't stack delivery jobs if one is already open for this contact
-    const { data: existing } = await supabase
+    // Guard: don't stack delivery jobs if one is already open for this contact.
+    // An errored guard must NOT pass as "no job exists" — that creates duplicates.
+    const { data: existing, error: guardError } = await supabase
       .from('jobs')
       .select('id')
+      .eq('org_id', profile.org_id)
       .eq('contact_id', deal.contact_id)
       .eq('job_type', 'Delivery')
       .not('status', 'in', '("Completed","Cancelled")')
       .limit(1);
+    if (guardError) {
+      console.error('Error checking for existing delivery job:', guardError);
+      toast(`Deal moved, but the delivery handoff failed: ${guardError.message}. Create the delivery job manually.`, 'error');
+      return false;
+    }
 
-    if (!existing || existing.length === 0) {
+    if (existing.length === 0) {
       // Jobs require a location — deal's, then the user's, then the org's first
       let locationId = deal.location_id ?? profile.location_id ?? null;
       if (!locationId) {
         const { data: loc } = await supabase.from('locations').select('id').eq('org_id', profile.org_id).limit(1).single();
         locationId = loc?.id ?? null;
       }
-      if (locationId) {
-        await supabase.from('jobs').insert({
-          org_id: profile.org_id,
-          contact_id: deal.contact_id,
-          location_id: locationId,
-          title: `${deal.title} – Delivery`,
-          job_type: 'Delivery',
-          status: 'Delivery',
-          priority: deal.priority,
-          amount_to_collect: deal.amount,
-          description: `Auto-created when the deal was won. Confirm delivery time with the customer, then drag onto the schedule.`,
-          created_by: profile.id,
-        });
+      if (!locationId) {
+        toast('Deal moved, but no store location exists to attach the delivery job to.', 'error');
+        return false;
+      }
+      const { error: jobError } = await supabase.from('jobs').insert({
+        org_id: profile.org_id,
+        contact_id: deal.contact_id,
+        location_id: locationId,
+        title: `${deal.title} – Delivery`,
+        job_type: 'Delivery',
+        status: 'Delivery',
+        priority: deal.priority,
+        amount_to_collect: deal.amount,
+        description: `Auto-created when the deal was won. Confirm delivery time with the customer, then drag onto the schedule.`,
+        created_by: profile.id,
+      });
+      if (jobError) {
+        console.error('Error creating delivery job:', jobError);
+        toast(`Deal moved, but creating the delivery job failed: ${jobError.message}. Create it manually.`, 'error');
+        return false;
       }
     }
 
     // Lead becomes a Customer
-    await supabase.from('contacts').update({ customer_type: 'Customer' }).eq('id', deal.contact_id);
+    const { error: promoteError } = await supabase.from('contacts').update({ customer_type: 'Customer' }).eq('id', deal.contact_id);
+    if (promoteError) {
+      console.error('Error promoting contact to Customer:', promoteError);
+      toast(`Delivery job created, but promoting the lead to Customer failed: ${promoteError.message}`, 'error');
+    }
 
     // Tell the service side a delivery just landed in their queue
-    const { data: managers } = await supabase
+    const { data: managers, error: managersError } = await supabase
       .from('profiles')
       .select('id')
       .eq('org_id', profile.org_id)
       .in('role', ['service_manager', 'owner_manager']);
-    await Promise.all((managers ?? []).filter(m => m.id !== profile.id).map(m =>
+    if (managersError) console.error('Error fetching managers for won-deal ping:', managersError);
+    const notifyResults = await Promise.all((managers ?? []).filter(m => m.id !== profile.id).map(m =>
       supabase.from('notifications').insert({
         user_id: m.id,
         type: 'job',
@@ -131,7 +184,10 @@ export function usePipeline() {
         link: '/service',
       })
     ));
-  }, [profile]);
+    notifyResults.forEach(r => { if (r.error) console.error('Error sending won-deal notification:', r.error); });
+
+    return true;
+  }, [profile, toast]);
 
   const moveDeal = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -164,8 +220,8 @@ export function usePipeline() {
     // Crossing into Closed-Won triggers the sales → service handoff
     const wonStage = stages.find(s => s.name === 'Closed - Won');
     if (movedDeal && wonStage && destination.droppableId === wonStage.id && source.droppableId !== wonStage.id) {
-      await handleDealWon(movedDeal);
-      toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
+      const handedOff = await handleDealWon(movedDeal);
+      if (handedOff) toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
     }
   }, [deals, stages, fetchPipeline, handleDealWon, toast]);
 
@@ -188,7 +244,8 @@ export function usePipeline() {
   return {
     stages,
     deals,
-    dealsWithTasks,
+    salespeople,
+    followUpsByDeal,
     isLoading,
     getDealsForStage,
     moveDeal,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sanitizeSearchTerm } from '@/lib/utils';
 import type { InventoryItem } from '@/types/database';
 
 export function useInventory() {
@@ -23,8 +24,9 @@ export function useInventory() {
       query = query.eq('location_id', activeLocationId);
     }
 
-    if (searchQuery.trim()) {
-      query = query.or(`sku.ilike.%${searchQuery}%,product.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`);
+    const needle = sanitizeSearchTerm(searchQuery);
+    if (needle) {
+      query = query.or(`sku.ilike.%${needle}%,product.ilike.%${needle}%,category.ilike.%${needle}%`);
     }
 
     const { data, error } = await query;
@@ -35,7 +37,7 @@ export function useInventory() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  // Real-time subscription â any INSERT/UPDATE/DELETE on inventory_items refreshes everywhere
+  // Real-time subscription — any INSERT/UPDATE/DELETE on inventory_items refreshes everywhere
   useEffect(() => {
     if (!profile) return;
     const channel = supabase

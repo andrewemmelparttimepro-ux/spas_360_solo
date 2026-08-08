@@ -73,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const response = await fetch('https://api.elevenlabs.io/v1/single-use-token/realtime_scribe', {
       method: 'POST',
       headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+      signal: AbortSignal.timeout(15_000),
     });
     const body = (await response.json().catch(() => ({}))) as { token?: unknown };
     if (!response.ok || typeof body.token !== 'string' || !body.token) {

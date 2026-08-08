@@ -29,6 +29,11 @@ export default function Reports() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {r.loadError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          Some report data couldn't load — these numbers may be incomplete. ({r.loadError})
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Reports</h1>
         <select
@@ -67,10 +72,10 @@ export default function Reports() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={r.revenueByLocation}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#2A2A32" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip cursor={{ fill: '#1E1E24' }} formatter={(v: number) => money(v)} contentStyle={{ borderRadius: 8, border: '1px solid #2A2A32', background: '#16161B', color: '#F0F0F0', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#D5DEE8" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7789', fontSize: 12 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7789', fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
+                  <Tooltip cursor={{ fill: '#E9EFF5' }} formatter={(v: number) => money(v)} contentStyle={{ borderRadius: 8, border: '1px solid #D5DEE8', background: '#FFFFFF', color: '#101827', boxShadow: '0 12px 28px rgba(15,23,42,0.14)' }} />
                   <Bar dataKey="revenue" fill={BAR} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -88,10 +93,10 @@ export default function Reports() {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={r.jobsByStatus} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#2A2A32" />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="status" width={110} axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                  <Tooltip cursor={{ fill: '#1E1E24' }} contentStyle={{ borderRadius: 8, border: '1px solid #2A2A32', background: '#16161B', color: '#F0F0F0', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }} />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#D5DEE8" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#6B7789', fontSize: 12 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="status" width={110} axisLine={false} tickLine={false} tick={{ fill: '#6B7789', fontSize: 12 }} />
+                  <Tooltip cursor={{ fill: '#E9EFF5' }} contentStyle={{ borderRadius: 8, border: '1px solid #D5DEE8', background: '#FFFFFF', color: '#101827', boxShadow: '0 12px 28px rgba(15,23,42,0.14)' }} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {r.jobsByStatus.map((_, i) => <Cell key={i} fill={STATUS_COLORS[i % STATUS_COLORS.length]} />)}
                   </Bar>

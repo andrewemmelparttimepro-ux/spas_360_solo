@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// PostgREST .or() filters are a comma/paren grammar; model-supplied search text
+// must never splice into the filter expression (e.g. "Smith, John").
+const cleanTerm = (term: string) => String(term ?? '').replace(/[,()\\%]/g, ' ').replace(/\s+/g, ' ').trim();
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -133,11 +137,13 @@ export function createAgentTools(
       required: ['query'],
     },
     execute: async ({ query }) => {
-      const { data } = await client
+      const needle = cleanTerm(query);
+      const { data, error } = await client
         .from('contacts')
         .select('id, first_name, last_name, phone, email, customer_type, lead_source, created_at')
-        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
+        .or(`first_name.ilike.%${needle}%,last_name.ilike.%${needle}%,phone.ilike.%${needle}%,email.ilike.%${needle}%`)
         .limit(5);
+      if (error) return { error: `Contact search failed: ${error.message}` };
       return data ?? [];
     },
   },
@@ -215,7 +221,7 @@ export function createAgentTools(
       let q = client
         .from('inventory_items')
         .select(`id, sku, product, brand, category, model, color_finish, status, msrp, sale_price, locations:location_id(name), ${attrSel}`);
-      if (query) q = q.or(`product.ilike.%${query}%,brand.ilike.%${query}%,sku.ilike.%${query}%,category.ilike.%${query}%,model.ilike.%${query}%`);
+      if (query) { const needle = cleanTerm(query); q = q.or(`product.ilike.%${needle}%,brand.ilike.%${needle}%,sku.ilike.%${needle}%,category.ilike.%${needle}%,model.ilike.%${needle}%`); }
       if (status) q = q.eq('status', status);
       if (min_seats) q = q.gte('product_attributes.seats', Number(min_seats));
       if (lounge === 'true') q = q.eq('product_attributes.lounge', true);
@@ -533,7 +539,7 @@ export function createAgentTools(
         const { data: byContact } = await client
           .from('contacts')
           .select('id')
-          .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
+          .or(`first_name.ilike.%${cleanTerm(query)}%,last_name.ilike.%${cleanTerm(query)}%`)
           .limit(3);
         const ids = (byContact ?? []).map(c => c.id);
         if (ids.length > 0) {

@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/agent/run.ts": {
+      "maxDuration": 300
+    },
+    "api/chat.ts": {
+      "maxDuration": 90
+    }
+  }
 }

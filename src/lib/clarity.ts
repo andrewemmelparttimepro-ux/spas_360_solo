@@ -4,6 +4,14 @@ type ClarityWindow = Window & {
 
 const clarityProjectId = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim();
 
+export function trackClarityEvent(name: string) {
+  if (!import.meta.env.PROD || typeof window === 'undefined') return;
+  const safeName = String(name || '').replace(/\s+/g, '_').trim().slice(0, 80);
+  if (!safeName) return;
+  const clarityWindow = window as ClarityWindow;
+  if (typeof clarityWindow.clarity === 'function') clarityWindow.clarity('event', safeName);
+}
+
 export function installClarity() {
   if (!import.meta.env.PROD || !clarityProjectId || typeof window === 'undefined') {
     return;

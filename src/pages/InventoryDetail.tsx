@@ -3,6 +3,7 @@ import { ArrowLeft, Pencil } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import type { InventoryItem, InventoryStatus } from '@/types/database';
 
@@ -15,15 +16,20 @@ const STATUS_COLORS: Record<string, string> = {
 const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
 
 // --------------- Inline editable field for detail view ---------------
+type FieldOption = string | { value: string; label: string };
+
 function EditableField({
   label, value, field, itemId, onSave,
-  type = 'text', options, prefix, bold, color, multiline,
+  type = 'text', options, prefix, bold, color, multiline, displayValue,
 }: {
   label: string; value: string | number | null; field: string; itemId: string;
   onSave: (id: string, u: Partial<InventoryItem>) => Promise<boolean>;
-  type?: 'text' | 'number' | 'select'; options?: string[];
+  type?: 'text' | 'number' | 'select'; options?: FieldOption[];
   prefix?: string; bold?: boolean; color?: string; multiline?: boolean;
+  // For FK fields (e.g. location_id): the stored value is an id, this is what the human sees
+  displayValue?: string;
 }) {
+  const normalizedOptions = options?.map(o => (typeof o === 'string' ? { value: o, label: o } : o));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ''));
   const [saving, setSaving] = useState(false);
@@ -43,9 +49,9 @@ function EditableField({
 
   const cancel = () => { setDraft(String(value ?? '')); setEditing(false); };
 
-  const display = value != null && value !== ''
+  const display = displayValue ?? (value != null && value !== ''
     ? (prefix ? `${prefix}${Number(value).toLocaleString()}` : String(value))
-    : 'â';
+    : '—');
 
   return (
     <div>
@@ -59,7 +65,7 @@ function EditableField({
             disabled={saving}
             className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30 w-full"
           >
-            {options?.map(o => <option key={o} value={o}>{o}</option>)}
+            {normalizedOptions?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         ) : multiline ? (
           <textarea
@@ -95,10 +101,41 @@ function EditableField({
   );
 }
 
+// Editable status badge — module scope so re-renders don't remount an open <select>
+function StatusBadge({ item, onSave }: { item: InventoryItem; onSave: (id: string, u: Partial<InventoryItem>) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const ref = useRef<HTMLSelectElement>(null);
+  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+
+  if (editing) {
+    return (
+      <select
+        ref={ref} value={item.status}
+        onChange={async e => { await onSave(item.id, { status: e.target.value as InventoryStatus }); setEditing(false); }}
+        onBlur={() => setEditing(false)}
+        className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30"
+      >
+        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+    );
+  }
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className={cn("px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", STATUS_COLORS[item.status] ?? 'bg-ink-950')}
+      title="Click to change status"
+    >
+      {item.status}
+      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </span>
+  );
+}
+
 // =============== Main detail component ===============
 export default function InventoryDetail() {
   const { id } = useParams();
   const { locations } = useAuth();
+  const { toast } = useToast();
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -128,45 +165,19 @@ export default function InventoryDetail() {
 
   const handleSave = useCallback(async (itemId: string, updates: Partial<InventoryItem>) => {
     const { error } = await supabase.from('inventory_items').update(updates).eq('id', itemId);
-    if (error) { console.error('Error updating:', error); return false; }
+    if (error) {
+      console.error('Error updating:', error);
+      toast(`Couldn't save: ${error.message}`, 'error');
+      return false;
+    }
     await fetchItem();
     return true;
-  }, [fetchItem]);
+  }, [fetchItem, toast]);
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   if (!item) return <div className="text-center text-ink-500"><p>Item not found</p><Link to="/inventory" className="text-brand-400 text-sm mt-2 hover:underline">Back</Link></div>;
 
   const loc = (item as unknown as Record<string, unknown>).locations as { name: string } | undefined;
-
-  // Editable status badge
-  const StatusBadge = () => {
-    const [editing, setEditing] = useState(false);
-    const ref = useRef<HTMLSelectElement>(null);
-    useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
-
-    if (editing) {
-      return (
-        <select
-          ref={ref} value={item.status}
-          onChange={async e => { await handleSave(item.id, { status: e.target.value as InventoryStatus }); setEditing(false); }}
-          onBlur={() => setEditing(false)}
-          className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30"
-        >
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-      );
-    }
-    return (
-      <span
-        onClick={() => setEditing(true)}
-        className={cn("px-3 py-1 rounded-full text-sm font-medium cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", STATUS_COLORS[item.status] ?? 'bg-ink-950')}
-        title="Click to change status"
-      >
-        {item.status}
-        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-      </span>
-    );
-  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -176,7 +187,7 @@ export default function InventoryDetail() {
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{item.product}</h1>
           <p className="text-sm text-ink-400">Serial Number: {item.sku}</p>
         </div>
-        <StatusBadge />
+        <StatusBadge item={item} onSave={handleSave} />
       </div>
 
       <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
@@ -189,7 +200,7 @@ export default function InventoryDetail() {
           <EditableField label="Category" value={item.category} field="category" itemId={item.id} onSave={handleSave} type="select" options={CATEGORY_OPTIONS} />
           <EditableField label="Model" value={item.model} field="model" itemId={item.id} onSave={handleSave} />
           <EditableField label="Color/Finish" value={item.color_finish} field="color_finish" itemId={item.id} onSave={handleSave} />
-          <EditableField label="Location" value={loc?.name ?? 'â'} field="location_id" itemId={item.id} onSave={handleSave} type="select" options={locations.map(l => l.name)} />
+          <EditableField label="Location" value={item.location_id} displayValue={loc?.name ?? '—'} field="location_id" itemId={item.id} onSave={handleSave} type="select" options={locations.map(l => ({ value: l.id, label: l.name }))} />
         </div>
       </div>
 

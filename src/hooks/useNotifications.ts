@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,19 +18,24 @@ export async function createNotification(
   n: { type: string; title: string; body?: string; link?: string }
 ) {
   if (!userId) return;
-  await supabase.from('notifications').insert({
+  // This is the single funnel for every mention/deal-won/SMS ping — a dropped
+  // insert must at least leave a trace
+  const { error } = await supabase.from('notifications').insert({
     user_id: userId,
     type: n.type,
     title: n.title,
     body: n.body ?? null,
     link: n.link ?? null,
   });
+  if (error) console.error('Error creating notification:', error);
 }
 
 export function useNotifications() {
   const { user } = useAuth();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const itemsRef = useRef<AppNotification[]>([]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) { setItems([]); setIsLoading(false); return; }
@@ -65,13 +70,22 @@ export function useNotifications() {
 
   const markRead = useCallback(async (id: string) => {
     setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n)); // optimistic
-    await supabase.from('notifications').update({ read: true }).eq('id', id);
+    const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+    if (error) {
+      console.error('Error marking notification read:', error);
+      setItems(prev => prev.map(n => n.id === id ? { ...n, read: false } : n)); // revert — bell must match the DB
+    }
   }, []);
 
   const markAllRead = useCallback(async () => {
     if (!user) return;
+    const before = itemsRef.current;
     setItems(prev => prev.map(n => ({ ...n, read: true })));
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false);
+    if (error) {
+      console.error('Error marking all notifications read:', error);
+      setItems(before); // revert — bell must match the DB
+    }
   }, [user]);
 
   return { items, unreadCount, isLoading, markRead, markAllRead, refresh: fetchNotifications };

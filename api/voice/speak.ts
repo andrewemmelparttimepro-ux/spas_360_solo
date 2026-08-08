@@ -102,6 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             speed: 1.03,
           },
         }),
+        signal: AbortSignal.timeout(30_000),
       },
     );
 

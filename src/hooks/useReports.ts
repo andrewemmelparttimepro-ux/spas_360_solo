@@ -16,6 +16,7 @@ function rangeFor(period: DashboardPeriod): { start: Date; end: Date } {
 
 export interface ReportsData {
   isLoading: boolean;
+  loadError: string | null;
   revenueByLocation: { name: string; revenue: number }[];
   pipelineByStage: { stage: string; count: number; value: number }[];
   jobsByStatus: { status: string; count: number }[];
@@ -31,6 +32,7 @@ export function useReports(period: DashboardPeriod = 'month'): ReportsData {
   const { profile } = useAuth();
   const [data, setData] = useState<ReportsData>({
     isLoading: true,
+    loadError: null,
     revenueByLocation: [], pipelineByStage: [], jobsByStatus: [],
     inventoryByStatus: [], inventoryAging: [],
     totals: { closedRevenue: 0, pipelineValue: 0, openJobs: 0, inventoryValue: 0 },
@@ -45,6 +47,10 @@ export function useReports(period: DashboardPeriod = 'month'): ReportsData {
       supabase.from('jobs').select('status').eq('org_id', profile.org_id),
       supabase.from('inventory_items').select('status, cost, msrp, sale_price, date_received').eq('org_id', profile.org_id),
     ]);
+
+    // A report full of zeros must mean "no data", never "a query quietly failed"
+    const firstError = dealsRes.error ?? jobsRes.error ?? invRes.error;
+    if (firstError) console.error('Error loading reports:', firstError);
 
     const deals = dealsRes.data ?? [];
     const jobs = jobsRes.data ?? [];
@@ -114,6 +120,7 @@ export function useReports(period: DashboardPeriod = 'month'): ReportsData {
 
     setData({
       isLoading: false,
+      loadError: firstError ? firstError.message : null,
       revenueByLocation, pipelineByStage, jobsByStatus, inventoryByStatus, inventoryAging,
       totals: { closedRevenue, pipelineValue, openJobs, inventoryValue },
     });

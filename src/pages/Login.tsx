@@ -60,7 +60,7 @@ export default function Login() {
           <h1 className="text-[26px] font-extrabold tracking-[0.14em] text-white leading-none">
             SPAS <span className="text-brand-400">360</span>
           </h1>
-          <p className="text-[11px] font-medium tracking-[0.32em] uppercase text-ink-500 mt-2.5">Dealership Command Center</p>
+          <p className="text-[11px] font-medium tracking-[0.32em] uppercase text-slate-500 mt-2.5">Dealership Command Center</p>
         </div>
 
         {/* Form Card */}
@@ -73,22 +73,22 @@ export default function Login() {
             {isSignUp && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-ink-300 mb-1">First Name</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">First Name</label>
                   <input
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink-300 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                     required
                   />
                 </div>
@@ -96,25 +96,25 @@ export default function Login() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-ink-300 mb-1">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="matt@spas360.com"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-ink-300 mb-1">Password</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-ink-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
                 required
                 minLength={6}
               />
@@ -162,18 +162,18 @@ export default function Login() {
             <button
               type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-              className="text-sm text-ink-500 hover:text-brand-400 transition-colors"
+              className="text-sm text-slate-500 hover:text-brand-400 transition-colors"
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-ink-500 mt-6">
+        <p className="text-center text-xs text-slate-500 mt-6">
           Minot & Bismarck, North Dakota
         </p>
-        <p className="text-center text-[11px] text-ink-500 mt-1.5">
-          Powered by <span className="text-ink-300 font-medium">NDAI</span>
+        <p className="text-center text-[11px] text-slate-500 mt-1.5">
+          Powered by <span className="text-slate-300 font-medium">NDAI</span>
         </p>
       </div>
     </div>

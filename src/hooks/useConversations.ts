@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CommunicationThread, Message, Contact } from '@/types/database';
@@ -15,6 +15,11 @@ export function useConversations() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Auto-select happens once, desktop only — on phones the list is the landing view,
+  // and keeping it out of fetchThreads' deps stops a full N+1 refetch per thread click.
+  const activeThreadIdRef = useRef<string | null>(null);
+  activeThreadIdRef.current = activeThreadId;
+  const didAutoSelect = useRef(false);
 
   const fetchThreads = useCallback(async () => {
     if (!profile) return;
@@ -48,11 +53,17 @@ export function useConversations() {
     );
 
     setThreads(enriched);
-    if (!activeThreadId && enriched.length > 0) {
+    if (
+      !didAutoSelect.current &&
+      !activeThreadIdRef.current &&
+      enriched.length > 0 &&
+      window.matchMedia('(min-width: 768px)').matches
+    ) {
+      didAutoSelect.current = true;
       setActiveThreadId(enriched[0].id);
     }
     setIsLoading(false);
-  }, [profile, activeThreadId]);
+  }, [profile]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
@@ -115,21 +126,25 @@ export function useConversations() {
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ error: 'Send failed' }));
-      return { error: err.error ?? 'Send failed' };
+      return { error: `Text not sent: ${err.error ?? 'Send failed'}` };
     }
 
-    await supabase.from('messages').insert({
+    const { error: recordError } = await supabase.from('messages').insert({
       thread_id: activeThreadId,
       sender_type: 'agent',
       sender_id: profile.id,
       body,
     });
-    await supabase
+    const { error: threadError } = await supabase
       .from('communication_threads')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', activeThreadId);
     await fetchMessages();
     await fetchThreads();
+    if (recordError || threadError) {
+      // The text DID go out — say so, but never let it vanish from history silently
+      return { error: `Text was sent, but saving it to the conversation failed: ${(recordError ?? threadError)!.message}` };
+    }
     return { error: null };
   }, [activeThreadId, threads, profile, fetchMessages, fetchThreads]);
 

@@ -56,12 +56,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Mark reality immediately after Twilio accepts it; history repair can safely retry.
-  await client.from('sms_outbox').update({
+  const bookkeepingErrors: string[] = [];
+  const { error: sentUpdateError } = await client.from('sms_outbox').update({
     status: 'sent',
     error: null,
     decided_by: userId,
     decided_at: new Date().toISOString(),
   }).eq('id', outboxId);
+  if (sentUpdateError) {
+    console.error('sms/approve: text SENT but outbox row not marked sent:', sentUpdateError);
+    bookkeepingErrors.push('outbox status');
+  }
 
   let threadId: string | null = null;
   const { data: existing } = await client
@@ -82,16 +87,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     threadId = created?.id ?? null;
   }
   if (threadId) {
-    await client.from('messages').insert({
+    const { error: msgError } = await client.from('messages').insert({
       thread_id: threadId,
       sender_type: 'agent',
       sender_id: userId,
       body: item.body,
     });
-    await client.from('communication_threads')
+    if (msgError) {
+      console.error('sms/approve: text SENT but not recorded in thread:', msgError);
+      bookkeepingErrors.push('conversation history');
+    }
+    const { error: threadError } = await client.from('communication_threads')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', threadId);
+    if (threadError) console.error('sms/approve: thread timestamp update failed:', threadError);
   }
 
-  return res.status(200).json({ sent: true, sid: send.sid, status: send.status, thread_id: threadId });
+  return res.status(200).json({
+    sent: true,
+    sid: send.sid,
+    status: send.status,
+    thread_id: threadId,
+    ...(bookkeepingErrors.length > 0
+      ? { warning: `Text was sent, but recording it failed (${bookkeepingErrors.join(', ')}). Check server logs.` }
+      : {}),
+  });
 }

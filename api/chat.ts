@@ -7,6 +7,19 @@ import { SALES_AGENT_PROMPT } from './_lib/system-prompt.js';
 // to/from its provider so the client never has to change.
 // Switch providers with AI_PROVIDER.
 const envValue = (value: string | undefined, fallback = '') => (value || fallback).trim();
+
+// A hung provider must never hold the function until the platform kills it
+const UPSTREAM_TIMEOUT_MS = 55_000;
+
+// Log the raw provider body server-side; callers (including the public Forward
+// Face channel) get a clean message with no provider internals
+function providerErrorResponse(res: VercelResponse, providerName: string, status: number, rawBody: string) {
+  console.error(`${providerName} error ${status}:`, rawBody.slice(0, 2000));
+  const friendly = status === 429
+    ? `${providerName} is rate-limiting right now — try again in a moment.`
+    : `The AI service (${providerName}) returned an error. Try again, and check the server logs if it persists.`;
+  return res.status(502).json({ error: friendly });
+}
 const PROVIDER = envValue(process.env.AI_PROVIDER, 'gemini').toLowerCase();
 const ANTHROPIC_API_KEY = envValue(process.env.ANTHROPIC_API_KEY) || undefined;
 const GEMINI_API_KEY = envValue(process.env.GEMINI_API_KEY) || undefined;
@@ -371,7 +384,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await handleOpenAI(messages, allowedTools, res);
     }
   } catch (err) {
-    return res.status(500).json({ error: (err as Error).message });
+    const e = err as Error;
+    console.error('chat handler error:', e);
+    if (e.name === 'TimeoutError' || e.name === 'AbortError') {
+      return res.status(504).json({ error: 'The AI service took too long to respond. Try again.' });
+    }
+    return res.status(500).json({ error: 'Something went wrong handling that request. Try again.' });
   }
 }
 
@@ -411,11 +429,11 @@ async function handleClaude(messages: OAIMessage[], tools: OAITool[], res: Verce
       messages: anthropicMessages,
       tools: anthropicTools,
     }),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    return res.status(response.status).json({ error: err });
+    return providerErrorResponse(res, 'Anthropic', response.status, await response.text());
   }
 
   const data = await response.json();
@@ -509,12 +527,12 @@ async function handleGemini(
           : undefined,
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       }),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     }
   );
 
   if (!response.ok) {
-    const err = await response.text();
-    return res.status(response.status).json({ error: err });
+    return providerErrorResponse(res, 'Gemini', response.status, await response.text());
   }
 
   const data = await response.json();
@@ -573,7 +591,7 @@ function convertMessagesToGemini(messages: { role: string; content: string; tool
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls as { function: { name: string; arguments: string } }[]) {
           parts.push({
-            functionCall: { name: tc.function.name, args: JSON.parse(tc.function.arguments) },
+            functionCall: { name: tc.function.name, args: safeParse(tc.function.arguments) },
           });
         }
       }
@@ -646,11 +664,11 @@ async function handleOpenAICompatible({
       // truncated long deliverables (proposals); 4k covers a 1-pager with room to think.
       max_tokens: 4096,
     }),
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    const err = await response.text();
-    return res.status(response.status).json({ error: err });
+    return providerErrorResponse(res, providerName, response.status, await response.text());
   }
 
   const data = await response.json();

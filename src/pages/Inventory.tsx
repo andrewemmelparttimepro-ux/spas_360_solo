@@ -1,4 +1,4 @@
-import { Search, Plus, Package, ArrowRightLeft, X, Check, Pencil } from 'lucide-react';
+import { Search, Plus, Package, X, Check, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
@@ -80,7 +80,7 @@ function EditableCell({
 
   const display = value != null && value !== '' && value !== 0
     ? (prefix ? `${prefix}${Number(value).toLocaleString()}` : String(value))
-    : (type === 'number' ? '$0' : 'â');
+    : (type === 'number' ? '$0' : '—');
 
   return (
     <span
@@ -188,9 +188,13 @@ export default function Inventory() {
           <p className="hidden sm:block text-sm text-ink-400 mt-1">Track units, parts, and chemicals across locations &mdash; click any cell to edit</p>
         </div>
         <div className="flex space-x-3">
-          <button className="bg-ink-900 border border-ink-700 text-ink-300 hover:bg-ink-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><ArrowRightLeft className="w-4 h-4 mr-2" />Transfer</button>
           <button onClick={() => setEditorTarget('new')} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
+      </div>
+
+      {/* One-tap Minot ↔ Bismarck switcher with live unit counts */}
+      <div className="mb-6 shrink-0">
+        <StoreSwitcher />
       </div>
 
       {editorTarget !== null && (
@@ -233,7 +237,7 @@ export default function Inventory() {
         <div className="flex-1 overflow-auto">
           <table className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
-              <tr className="border-b border-ink-700 bg-ink-900 sticky top-0">
+              <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Color Combination</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>

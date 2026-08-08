@@ -108,12 +108,14 @@ export default function ContactDetail() {
   // The 360° view: everything this customer has going on across the app
   useEffect(() => {
     if (!id) return;
+    let alive = true; // fast contact switches: only the latest fetch may commit
     Promise.all([
       supabase.from('deals').select('id, title, amount, created_at, stage:stage_id(name)').eq('contact_id', id).order('updated_at', { ascending: false }),
       supabase.from('jobs').select('id, title, status, scheduled_at, created_at').eq('contact_id', id).order('created_at', { ascending: false }),
       supabase.from('inventory_items').select('id, product, brand, sku, status').eq('customer_id', id),
       supabase.from('communication_threads').select('id').eq('contact_id', id),
     ]).then(async ([d, j, inv, threads]) => {
+      if (!alive) return;
       setRelDeals((d.data as unknown as RelDeal[]) ?? []);
       setRelJobs((j.data as unknown as RelJob[]) ?? []);
       setRelEquip((inv.data as unknown as RelEquip[]) ?? []);
@@ -124,9 +126,13 @@ export default function ContactDetail() {
           .in('thread_id', threadIds)
           .order('created_at', { ascending: false })
           .limit(15);
+        if (!alive) return;
         setRelTexts((msgs as RelText[]) ?? []);
+      } else {
+        setRelTexts([]); // no threads for this customer — never show the previous one's texts
       }
     });
+    return () => { alive = false; };
   }, [id]);
 
   const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
@@ -436,7 +442,7 @@ export default function ContactDetail() {
             ))}</div>
           </div>
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2><button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-400 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button></div>
+            <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2><button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button></div>
             {showTaskForm && <div className="flex space-x-3 mb-4"><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Task title..." className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" autoFocus /><button onClick={handleAddTask} className="px-3 py-2 bg-brand-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button><button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-ink-500 hover:text-ink-300"><X className="w-4 h-4" /></button></div>}
             <div className="space-y-2">{tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No tasks yet</p> : tasks.map(t => <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800"><input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" /><span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-ink-500' : 'text-ink-100'}`}>{t.title}</span><span className="text-xs text-ink-500">{new Date(t.due_at).toLocaleDateString()}</span></div>)}</div>
           </div>

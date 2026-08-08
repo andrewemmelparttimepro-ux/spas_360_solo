@@ -74,6 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         temperature: 0.1,
         max_tokens: 700,
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { sanitizeSearchTerm } from '@/lib/utils';
 import type { Contact } from '@/types/database';
 
 export function useContacts() {
@@ -8,13 +9,23 @@ export function useContacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  // Typed input updates instantly; the multi-page fetch fires 250ms after the last keystroke
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const fetchSeq = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const fetchContacts = useCallback(async () => {
     if (!profile) return;
     setIsLoading(true);
+    const seq = ++fetchSeq.current; // out-of-order responses must never overwrite newer ones
 
     const pageSize = 1000;
     const allContacts: Contact[] = [];
+    const needle = sanitizeSearchTerm(debouncedQuery);
     for (let from = 0; ; from += pageSize) {
       let query = supabase
         .from('contacts')
@@ -27,22 +38,25 @@ export function useContacts() {
         query = query.eq('location_id', activeLocationId);
       }
 
-      if (searchQuery.trim()) {
-        query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+      if (needle) {
+        query = query.or(`first_name.ilike.%${needle}%,last_name.ilike.%${needle}%,phone.ilike.%${needle}%,email.ilike.%${needle}%`);
       }
 
       const { data, error } = await query;
       if (error) {
+        // Keep the last good list rather than silently committing a partial one
         console.error('Error fetching contacts:', error);
-        break;
+        if (seq === fetchSeq.current) setIsLoading(false);
+        return;
       }
       const page = (data ?? []) as Contact[];
       allContacts.push(...page);
       if (page.length < pageSize) break;
     }
+    if (seq !== fetchSeq.current) return;
     setContacts(allContacts);
     setIsLoading(false);
-  }, [profile, activeLocationId, searchQuery]);
+  }, [profile, activeLocationId, debouncedQuery]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 

@@ -45,6 +45,7 @@ export async function sendText(to: string, body: string): Promise<
         Authorization: `Basic ${Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64')}`,
       },
       body: new URLSearchParams({ To: e164, From: TWILIO_FROM, Body: body.trim() }),
+      signal: AbortSignal.timeout(20_000),
     }
   );
   const data = await twilioRes.json();

@@ -1,4 +1,4 @@
-import { Search, Phone, Mail, Send, Paperclip, MoreVertical, Users, MessageSquare, Plus, UserPlus, Hash } from 'lucide-react';
+import { Search, Phone, Send, Users, MessageSquare, UserPlus, Hash, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
 import { useTeamChat, type TeamThread } from '@/hooks/useTeamChat';
@@ -14,7 +14,7 @@ import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 type Tab = 'team' | 'customers';
 
-// âââ Avatar helper âââ
+// ─── Avatar helper ───
 function Avatar({ initials, color, small }: { initials: string; color: string; small?: boolean }) {
   return (
     <div className={cn(
@@ -38,7 +38,7 @@ function colorForId(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-// âââ Team Chat Panel âââ
+// ─── Team Chat Panel ───
 function TeamChatPanel() {
   const {
     threads, activeThread, activeThreadId, setActiveThreadId,
@@ -89,8 +89,11 @@ function TeamChatPanel() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Sidebar: Threads + Team */}
-      <div className="w-full md:w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
+      {/* Sidebar: Threads + Team. On phones the list and the conversation swap — never share the row. */}
+      <div className={cn(
+        'w-full md:w-80 border-r border-ink-700 flex-col bg-ink-950 shrink-0',
+        activeThread ? 'hidden md:flex' : 'flex'
+      )}>
         <div className="p-3 border-b border-ink-700 flex items-center gap-2">
           <button
             onClick={() => setShowNewDM(!showNewDM)}
@@ -189,12 +192,19 @@ function TeamChatPanel() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col bg-ink-900">
+      <div className={cn('flex-1 flex-col bg-ink-900', activeThread ? 'flex' : 'hidden md:flex')}>
         {activeThread ? (
           <>
             {/* Header */}
-            <div className="h-16 border-b border-ink-700 flex items-center justify-between px-6 shrink-0">
+            <div className="h-16 border-b border-ink-700 flex items-center justify-between px-4 sm:px-6 shrink-0">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setActiveThreadId(null)}
+                  className="md:hidden p-2 -ml-2 text-ink-400 hover:text-ink-200 rounded-lg hover:bg-ink-800 transition-colors"
+                  aria-label="Back to conversations"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
                 {(activeThread.participants || []).length > 2 ? (
                   <div className="w-10 h-10 rounded-full bg-ink-700 flex items-center justify-center">
                     <Users className="w-5 h-5 text-ink-400" />
@@ -219,7 +229,7 @@ function TeamChatPanel() {
               {messages.length === 0 ? (
                 <div className="text-center py-12">
                   <MessageSquare className="w-10 h-10 text-ink-300 mx-auto mb-3" />
-                  <p className="text-sm text-ink-500">No messages yet â say hello!</p>
+                  <p className="text-sm text-ink-500">No messages yet — say hello!</p>
                 </div>
               ) : messages.map(msg => {
                 const isMe = msg.sender_id === user?.id;
@@ -283,6 +293,7 @@ function TeamChatPanel() {
                 </div>
                 <button
                   onClick={handleSend}
+                  aria-label="Send message"
                   className="p-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors shrink-0 shadow-sm"
                 >
                   <Send className="w-5 h-5" />
@@ -302,21 +313,29 @@ function TeamChatPanel() {
   );
 }
 
-// âââ Customer Messages Panel (original) âââ
+// ─── Customer Messages Panel (original) ───
 function CustomerPanel() {
   const { threads, activeThread, setActiveThreadId, messages, isLoading, sendMessage, refresh } = useConversations();
   const { toast } = useToast();
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState('');
 
   const handleSend = async () => {
     if (!draft.trim() || sending) return;
     setSending(true);
     const { error } = await sendMessage(draft);
     setSending(false);
-    if (error) { toast(`Text not sent: ${error}`, 'error'); return; }
+    if (error) { toast(error, 'error'); return; }
     setDraft('');
   };
+
+  const needle = search.trim().toLowerCase();
+  const visibleThreads = needle
+    ? threads.filter(t =>
+        `${t.contact.first_name} ${t.contact.last_name}`.toLowerCase().includes(needle) ||
+        (t.latest_message ?? '').toLowerCase().includes(needle))
+    : threads;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
@@ -324,20 +343,27 @@ function CustomerPanel() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Thread List */}
-      <div className="w-full md:w-80 border-r border-ink-700 flex flex-col bg-ink-950 shrink-0">
+      {/* Thread List. On phones the list and the conversation swap — never share the row. */}
+      <div className={cn(
+        'w-full md:w-80 border-r border-ink-700 flex-col bg-ink-950 shrink-0',
+        activeThread ? 'hidden md:flex' : 'flex'
+      )}>
         <div className="p-4 border-b border-ink-700">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
-            <input type="text" placeholder="Search messages..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 outline-none" />
+            <input
+              type="text" placeholder="Search messages..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 outline-none"
+            />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {/* Ari's queued texts — one-tap approve, then Twilio fires */}
           <SmsApprovals onSent={refresh} />
-          {threads.length === 0 ? (
-            <p className="text-sm text-ink-500 text-center py-8">No customer conversations yet</p>
-          ) : threads.map(thread => (
+          {visibleThreads.length === 0 ? (
+            <p className="text-sm text-ink-500 text-center py-8">{needle ? 'No conversations match your search' : 'No customer conversations yet'}</p>
+          ) : visibleThreads.map(thread => (
             <div
               key={thread.id}
               onClick={() => setActiveThreadId(thread.id)}
@@ -356,15 +382,21 @@ function CustomerPanel() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-ink-900">
+      <div className={cn('flex-1 flex-col bg-ink-900', activeThread ? 'flex' : 'hidden md:flex')}>
         {activeThread ? (
           <>
-            <div className="h-16 border-b border-ink-700 flex items-center justify-between px-6 shrink-0">
+            <div className="h-16 border-b border-ink-700 flex items-center px-4 sm:px-6 shrink-0 gap-1">
+              <button
+                onClick={() => setActiveThreadId(null)}
+                className="md:hidden p-2 -ml-2 text-ink-400 hover:text-ink-200 rounded-lg hover:bg-ink-800 transition-colors"
+                aria-label="Back to conversations"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
               <div>
                 <h2 className="text-lg font-semibold text-ink-100">{activeThread.contact.first_name} {activeThread.contact.last_name}</h2>
                 <p className="text-xs text-ink-400 flex items-center"><Phone className="w-3 h-3 mr-1" />{activeThread.contact.phone}</p>
               </div>
-              <button className="p-2 text-ink-500 hover:text-ink-300 hover:bg-ink-800 rounded-lg transition-colors"><MoreVertical className="w-5 h-5" /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-ink-950/50">
@@ -382,7 +414,6 @@ function CustomerPanel() {
 
             <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-ink-700 bg-ink-900 shrink-0">
               <div className="flex items-end space-x-2">
-                <button className="p-3 text-ink-500 hover:text-ink-300 hover:bg-ink-800 rounded-lg transition-colors shrink-0"><Paperclip className="w-5 h-5" /></button>
                 <VoiceDictationControl value={draft} onValueChange={setDraft} disabled={sending} />
                 <div className="flex-1 bg-ink-950 rounded-xl border border-transparent focus-within:border-brand-500 focus-within:bg-ink-900 focus-within:ring-1 focus-within:ring-brand-500 transition-all">
                   <textarea
@@ -392,7 +423,7 @@ function CustomerPanel() {
                     className="w-full bg-transparent border-none p-3 text-base sm:text-sm outline-none resize-none"
                   />
                 </div>
-                <button onClick={handleSend} className="p-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors shrink-0 shadow-sm"><Send className="w-5 h-5" /></button>
+                <button onClick={handleSend} aria-label="Send text message" className="p-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl transition-colors shrink-0 shadow-sm"><Send className="w-5 h-5" /></button>
               </div>
             </div>
           </>
@@ -406,7 +437,7 @@ function CustomerPanel() {
   );
 }
 
-// âââ Main Communication Page âââ
+// ─── Main Communication Page ───
 export default function Communication() {
   const [activeTab, setActiveTab] = useState<Tab>('team');
 

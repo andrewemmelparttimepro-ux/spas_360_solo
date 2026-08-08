@@ -23,7 +23,7 @@ export default function AppLayout() {
       <ActivityTracker />
       {/* 100dvh (not vh): the shell tracks the real visible viewport on mobile, so
           bottom-anchored composers aren't stranded when browser chrome/keyboard moves */}
-      <div className="flex flex-col h-[100dvh] bg-ink-950 text-ink-100 font-sans">
+      <div className="flex flex-col h-[100dvh] bg-[var(--color-app-canvas)] text-ink-100 font-sans">
         <Header onMenuClick={() => setDrawerOpen(true)} />
         <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <div className="flex flex-1 overflow-hidden">

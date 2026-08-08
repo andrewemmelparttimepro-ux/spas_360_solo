@@ -336,7 +336,7 @@ export default function Service() {
         {/* Stacked on phones the section scrolls; side-by-side on lg+ each pane owns its scroll */}
         <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden gap-4">
           {/* ─── Schedule board (left, like Jobber's calendar) ─── */}
-          <div className="flex-1 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden min-h-[420px]">
+          <div className="schedule-calendar flex-1 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden min-h-[420px]">
             <div className="p-3 sm:p-4 border-b border-ink-700 flex flex-wrap justify-between items-center gap-2 bg-ink-950">
               <div className="flex items-center gap-2">
                 <button onClick={goBack} className="p-1.5 hover:bg-ink-700 rounded-lg transition-colors" aria-label="Previous"><ChevronLeft className="w-4 h-4 text-ink-300" /></button>
@@ -524,6 +524,9 @@ export default function Service() {
                           <Link to={`/service/${job.id}`} onClick={e => e.stopPropagation()} className="block text-xs font-semibold leading-snug mt-0.5 hover:underline underline-offset-2">
                             {job.title}
                           </Link>
+                          <p className="mt-1 text-[10px] font-medium opacity-80">
+                            Created {format(new Date(job.created_at), 'MMM d, yyyy')}
+                          </p>
                         </div>
                       )}
                     </Draggable>

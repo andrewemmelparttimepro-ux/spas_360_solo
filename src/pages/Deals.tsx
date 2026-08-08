@@ -77,13 +77,8 @@ export default function Deals() {
       setAttach(null);
       return;
     }
-    const oldName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : 'no one';
-    await supabase.from('notes').insert({
-      deal_id: deal.id,
-      contact_id: customer.id,
-      body: `🔗 ${profile.first_name} ${profile.last_name} attached ${customer.first_name} ${customer.last_name} to this deal (was ${oldName}).`,
-      created_by: profile.id,
-    });
+    // Customer Notes are reserved for humans — the attach itself lands in the
+    // audit ledger, not the customer-facing timeline (customerNotes contract).
     toast(`${customer.first_name} attached to “${deal.title}”`, 'success');
     setAttach(null);
     spotlight(deal.id);
@@ -193,7 +188,7 @@ export default function Deals() {
         </div>
       )}
 
-      <div className="mb-5 overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/90 shadow-sm">
+      <div className="mb-5 shrink-0 overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/90 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-950/80 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-300">Sales follow-up control</p>
@@ -239,9 +234,14 @@ export default function Deals() {
           <FollowUpStat label="Overdue" value={overdueFollowUps} tone={overdueFollowUps ? 'danger' : 'good'} />
           <FollowUpStat label="Due today" value={dueToday} tone={dueToday ? 'warning' : 'neutral'} />
         </div>
-        <div className="overflow-x-auto">
+        <div
+          className="max-h-[60vh] overflow-auto"
+          role="region"
+          aria-label="Active deals table"
+          tabIndex={0}
+        >
           <table className="min-w-full divide-y divide-ink-800 text-sm">
-            <thead className="bg-ink-950/70 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
+            <thead className="sticky top-0 z-10 bg-ink-950 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
               <tr>
                 <th className="px-5 py-3">Deal</th>
                 <th className="px-5 py-3">Customer</th>
@@ -301,7 +301,7 @@ export default function Deals() {
       </div>
 
       {/* The live board, realtime scoreboard above the pipeline */}
-      <SalesBoard deals={visibleDeals} stages={stages} />
+      <SalesBoard deals={visibleDeals} stages={stages} followUpsByDeal={followUpsByDeal} />
 
       <div className="overflow-x-auto pb-4" data-cdrop-scroll>
         <DragDropContext onDragEnd={moveDeal}>

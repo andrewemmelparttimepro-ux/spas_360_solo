@@ -76,10 +76,11 @@
 
 :root {
   color-scheme: light;
+  --color-app-canvas: #D1D5DB;
 }
 
 body {
-  background: var(--color-ink-950);
+  background: var(--color-app-canvas);
   color: var(--color-ink-100);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -149,9 +150,45 @@ body {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 20px 42px -32px rgba(15, 23, 42, 0.5);
 }
 
+/* The personalized welcome is a dark island inside the light dashboard. */
+.dashboard-welcome {
+  --color-ink-300: #D2DAE5;
+  --color-brand-200: #BAE6FD;
+}
+
+/* The Schedule calendar remains a dark operational surface against the gray app canvas. */
+.schedule-calendar {
+  --color-ink-950: #08111F;
+  --color-ink-900: #0D1726;
+  --color-ink-850: #142033;
+  --color-ink-800: #1B2A3F;
+  --color-ink-700: #2A3A50;
+  --color-ink-600: #3C4E65;
+  --color-ink-500: #7F8EA3;
+  --color-ink-400: #A9B5C5;
+  --color-ink-300: #D2DAE5;
+  --color-ink-200: #E3E8EF;
+  --color-ink-100: #F7F9FC;
+  --color-brand-200: #BAE6FD;
+  --color-brand-300: #7CC4F4;
+  --color-brand-400: #45ACF2;
+  --color-emerald-200: #A7F3D0;
+  --color-emerald-300: #6EE7B7;
+  --color-amber-200: #FDE68A;
+  --color-amber-300: #FCD34D;
+  --color-orange-200: #FED7AA;
+  --color-red-200: #FECACA;
+  color-scheme: dark;
+  box-shadow: 0 18px 42px -22px rgba(8, 17, 31, 0.72);
+}
+
 /* Status labels sit on pale cards in the working canvas; keep Warranty legible. */
 .app-main .text-orange-200 {
   color: #9A3412 !important;
+}
+
+.app-main .schedule-calendar .text-orange-200 {
+  color: var(--color-orange-200) !important;
 }
 
 /* Quiet scrollbars for the light application shell. */
@@ -178,11 +215,11 @@ button:not(:disabled) {
   transition-duration: 150ms;
 }
 button:not(:disabled):hover {
-  filter: brightness(0.96) saturate(1.08);
+  filter: brightness(0.92) saturate(1.12) contrast(1.06);
 }
 .app-header button:not(:disabled):hover,
 .admin-rail button:not(:disabled):hover {
-  filter: brightness(1.12) saturate(1.08);
+  filter: brightness(1.18) saturate(1.12) contrast(1.06);
 }
 
 /* Accessible, on-brand keyboard focus */

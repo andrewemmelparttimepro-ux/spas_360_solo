@@ -7,6 +7,11 @@ import StoreSwitcher from '@/components/StoreSwitcher';
 import InventoryEditor from '@/components/InventoryEditor';
 import type { InventoryItem } from '@/types/database';
 import { cn } from '@/lib/utils';
+import {
+  joinSerialAndFlooring,
+  serialNumberForDisplay,
+  splitSerialAndFlooring,
+} from '@/lib/inventoryFields';
 
 // --------------- Inline editable cell ---------------
 function EditableCell({
@@ -31,7 +36,9 @@ function EditableCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ''));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
+  const requiresExplicitCommit = type === 'date' || type === 'select';
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -41,40 +48,86 @@ function EditableCell({
   useEffect(() => { if (!editing) setDraft(String(value ?? '')); }, [value, editing]);
 
   const commit = async () => {
-    if (draft === String(value ?? '')) { setEditing(false); return; }
+    const submittedValue = inputRef.current?.value ?? draft;
+    setDraft(submittedValue);
+    if (submittedValue === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
-    const parsed = type === 'number' ? (draft ? parseFloat(draft) : null) : draft;
-    await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
-    setSaving(false);
+    setSaveError(null);
+    const parsed = type === 'number' ? (submittedValue ? parseFloat(submittedValue) : null) : submittedValue;
+    try {
+      const saved = await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
+      if (saved) {
+        setEditing(false);
+        return;
+      }
+      setSaveError('Could not save. Try again.');
+    } catch {
+      setSaveError('Could not save. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => {
+    setDraft(String(value ?? ''));
+    setSaveError(null);
     setEditing(false);
   };
 
-  const cancel = () => { setDraft(String(value ?? '')); setEditing(false); };
-
   if (editing) {
-    return type === 'select' ? (
-      <select
-        ref={inputRef as React.RefObject<HTMLSelectElement>}
-        value={draft}
-        onChange={e => { setDraft(e.target.value); }}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Escape') cancel(); }}
-        disabled={saving}
-        className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 min-w-[100px] focus:ring-2 focus:ring-brand-500/30"
-      >
-        {options?.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    ) : (
-      <input
-        ref={inputRef as React.RefObject<HTMLInputElement>}
-        type={type}
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
-        disabled={saving}
-        className={cn("px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500/30 w-full max-w-[160px]", type === 'number' && 'text-right max-w-[100px]')}
-      />
+    return (
+      <span className="inline-flex flex-col items-start gap-1">
+        <span className="inline-flex items-center gap-1">
+          {type === 'select' ? (
+            <select
+              ref={inputRef as React.RefObject<HTMLSelectElement>}
+              value={draft}
+              onChange={e => { setDraft(e.target.value); setSaveError(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+              disabled={saving}
+              className="px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none bg-ink-900 min-w-[100px] focus:ring-2 focus:ring-brand-500/30"
+            >
+              {options?.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input
+              ref={inputRef as React.RefObject<HTMLInputElement>}
+              type={type}
+              value={draft}
+              onChange={e => { setDraft(e.target.value); setSaveError(null); }}
+              onBlur={requiresExplicitCommit ? undefined : commit}
+              onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
+              disabled={saving}
+              className={cn("px-2 py-1 border border-brand-500 rounded-lg text-xs outline-none focus:ring-2 focus:ring-brand-500/30 w-full max-w-[160px]", type === 'number' && 'text-right max-w-[100px]')}
+            />
+          )}
+          {requiresExplicitCommit && (
+            <>
+              <button
+                type="button"
+                onClick={commit}
+                disabled={saving}
+                aria-label={`Save ${field}`}
+                title="Save"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={cancel}
+                disabled={saving}
+                aria-label={`Cancel ${field}`}
+                title="Cancel"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-ink-700 text-ink-400 hover:bg-ink-800 disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </span>
+        {saveError && <span role="alert" className="text-[11px] font-medium text-red-400">{saveError}</span>}
+      </span>
     );
   }
 
@@ -84,7 +137,7 @@ function EditableCell({
 
   return (
     <span
-      onClick={() => setEditing(true)}
+      onClick={() => { setSaveError(null); setEditing(true); }}
       className={cn(
         "cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 group inline-flex items-center gap-1",
         className
@@ -97,19 +150,13 @@ function EditableCell({
   );
 }
 
-const splitSerialAndFlooring = (sku: string | null) => {
-  const value = (sku ?? '').trim();
-  const quoted = value.match(/^(.*?)\s*["“](.+?)["”]\s*$/);
-  if (quoted) return { serial: quoted[1].trim(), flooring: quoted[2].trim() };
-
-  const knownFlooring = value.match(/^(.*?)\s+(Wells Fargo|WF|TCCU(?:\s+Minot)?|MCHL(?:\s+TCCU)?|Consignment(?:\s+from\s+\w+)?|Paid Off(?:\s+by\s+\w+)?|Spas Etc(?:\s+TCCU)?|Spas TCCU)$/i);
-  return knownFlooring
-    ? { serial: knownFlooring[1].trim(), flooring: knownFlooring[2].trim() }
-    : { serial: value, flooring: '' };
+const importedCustomerOrStock = (item: InventoryItem) => {
+  const importedCustomer = item.notes?.match(/(?:^|·)\s*Customer:\s*(.*?)(?=\s*·|$)/i)?.[1]?.trim();
+  if (importedCustomer) {
+    return importedCustomer.toUpperCase() === 'STOCK' ? 'Stock' : importedCustomer;
+  }
+  return item.customer_id ? 'Customer' : 'Stock';
 };
-
-const joinSerialAndFlooring = (serial: string, flooring: string) =>
-  flooring.trim() ? `${serial.trim()} "${flooring.trim()}"`.trim() : serial.trim();
 
 function InventoryTextCell({
   item,
@@ -131,7 +178,11 @@ function InventoryTextCell({
     });
   };
 
-  return <EditableCell value={parsed[part]} field={part} itemId={item.id} onSave={handleSave} />;
+  const displayValue = part === 'serial'
+    ? serialNumberForDisplay(parsed.serial)
+    : parsed.flooring;
+
+  return <EditableCell value={displayValue} field={part} itemId={item.id} onSave={handleSave} />;
 }
 
 function OnHandCell({
@@ -175,7 +226,6 @@ export default function Inventory() {
     { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-500/15 text-red-400' },
   ];
   const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
-  const customerOrStock = (item: InventoryItem) => item.customer_id ? 'Customer' : 'Stock';
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -266,7 +316,7 @@ export default function Inventory() {
                   <td className="p-4 text-sm text-ink-300">
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">{customerOrStock(item)}</td>
+                  <td className="p-4 text-sm text-ink-300">{importedCustomerOrStock(item)}</td>
                   <td className="p-4 text-sm text-ink-300">
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
                   </td>

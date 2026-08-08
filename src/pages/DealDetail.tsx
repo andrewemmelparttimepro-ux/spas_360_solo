@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, AlertCircle, Plus, Save, X, Pencil, Bot, Clock3 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3 } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
@@ -179,7 +179,7 @@ export default function DealDetail() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
         <Link to="/deals" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
-        <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-400 mt-1 inline-block">{contact.first_name} {contact.last_name} · {contact.phone}</Link>}</div>
+        <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300 mt-1 inline-block">{contact.first_name} {contact.last_name} · {contact.phone}</Link>}</div>
         <div className="flex flex-col items-start gap-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Priority</span>
           <EditablePriority value={deal.priority} onSave={saveDeal} />

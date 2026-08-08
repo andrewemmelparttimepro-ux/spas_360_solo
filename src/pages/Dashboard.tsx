@@ -1,13 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Wrench, AlertCircle, Plus, BarChart3, Sparkles } from 'lucide-react';
+import { DollarSign, Users, Wrench, AlertCircle, Plus, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 import QuickCreate from '@/components/QuickCreate';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { trackClarityEvent } from '@/lib/clarity';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
@@ -20,10 +19,9 @@ type ActionType = 'task' | 'part' | 'invoice' | 'lead';
 
 const actionDotColors: Record<ActionType, string> = { task: 'bg-amber-500', part: 'bg-brand-400', invoice: 'bg-emerald-500', lead: 'bg-purple-500' };
 const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/deals', lead: '/deals' };
-const clarityPeriodTokens: Record<DashboardPeriod, string> = { week: 'week', month: 'month', lastMonth: 'last_month' };
 
 export default function Dashboard() {
-  const { profile, activeLocationId, locations } = useAuth();
+  const { profile } = useAuth();
   const [period, setPeriod] = useState<DashboardPeriod>('week');
   const [showCreate, setShowCreate] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -45,20 +43,9 @@ export default function Dashboard() {
     setLogoUrl(signed?.signedUrl ?? null);
   }, [profile]);
 
-  useEffect(() => { loadLogo(); }, [loadLogo]);
-
-  const trackPeriodSelector = useCallback((kind: 'focus' | 'open' | 'change', nextPeriod?: DashboardPeriod) => {
-    if (kind === 'change' && nextPeriod) {
-      const token = clarityPeriodTokens[nextPeriod] || String(nextPeriod || 'unknown').toLowerCase();
-      trackClarityEvent(`spas_dashboard_period_change_${token}`);
-      return;
-    }
-    trackClarityEvent(`spas_dashboard_period_selector_${kind}`);
-  }, []);
-
-  const activeLocationName = activeLocationId
-    ? locations.find((location) => location.id === activeLocationId)?.name ?? 'your store'
-    : 'all stores';
+  useEffect(() => {
+    void loadLogo();
+  }, [loadLogo]);
 
   if (isLoading) {
     return (
@@ -85,18 +72,8 @@ export default function Dashboard() {
         <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
         <div className="flex items-center gap-3">
           <select
-            id="dashboard-period-selector"
-            name="dashboard-period-selector"
-            aria-label="Dashboard period selector"
-            data-analytics="dashboard-period-selector"
             value={period}
-            onClick={() => trackPeriodSelector('open')}
-            onFocus={() => trackPeriodSelector('focus')}
-            onChange={(e) => {
-              const nextPeriod = e.target.value as DashboardPeriod;
-              trackPeriodSelector('change', nextPeriod);
-              setPeriod(nextPeriod);
-            }}
+            onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
             className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
           >
             {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
@@ -114,32 +91,20 @@ export default function Dashboard() {
 
       {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
 
-      <div className="overflow-hidden rounded-2xl border border-ink-700 bg-[radial-gradient(circle_at_top_left,_rgba(16,117,184,0.22),_transparent_45%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.86))] p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              Brandon's dashboard view
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+      <section className="dashboard-welcome overflow-hidden rounded-2xl border border-ink-700 bg-[radial-gradient(circle_at_top_left,_rgba(16,117,184,0.22),_transparent_45%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.86))] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-200">Spas 360</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
               Welcome back{profile ? `, ${profile.first_name}` : ''}
             </h2>
-            <p className="mt-2 max-w-2xl text-sm text-ink-300">
-              Here's the live pulse for {activeLocationName}, with the sales board, service load, and customer momentum in one place.
-            </p>
+            <p className="mt-2 text-sm text-ink-300">Your dealership pulse, personalized for the team.</p>
           </div>
-          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            <div className="flex h-16 w-20 items-center justify-center rounded-xl bg-white/95 p-2 shadow-sm">
-              <img src={logoUrl ?? '/logo-mark.png'} alt="Business logo" className="max-h-full max-w-full object-contain" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-400">Sales tool branding</p>
-              <p className="mt-1 text-sm font-medium text-white">Personalized dashboard header is live.</p>
-              <p className="mt-1 text-xs text-ink-400">Approved logo shows here automatically when a branded asset is attached in Settings.</p>
-            </div>
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center rounded-2xl bg-white p-3 shadow-sm">
+            <img src={logoUrl ?? '/logo-mark.png'} alt="Spas 360 business logo" className="max-h-full max-w-full object-contain" />
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statMeta.map((meta) => {

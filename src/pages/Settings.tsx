@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/Toast';
 import { LogOut, User, MapPin, Shield, Users, MailPlus, X, BellRing, ImagePlus, Loader2, CheckCircle2 } from 'lucide-react';
 import type { Profile } from '@/types/database';
 import { pushSupported, pushPermission, pushEnabledHere, enablePush, disablePush } from '@/lib/push';
+import MigrationCenter from '@/components/MigrationCenter';
 
 interface AppInvite {
   id: string;
@@ -369,6 +370,9 @@ export default function Settings() {
 
       {/* Canonical brand asset used by server-rendered Ari artifacts */}
       <BrandAssetsPanel />
+
+      {/* Owner-only, API-backed OAuth migration workflow */}
+      <MigrationCenter />
 
       {/* Team & permissions — owner/manager only */}
       <TeamPanel />

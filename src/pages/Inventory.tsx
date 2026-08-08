@@ -238,8 +238,9 @@ export default function Inventory() {
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Inventory Management</h1>
-          <p className="hidden sm:block text-sm text-ink-400 mt-1">Track units, parts, and chemicals across locations &mdash; click any cell to edit</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600">Sales</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Inventory</h1>
+          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Track units, parts, and chemicals across locations &mdash; click any cell to edit</p>
         </div>
         <div className="flex space-x-3">
           <button onClick={() => setEditorTarget('new')} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
@@ -262,9 +263,9 @@ export default function Inventory() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 shrink-0">
         {summaryCards.map(card => (
-          <div key={card.label} className="bg-ink-900 p-5 rounded-xl border border-ink-700 shadow-sm flex items-center">
-            <div className={`p-3 rounded-lg mr-4 ${card.color}`}><Package className="w-6 h-6" /></div>
-            <div><p className="text-sm font-medium text-ink-400">{card.label}</p><p className="text-2xl font-bold text-ink-100">{card.value}</p></div>
+          <div key={card.label} className="bg-ink-900 p-4 rounded-xl border border-ink-700 shadow-sm flex items-center">
+            <div className={`p-2.5 rounded-lg mr-3 ${card.color}`}><Package className="w-5 h-5" /></div>
+            <div><p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{card.label}</p><p className="text-xl font-bold text-ink-100">{card.value}</p></div>
           </div>
         ))}
       </div>

@@ -35,7 +35,10 @@ export default function Reports() {
         </div>
       )}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Reports</h1>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">The Office</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Reports</h1>
+        </div>
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}

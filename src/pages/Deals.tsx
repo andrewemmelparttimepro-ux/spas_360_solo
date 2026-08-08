@@ -128,8 +128,9 @@ export default function Deals() {
     <div className="max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Deals</h1>
-          <p className="hidden sm:block text-sm text-ink-400 mt-1">Every customer, every stage — live</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600">Sales</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Deals</h1>
+          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Every customer, every stage — live</p>
         </div>
         {/* Violet = customer action, everywhere it appears (page color system) */}
         <button onClick={() => setShowWizard(true)} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">

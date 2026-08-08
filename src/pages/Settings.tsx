@@ -340,7 +340,10 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Settings</h1>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">The Office</p>
+        <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Settings</h1>
+      </div>
 
       {/* Profile */}
       <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">

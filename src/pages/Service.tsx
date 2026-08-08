@@ -249,8 +249,9 @@ export default function Service() {
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Service Schedule</h1>
-          <p className="hidden sm:block text-sm text-ink-400 mt-1">Drag jobs from the queue onto a day — drag back to unschedule</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Service</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Schedule</h1>
+          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Drag jobs from the queue onto a day — drag back to unschedule</p>
         </div>
         <button
           onClick={() => {

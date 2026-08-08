@@ -69,7 +69,10 @@ export default function Dashboard() {
         </div>
       )}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">Overview</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
+        </div>
         <div className="flex items-center gap-3">
           <select
             value={period}

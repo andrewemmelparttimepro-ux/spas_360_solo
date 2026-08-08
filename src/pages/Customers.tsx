@@ -86,8 +86,9 @@ export default function Customers() {
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-100 tracking-tight">Customers</h1>
-          <p className="hidden sm:block text-sm text-ink-400 mt-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">Relationships</p>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Customers</h1>
+          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">
             {cards.length} relationships — grab a card and drag it onto <span className="text-brand-300 font-medium">Deals</span> or <span className="text-emerald-300 font-medium">Schedule</span> up top
           </p>
         </div>

@@ -46,7 +46,9 @@ describe('Suggestion Box access model', () => {
     ]);
 
     assert.match(header, /aria-label="Open Suggestion Box"/);
-    assert.match(header, />Suggestion Box</);
+    // 2026-08-08: the header entry point is a quiet icon (title + aria-label),
+    // not a labeled pill — hierarchy pass per Andrew.
+    assert.match(header, /title="Suggestion Box"/);
     assert.match(component, /from\('suggestions'\)\.insert/);
     assert.match(component, /isManager && \(/);
     assert.match(component, /role="dialog"/);

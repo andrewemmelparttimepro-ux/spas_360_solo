@@ -54,7 +54,7 @@ export function useCustomerCards() {
 
     const [contactRes, stageRes, dealRes, jobRes, equipRes, taskRes] = await Promise.all([
       fetchEveryContact(),
-      supabase.from('pipeline_stages').select('id, name').eq('org_id', profile.org_id),
+      supabase.from('pipeline_stages').select('id, name, is_won, is_lost').eq('org_id', profile.org_id),
       supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id),
       supabase.from('jobs').select('contact_id, status, amount_to_collect, service_level').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),
       supabase.from('inventory_items').select('customer_id').eq('org_id', profile.org_id).not('customer_id', 'is', null),
@@ -64,16 +64,16 @@ export function useCustomerCards() {
     if (contactRes.error) console.error('Error fetching customers:', contactRes.error);
     setContacts((contactRes.data as typeof contacts) ?? []);
 
-    const stageName = new Map((stageRes.data ?? []).map(s => [s.id as string, s.name as string]));
+    const stageFlags = new Map((stageRes.data ?? []).map(s => [s.id as string, { won: !!s.is_won, lost: !!s.is_lost }]));
     const deals = new Map<string, { open: number; openValue: number; won: number }>();
     const dealContact = new Map<string, string>(); // deal id → contact id (open deals only)
     for (const d of dealRes.data ?? []) {
       const cid = d.contact_id as string;
-      const name = stageName.get(d.stage_id as string) ?? '';
+      const flags = stageFlags.get(d.stage_id as string) ?? { won: false, lost: false };
       const agg = deals.get(cid) ?? { open: 0, openValue: 0, won: 0 };
-      if (name === 'Closed - Won') {
+      if (flags.won) {
         agg.won += Number(d.amount) || 0;
-      } else if (name !== 'Closed - Lost') {
+      } else if (!flags.lost) {
         agg.open += 1;
         agg.openValue += Number(d.amount) || 0;
         dealContact.set(d.id as string, cid);

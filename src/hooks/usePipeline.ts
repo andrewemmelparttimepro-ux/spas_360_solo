@@ -108,93 +108,10 @@ export function usePipeline() {
     return deals.filter(d => d.stage_id === stageId);
   }, [deals]);
 
-  // ─── Sales → Service bridge ─────────────────────────────
-  // A won deal becomes a Delivery job in the unscheduled queue ("Wyant – Hot Tub – Delivery"),
-  // the contact is promoted to Customer, and service managers get notified.
-  // Returns true only when the full handoff really happened — the caller's toast must not lie.
-  const handleDealWon = useCallback(async (deal: PipelineDeal): Promise<boolean> => {
-    if (!profile) return false;
-
-    // Guard: don't stack delivery jobs if one is already open for this contact.
-    // An errored guard must NOT pass as "no job exists" — that creates duplicates.
-    const { data: existing, error: guardError } = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('org_id', profile.org_id)
-      .eq('contact_id', deal.contact_id)
-      .eq('job_type', 'Delivery')
-      .not('status', 'in', '("Completed","Cancelled")')
-      .limit(1);
-    if (guardError) {
-      console.error('Error checking for existing delivery job:', guardError);
-      toast(`Deal moved, but the delivery handoff failed: ${guardError.message}. Create the delivery job manually.`, 'error');
-      return false;
-    }
-
-    if (existing.length === 0) {
-      // Jobs require a location — deal's, then the user's, then the org's first
-      let locationId = deal.location_id ?? profile.location_id ?? null;
-      if (!locationId) {
-        const { data: loc } = await supabase.from('locations').select('id').eq('org_id', profile.org_id).limit(1).single();
-        locationId = loc?.id ?? null;
-      }
-      if (!locationId) {
-        toast('Deal moved, but no store location exists to attach the delivery job to.', 'error');
-        return false;
-      }
-      const { error: jobError } = await supabase.from('jobs').insert({
-        org_id: profile.org_id,
-        contact_id: deal.contact_id,
-        location_id: locationId,
-        title: `${deal.title} – Delivery`,
-        job_type: 'Delivery',
-        status: 'Delivery',
-        priority: deal.priority,
-        amount_to_collect: deal.amount,
-        description: `Auto-created when the deal was won. Confirm delivery time with the customer, then drag onto the schedule.`,
-        created_by: profile.id,
-      });
-      if (jobError) {
-        console.error('Error creating delivery job:', jobError);
-        toast(`Deal moved, but creating the delivery job failed: ${jobError.message}. Create it manually.`, 'error');
-        return false;
-      }
-    }
-
-    // Lead becomes a Customer
-    const { error: promoteError } = await supabase.from('contacts').update({ customer_type: 'Customer' }).eq('id', deal.contact_id);
-    if (promoteError) {
-      console.error('Error promoting contact to Customer:', promoteError);
-      toast(`Delivery job created, but promoting the lead to Customer failed: ${promoteError.message}`, 'error');
-    }
-
-    // Tell the service side a delivery just landed in their queue
-    const { data: managers, error: managersError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('org_id', profile.org_id)
-      .in('role', ['service_manager', 'owner_manager']);
-    if (managersError) console.error('Error fetching managers for won-deal ping:', managersError);
-    const notifyResults = await Promise.all((managers ?? []).filter(m => m.id !== profile.id).map(m =>
-      supabase.from('notifications').insert({
-        user_id: m.id,
-        type: 'job',
-        title: `Deal won: ${deal.title}`,
-        body: 'A delivery job was added to the unscheduled queue.',
-        link: '/service',
-      })
-    ));
-    notifyResults.forEach(r => { if (r.error) console.error('Error sending won-deal notification:', r.error); });
-
-    return true;
-  }, [profile, toast]);
-
   const moveDeal = useCallback(async (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-
-    const movedDeal = deals.find(d => d.id === draggableId);
 
     // Optimistic update
     setDeals(prev => {
@@ -205,25 +122,29 @@ export function usePipeline() {
       return updated;
     });
 
-    // Persist to Supabase
-    const { error } = await supabase
-      .from('deals')
-      .update({ stage_id: destination.droppableId, position: destination.index })
-      .eq('id', draggableId);
+    // Atomic server-side move: renumbers both stages, and the DB trigger owns
+    // the entire won-deal handoff (delivery job, customer promotion, manager
+    // pings) — identical no matter which path wins the deal.
+    const { error } = await supabase.rpc('move_deal', {
+      p_deal_id: draggableId,
+      p_stage_id: destination.droppableId,
+      p_position: destination.index,
+    });
 
     if (error) {
       console.error('Error moving deal:', error);
+      toast(`Couldn't move that deal: ${error.message}`, 'error');
       fetchPipeline(); // Revert on error
       return;
     }
 
-    // Crossing into Closed-Won triggers the sales → service handoff
-    const wonStage = stages.find(s => s.name === 'Closed - Won');
-    if (movedDeal && wonStage && destination.droppableId === wonStage.id && source.droppableId !== wonStage.id) {
-      const handedOff = await handleDealWon(movedDeal);
-      if (handedOff) toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
+    // Celebrate the non-won → won crossing (the work already happened in the DB)
+    const destStage = stages.find(s => s.id === destination.droppableId);
+    const sourceStage = stages.find(s => s.id === source.droppableId);
+    if (destStage?.is_won && !sourceStage?.is_won) {
+      toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
     }
-  }, [deals, stages, fetchPipeline, handleDealWon, toast]);
+  }, [stages, fetchPipeline, toast]);
 
   const createDeal = useCallback(async (deal: Partial<Deal>) => {
     if (!profile) return null;

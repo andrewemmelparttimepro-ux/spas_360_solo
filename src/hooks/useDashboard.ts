@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths,
-  eachDayOfInterval, eachWeekOfInterval, format, isWithinInterval, parseISO,
+  eachDayOfInterval, eachWeekOfInterval, format, isWithinInterval,
 } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,9 +35,6 @@ interface RevenuePoint {
   revenue: number;
 }
 
-const WON_STAGE = 'Closed - Won';
-const LOST_STAGE = 'Closed - Lost';
-
 function rangeFor(period: DashboardPeriod): { start: Date; end: Date } {
   const now = new Date();
   switch (period) {
@@ -52,31 +49,31 @@ function rangeFor(period: DashboardPeriod): { start: Date; end: Date } {
   }
 }
 
-interface ClosedDeal { amount: number; closedAt: Date }
+// The DB aggregates revenue per dealership-local day ({d: 'YYYY-MM-DD', v: dollars});
+// this only maps those days into the chart's display buckets.
+type DailyRevenue = { d: string; v: number };
 
 /**
- * Build the revenue chart from real closed-won deals.
  * Week → one bucket per weekday; month/lastMonth → one bucket per calendar week.
- * `updated_at` is the best-available realization signal (no dedicated closed_at column).
+ * Revenue realizes on deals.closed_at, aggregated server-side (no row caps).
  */
-function bucketRevenue(deals: ClosedDeal[], period: DashboardPeriod, range: { start: Date; end: Date }): RevenuePoint[] {
+function bucketRevenue(daily: DailyRevenue[], period: DashboardPeriod, range: { start: Date; end: Date }): RevenuePoint[] {
+  const byDay = new Map(daily.map((r) => [r.d, Number(r.v) || 0]));
   if (period === 'week') {
     const days = eachDayOfInterval({ start: range.start, end: range.end });
-    return days.map((day) => {
-      const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
-      const revenue = deals
-        .filter((d) => isWithinInterval(d.closedAt, { start: day, end: dayEnd }))
-        .reduce((s, d) => s + d.amount, 0);
-      return { name: format(day, 'EEE'), revenue };
-    });
+    return days.map((day) => ({
+      name: format(day, 'EEE'),
+      revenue: byDay.get(format(day, 'yyyy-MM-dd')) ?? 0,
+    }));
   }
 
   const weeks = eachWeekOfInterval({ start: range.start, end: range.end }, { weekStartsOn: 1 });
   return weeks.map((weekStart, i) => {
     const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-    const revenue = deals
-      .filter((d) => isWithinInterval(d.closedAt, { start: weekStart, end: weekEnd }))
-      .reduce((s, d) => s + d.amount, 0);
+    const revenue = daily.reduce((sum, r) => {
+      const day = new Date(`${r.d}T00:00:00`); // local midnight — matches the DB's local-day grouping
+      return isWithinInterval(day, { start: weekStart, end: weekEnd }) ? sum + (Number(r.v) || 0) : sum;
+    }, 0);
     return { name: `Wk ${i + 1}`, revenue };
   });
 }
@@ -95,56 +92,43 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
     if (!profile) return;
     setIsLoading(true);
 
-    const [dealsRes, jobsRes, partsRes, tasksRes] = await Promise.all([
-      supabase.from('deals').select('amount, updated_at, stage_id, pipeline_stages!inner(name)').eq('org_id', profile.org_id),
-      supabase.from('jobs').select('id, status, scheduled_at').eq('org_id', profile.org_id),
-      supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']),
+    const range = rangeFor(period);
+
+    // Money and counts aggregate in SQL (no 1,000-row cap can understate them);
+    // the two list queries below only feed the Requires Attention feed.
+    const [summaryRes, partsRes, tasksRes] = await Promise.all([
+      supabase.rpc('dashboard_summary', {
+        p_start: range.start.toISOString(),
+        p_end: range.end.toISOString(),
+      }),
+      supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']).limit(200),
       supabase.from('tasks').select('id, title, status, due_at, deal_id').eq('assigned_to', profile.id).in('status', ['Pending', 'Overdue']).order('due_at').limit(10),
     ]);
 
     // Zeros on the money tiles must mean "zero", never "the query failed"
-    const firstError = dealsRes.error ?? jobsRes.error ?? partsRes.error ?? tasksRes.error;
+    const firstError = summaryRes.error ?? partsRes.error ?? tasksRes.error;
     if (firstError) console.error('Error loading dashboard:', firstError);
     setLoadError(firstError ? firstError.message : null);
 
-    const deals = dealsRes.data ?? [];
-    const jobs = jobsRes.data ?? [];
+    const summary = (summaryRes.data ?? {}) as {
+      total_revenue?: number;
+      revenue_daily?: DailyRevenue[];
+      active_deals?: number;
+      unscheduled_jobs?: number;
+      overdue_parts?: number;
+    };
     const parts = partsRes.data ?? [];
     const tasks = tasksRes.data ?? [];
-
-    const stageName = (d: Record<string, unknown>) =>
-      (d.pipeline_stages as { name: string } | null)?.name ?? '';
-
-    const range = rangeFor(period);
-
-    // Closed-won deals, with their realization date
-    const closedDeals: ClosedDeal[] = deals
-      .filter((d) => stageName(d as Record<string, unknown>) === WON_STAGE)
-      .map((d) => ({
-        amount: Number((d as Record<string, unknown>).amount) || 0,
-        closedAt: parseISO((d as Record<string, unknown>).updated_at as string),
-      }));
-
-    // Revenue is period-scoped (won deals realized within the selected range)
-    const totalRevenue = closedDeals
-      .filter((d) => isWithinInterval(d.closedAt, range))
-      .reduce((s, d) => s + d.amount, 0);
-
-    // Operational counts are live "right now" snapshots, not period-bound
-    const activeDeals = deals.filter((d) => {
-      const name = stageName(d as Record<string, unknown>);
-      return name !== WON_STAGE && name !== LOST_STAGE;
-    }).length;
-    const unscheduledJobs = jobs.filter((j: Record<string, unknown>) =>
-      !j.scheduled_at && j.status !== 'Completed' && j.status !== 'Cancelled'
-    ).length;
-
     const now = new Date();
-    const overdueParts = parts.filter((p: Record<string, unknown>) =>
-      p.expected_arrival && new Date(p.expected_arrival as string) < now
-    ).length;
 
-    setStats({ totalRevenue, activeDeals, unscheduledJobs, overduePartsCount: overdueParts });
+    if (!summaryRes.error) {
+      setStats({
+        totalRevenue: Number(summary.total_revenue) || 0,
+        activeDeals: Number(summary.active_deals) || 0,
+        unscheduledJobs: Number(summary.unscheduled_jobs) || 0,
+        overduePartsCount: Number(summary.overdue_parts) || 0,
+      });
+    }
 
     // Action items: overdue/pending tasks + parts sitting too long
     const taskActions: ActionItem[] = tasks.map((t: Record<string, unknown>) => ({
@@ -180,8 +164,10 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
 
     setActions([...partActions, ...taskActions].slice(0, 10));
 
-    // Real revenue chart from closed-won deals
-    setRevenueData(bucketRevenue(closedDeals, period, range));
+    // Real revenue chart from closed-won deals (server-aggregated per local day)
+    if (!summaryRes.error) {
+      setRevenueData(bucketRevenue(summary.revenue_daily ?? [], period, range));
+    }
 
     setIsLoading(false);
   }, [profile, period]);

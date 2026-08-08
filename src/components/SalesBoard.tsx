@@ -13,8 +13,8 @@ const money = (v: number) => v >= 10000 ? `$${Math.round(v / 1000)}k` : `$${v.to
 
 export default function SalesBoard({ deals, stages }: { deals: Deal[]; stages: PipelineStage[] }) {
   const board = useMemo(() => {
-    const wonId = stages.find(s => s.name === 'Closed - Won')?.id;
-    const lostId = stages.find(s => s.name === 'Closed - Lost')?.id;
+    const wonId = stages.find(s => s.is_won)?.id;
+    const lostId = stages.find(s => s.is_lost)?.id;
     const open = deals.filter(d => d.stage_id !== wonId && d.stage_id !== lostId);
 
     const now = new Date();

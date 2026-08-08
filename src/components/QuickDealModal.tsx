@@ -65,7 +65,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
       });
     supabase.from('pipeline_stages').select('*').eq('org_id', profile.org_id).order('position')
       .then(({ data }) => {
-        const open = (data ?? []).filter(s => !s.name.startsWith('Closed'));
+        const open = (data ?? []).filter(s => !s.is_won && !s.is_lost);
         setStages(open);
         if (!stageId && open.length > 0) setStage(open[0].id);
       });

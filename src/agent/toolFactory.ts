@@ -484,20 +484,21 @@ export function createAgentTools(
     execute: async ({ mine_only }) => {
       const me = await currentProfile(client, getUserId);
       if (!me) return { error: 'Could not resolve your account.' };
+      // Closed-stage filtering happens server-side (via the stage flags) so the
+      // limit can never eat open deals while returning recently-closed ones.
       let q = client
         .from('deals')
-        .select('id, title, amount, priority, updated_at, expected_close_date, pipeline_stages(name), contacts:contact_id(first_name, last_name), assigned:assigned_to(first_name, last_name)')
+        .select('id, title, amount, priority, updated_at, expected_close_date, pipeline_stages!inner(name, is_won, is_lost), contacts:contact_id(first_name, last_name), assigned:assigned_to(first_name, last_name)')
         .eq('org_id', me.org_id)
+        .eq('pipeline_stages.is_won', false)
+        .eq('pipeline_stages.is_lost', false)
         .order('updated_at', { ascending: false })
         .limit(25);
       if (mine_only === 'true') q = q.eq('assigned_to', me.userId);
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) return { error: `Couldn't load open deals: ${error.message}` };
       const now = Date.now();
       return (data ?? [])
-        .filter((d: Record<string, unknown>) => {
-          const stage = d.pipeline_stages as { name: string } | null;
-          return stage && !stage.name.startsWith('Closed');
-        })
         .map((d: Record<string, unknown>) => {
           const stage = d.pipeline_stages as { name: string } | null;
           const c = d.contacts as { first_name: string; last_name: string } | null;
@@ -642,7 +643,7 @@ export function createAgentTools(
       if (!deal?.org_id) return { error: 'Deal not found.' };
       const { data: stage } = await client
         .from('pipeline_stages')
-        .select('id, name')
+        .select('id, name, is_won')
         .eq('org_id', deal.org_id)
         .ilike('name', stage_name)
         .limit(1)
@@ -653,7 +654,15 @@ export function createAgentTools(
         .update({ stage_id: stage.id, updated_at: new Date().toISOString() })
         .eq('id', deal_id);
       if (error) return { error: error.message };
-      return { success: true, moved_to: stage.name };
+      // Winning a deal fires the server-side bridge (delivery job, customer
+      // promotion, manager pings) — tell Ari so it can relay the truth.
+      return {
+        success: true,
+        moved_to: stage.name,
+        ...(stage.is_won
+          ? { won_handoff: 'A Delivery job was auto-created in the Service queue (unless one was already open), the contact was promoted to Customer, and service managers were notified.' }
+          : {}),
+      };
     },
   },
   {

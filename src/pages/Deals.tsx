@@ -110,7 +110,7 @@ export default function Deals() {
     return `${deal.title} ${contactName} ${ownerName}`.toLowerCase().includes(searchNeedle);
   };
   const visibleDeals = deals.filter(matchesOwnerAndSearch);
-  const closedStageIds = new Set(stages.filter(stage => stage.name.startsWith('Closed')).map(stage => stage.id));
+  const closedStageIds = new Set(stages.filter(stage => stage.is_won || stage.is_lost).map(stage => stage.id));
   const activeDeals = visibleDeals
     .filter(deal => !closedStageIds.has(deal.stage_id))
     .sort((a, b) => {
@@ -308,7 +308,7 @@ export default function Deals() {
           <div className="flex space-x-4 items-start">
             {stages.map(stage => {
               const stageDeals = visibleDeals.filter(deal => deal.stage_id === stage.id);
-              const closed = stage.name.startsWith('Closed');
+              const closed = stage.is_won || stage.is_lost;
               // Closed stages don't take customer drops — new deals start live
               const stageDropProps = !closed ? { 'data-cdrop': 'stage', 'data-cdrop-stage': stage.id } : {};
               const stageIsOver = activeTarget === `stage:${stage.id}`;

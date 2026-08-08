@@ -40,7 +40,7 @@ export interface Property {
 
 export interface PipelineStage {
   id: string; org_id: string; name: string; position: number;
-  probability: number; created_at: string;
+  probability: number; is_won: boolean; is_lost: boolean; created_at: string;
 }
 
 export interface Deal {
@@ -49,7 +49,7 @@ export interface Deal {
   expected_close_date: string | null; assigned_to: string;
   product_interest: string[] | null; lead_source: LeadSource;
   lost_reason: string | null; location_id: string | null;
-  position: number; created_at: string; updated_at: string;
+  position: number; closed_at: string | null; created_at: string; updated_at: string;
 }
 
 export interface Job {

@@ -2,20 +2,27 @@
   "functions": {
     "api/migrations/process.ts": { "maxDuration": 60 },
     "api/migrations/callback-hubspot.ts": { "maxDuration": 30 },
-    "api/migrations/callback-jobber.ts": { "maxDuration": 30 }
+    "api/migrations/callback-jobber.ts": { "maxDuration": 30 },
+    "api/agent/run.ts": { "maxDuration": 300 },
+    "api/chat.ts": { "maxDuration": 90 }
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; worker-src 'self' blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.elevenlabs.io wss://api.elevenlabs.io https://*.clarity.ms https://c.bing.com https://*.vercel-insights.com https://vitals.vercel-insights.com; upgrade-insecure-requests" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/agent/run.ts": {
-      "maxDuration": 300
-    },
-    "api/chat.ts": {
-      "maxDuration": 90
-    }
-  }
+  ]
 }

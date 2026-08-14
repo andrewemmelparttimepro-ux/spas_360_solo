@@ -13,14 +13,16 @@
     "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts",
     "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs",
     "test:customer-notes": "node --experimental-strip-types --test tests/customerNotes.test.ts",
-    "test:suggestions": "node --experimental-strip-types --test tests/suggestionBox.test.ts"
+    "test:suggestions": "node --experimental-strip-types --test tests/suggestionBox.test.ts",
+    "test:knowledge": "node --experimental-strip-types --test tests/knowledgeAndHardening.test.ts",
+    "knowledge:dry-run": "node scripts/knowledge/ingest.mjs --dry-run",
+    "knowledge:ingest": "node scripts/knowledge/ingest.mjs"
   },
   "dependencies": {
     "@elevenlabs/react": "1.10.0",
     "@hello-pangea/dnd": "^18.0.1",
-    "@supabase/supabase-js": "^2.101.1",
+    "@supabase/supabase-js": "^2.112.3",
     "@vercel/analytics": "^2.0.1",
-    "@vercel/node": "^5.7.0",
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -28,8 +30,8 @@
     "lucide-react": "^0.546.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.14.0",
-    "recharts": "^3.8.1",
+    "react-router-dom": "^7.18.2",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^3.5.0",
     "web-push": "^3.6.7"
   },
@@ -39,9 +41,37 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vercel/node": "^5.10.0",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
+  },
+  "overrides": {
+    "dompurify": "3.4.13",
+    "nanoid": "3.3.18",
+    "postcss": "8.5.24",
+    "glob": {
+      "brace-expansion": "5.0.9"
+    },
+    "@vercel/node": {
+      "undici": "6.28.0",
+      "path-to-regexp": "6.3.0",
+      "@vercel/static-config": {
+        "ajv": "8.20.0"
+      },
+      "@vercel/build-utils": {
+        "@vercel/python-analysis": {
+          "js-yaml": "4.3.1",
+          "minimatch": "10.2.6",
+          "smol-toml": "1.8.0"
+        }
+      },
+      "@vercel/nft": {
+        "@mapbox/node-pre-gyp": {
+          "tar": "7.5.22"
+        }
+      }
+    }
   }
 }

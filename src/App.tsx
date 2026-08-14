@@ -19,6 +19,7 @@ const JobDetail = lazy(() => import('./pages/JobDetail'));
 const InventoryDetail = lazy(() => import('./pages/InventoryDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Citadel = lazy(() => import('./pages/Citadel'));
+const Knowledge = lazy(() => import('./pages/Knowledge'));
 
 function PageLoader() {
   const [timedOut, setTimedOut] = useState(false);
@@ -100,6 +101,7 @@ function AuthGate() {
           <Route path="communication" element={<Communication />} />
           <Route path="reports" element={<Reports />} />
           <Route path="citadel" element={<Citadel />} />
+          <Route path="knowledge" element={<Knowledge />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

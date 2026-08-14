@@ -5,8 +5,11 @@ import {SpeedInsights} from '@vercel/speed-insights/react';
 import App from './App.tsx';
 import './index.css';
 import {installClarity} from './lib/clarity';
+import {installErrorTelemetry} from './lib/errorTelemetry';
+import AppErrorBoundary from './components/ui/AppErrorBoundary';
 
 installClarity();
+installErrorTelemetry();
 
 // PWA: register the service worker (prod only — HMR and a SW don't mix)
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
@@ -17,7 +20,9 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
     <Analytics />
     <SpeedInsights />
   </StrictMode>,

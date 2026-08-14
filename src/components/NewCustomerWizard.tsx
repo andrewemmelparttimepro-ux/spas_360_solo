@@ -81,6 +81,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const [interests, setInterests] = useState<string[]>([]);
   const [amount, setAmount] = useState('');
   const [priority, setPriority] = useState<string | null>(null);
+  const [expectedCloseDate, setExpectedCloseDate] = useState('');
   const [followupDate, setFollowupDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 2);
     return d.toISOString().split('T')[0];
@@ -94,17 +95,15 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
     const digits = phone.replace(/\D/g, '');
     const name = (first + last).trim();
     if (digits.length < 3 && name.length < 2) { setMatches([]); return; }
-    const ors: string[] = [];
-    if (first.trim().length >= 2) ors.push(`first_name.ilike.${first.trim()}%`);
-    if (last.trim().length >= 2) ors.push(`last_name.ilike.${last.trim()}%`);
-    if (digits.length >= 3) ors.push(`phone.ilike.%${digits}%`);
-    const { data } = await supabase
-      .from('contacts')
-      .select('id, first_name, last_name, phone, customer_type, assigned_to, assigned:assigned_to(first_name, last_name)')
-      .or(ors.join(','))
-      .limit(4);
+    const { data } = await supabase.rpc('find_contact_duplicates', {
+      p_phone: phone || null,
+      p_email: email || null,
+      p_first_name: first || null,
+      p_last_name: last || null,
+      p_limit: 4,
+    });
     setMatches((data as unknown as DupeMatch[]) ?? []);
-  }, [phone, first, last, existing]);
+  }, [phone, email, first, last, existing]);
 
   useEffect(() => {
     const t = setTimeout(searchMatches, 300);
@@ -114,7 +113,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const step1Done = !!existing || (first.trim().length > 0 && last.trim().length > 0 && phone.trim().length >= 7);
   const step2Done = source !== null;
   const step3Done = interests.length > 0;
-  const step4Done = priority !== null;
+  const step4Done = priority !== null && expectedCloseDate.length > 0;
   const step5Done = followupDate.length > 0;
   const doneCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
   const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !saving;
@@ -130,20 +129,25 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       let contactId = existing ? existing.id : null;
       let contactFirst = existing ? existing.first_name : first.trim();
       if (!contactId) {
-        const { data, error } = await supabase.from('contacts').insert({
-          org_id: profile.org_id,
-          location_id: profile.location_id ?? null,
-          first_name: first.trim(),
-          last_name: last.trim(),
-          phone: phone.trim(),
-          email: email.trim() || null,
-          lead_source: source,
-          customer_type: 'Lead',
-          assigned_to: user.id,
-        }).select('id, first_name').single();
+        const { data, error } = await supabase.rpc('create_contact_guarded', {
+          p_first_name: first.trim(),
+          p_last_name: last.trim(),
+          p_phone: phone.trim(),
+          p_email: email.trim() || null,
+          p_lead_source: source,
+          p_location_id: profile.location_id ?? null,
+          p_assigned_to: user.id,
+          p_customer_type: 'Lead',
+        });
         if (error) throw new Error(error.message);
-        contactId = data.id;
-        contactFirst = data.first_name;
+        const result = data as { created?: boolean; contact?: { id: string; first_name: string }; duplicates?: DupeMatch[] } | null;
+        if (!result?.created || !result.contact) {
+          setMatches(result?.duplicates ?? []);
+          toast('An exact phone or email match already exists. Choose that customer before creating the deal.', 'error');
+          return;
+        }
+        contactId = result.contact.id;
+        contactFirst = result.contact.first_name;
       }
 
       // 2. Deal — lands in the first pipeline stage
@@ -163,6 +167,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
         priority,
         lead_source: source,
         product_interest: interests,
+        expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
         location_id: profile.location_id ?? null,
         position: 0,
@@ -316,13 +321,25 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             <input placeholder="Estimated value $ (optional)" type="number" value={amount} onChange={e => setAmount(e.target.value)} className={cn(inputClass, 'max-w-[220px]')} />
           </section>
 
-          {/* Step 4 — priority */}
+          {/* Step 4 — priority and an explicit forecast date */}
           <section>
-            <StepHeader n={4} title="How hot is this lead?" done={step4Done} />
+            <StepHeader n={4} title="How hot is this lead, and when could it close?" done={step4Done} />
             <div className="grid grid-cols-3 gap-2">
               {PRIORITIES.map(p => (
                 <Chip key={p.value} active={priority === p.value} onClick={() => setPriority(p.value)} hint={p.hint}>{p.label}</Chip>
               ))}
+            </div>
+            <div className="mt-3 max-w-[240px]">
+              <label className="block text-[11px] font-semibold text-ink-400 mb-1.5" htmlFor="new-customer-expected-close">
+                Expected close date *
+              </label>
+              <input
+                id="new-customer-expected-close"
+                type="date"
+                value={expectedCloseDate}
+                onChange={e => setExpectedCloseDate(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </section>
 

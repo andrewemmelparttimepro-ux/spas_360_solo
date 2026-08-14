@@ -78,13 +78,24 @@ export function useContacts(enabled = true) {
   const createContact = useCallback(async (contact: Partial<Contact>) => {
     if (!profile) return null;
     const { data, error } = await supabase
-      .from('contacts')
-      .insert({ ...contact, org_id: profile.org_id } as Contact)
-      .select()
-      .single();
+      .rpc('create_contact_guarded', {
+        p_first_name: contact.first_name ?? '',
+        p_last_name: contact.last_name ?? '',
+        p_phone: contact.phone ?? '',
+        p_email: contact.email ?? null,
+        p_lead_source: contact.lead_source ?? 'Walk-in',
+        p_location_id: contact.location_id ?? profile.location_id ?? null,
+        p_assigned_to: contact.assigned_to ?? null,
+        p_customer_type: contact.customer_type ?? 'Lead',
+      });
     if (error) { console.error('Error creating contact:', error); return null; }
+    const result = data as { created?: boolean; contact?: Contact; duplicates?: Contact[] } | null;
+    if (!result?.created || !result.contact) {
+      console.warn('Contact creation stopped: an exact phone or email match already exists.', result?.duplicates?.map(d => d.id));
+      return null;
+    }
     await fetchContacts();
-    return data;
+    return result.contact;
   }, [profile, fetchContacts]);
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {

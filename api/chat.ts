@@ -320,7 +320,7 @@ async function fetchForwardFaceContext(query: string): Promise<string> {
 
   const [inventoryResponse, knowledgeResponse, scheduleResponse] = await Promise.all([
     fetch(`${supabaseUrl}/rest/v1/inventory_items?${inventoryParams.toString()}`, { headers }),
-    fetch(`${supabaseUrl}/rest/v1/rpc/search_knowledge`, {
+    fetch(`${supabaseUrl}/rest/v1/rpc/search_knowledge_v2`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -328,6 +328,7 @@ async function fetchForwardFaceContext(query: string): Promise<string> {
         p_query: query.slice(0, 800),
         p_doc_types: null,
         p_limit: 6,
+        p_access_scope: 'public',
       }),
     }),
     fetch(`${supabaseUrl}/rest/v1/jobs?${scheduleParams.toString()}`, { headers }),
@@ -377,7 +378,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Staff get room to work; anonymous shoppers get a tighter per-IP budget.
   const rate = isForwardFace
     ? await consumeRateLimit(`chat:ff:${clientIp(req.headers)}`, 15, 300)
-    : await consumeRateLimit(`chat:user:${callerUserId}`, 40, 300);
+    : await consumeRateLimit(`chat:user:${callerUserId}`, 40, 300, { failOpen: true });
   if (!rate.allowed) {
     res.setHeader('Retry-After', String(Math.max(rate.retryAfterSeconds, 1)));
     return res.status(429).json({ error: 'Slow down a moment — too many requests. Try again shortly.' });

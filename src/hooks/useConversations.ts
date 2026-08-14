@@ -26,32 +26,25 @@ export function useConversations() {
     if (!profile) return;
     setIsLoading(true);
 
-    const { data, error } = await supabase
-      .from('communication_threads')
-      .select('*, contacts:contact_id(first_name, last_name, phone)')
-      .eq('org_id', profile.org_id)
-      .order('last_message_at', { ascending: false, nullsFirst: false });
+    const { data, error } = await supabase.rpc('list_communication_threads', { p_org: profile.org_id });
 
     if (error) { console.error('Error fetching threads:', error); setIsLoading(false); return; }
 
-    // Enrich with latest message
-    const enriched: ThreadWithContact[] = await Promise.all(
-      (data ?? []).map(async (t: Record<string, unknown>) => {
-        const { data: msgs } = await supabase
-          .from('messages')
-          .select('body')
-          .eq('thread_id', t.id as string)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        return {
-          ...t,
-          contact: t.contacts as ThreadWithContact['contact'],
-          latest_message: msgs?.[0]?.body ?? '',
-          unread_count: 0, // TODO: implement read tracking
-        } as ThreadWithContact;
-      })
-    );
+    const enriched: ThreadWithContact[] = (data ?? []).map((t: Record<string, unknown>) => ({
+      id: t.id,
+      org_id: t.org_id,
+      contact_id: t.contact_id,
+      thread_type: t.thread_type,
+      last_message_at: t.last_message_at,
+      created_at: t.created_at,
+      contact: {
+        first_name: t.contact_first_name,
+        last_name: t.contact_last_name,
+        phone: t.contact_phone,
+      },
+      latest_message: t.latest_message ?? '',
+      unread_count: Number(t.unread_count) || 0,
+    })) as ThreadWithContact[];
 
     setThreads(enriched);
     if (
@@ -78,6 +71,11 @@ export function useConversations() {
       .order('created_at', { ascending: true });
     if (error) console.error('Error fetching messages:', error);
     setMessages(data ?? []);
+    if (!error) {
+      const { error: readError } = await supabase.rpc('mark_communication_thread_read', { p_thread_id: activeThreadId });
+      if (readError) console.error('Error marking conversation read:', readError);
+      else setThreads(current => current.map(thread => thread.id === activeThreadId ? { ...thread, unread_count: 0 } : thread));
+    }
   }, [activeThreadId]);
 
   useEffect(() => { fetchMessages(); }, [fetchMessages]);
@@ -89,6 +87,18 @@ export function useConversations() {
     const channel = supabase
       .channel(`conv-threads-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'communication_threads', filter: `org_id=eq.${profile.org_id}` }, refetch)
+      .subscribe();
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
+  }, [profile, fetchThreads]);
+
+  // A new inbound message may not mutate its thread row in the same transaction.
+  // Refresh unread watermarks directly from message inserts, without N+1 reads.
+  useEffect(() => {
+    if (!profile) return;
+    const refetch = debounceRefetch(fetchThreads);
+    const channel = supabase
+      .channel(`conv-unread-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refetch)
       .subscribe();
     return () => { refetch.cancel(); supabase.removeChannel(channel); };
   }, [profile, fetchThreads]);

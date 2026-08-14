@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, type NavigateFunction } from 'react-router-dom';
-import { Search, Contact, Users, Wrench, Package, CornerDownLeft, Plus, LayoutDashboard, Handshake, MessageSquare, BarChart3, Settings, Zap } from 'lucide-react';
+import { Search, Contact, Users, Wrench, Package, CornerDownLeft, Plus, LayoutDashboard, Handshake, MessageSquare, BarChart3, Settings, Zap, BookOpen } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 interface Hit {
   id: string;
-  kind: 'contact' | 'deal' | 'job' | 'inventory';
+  kind: 'contact' | 'deal' | 'job' | 'inventory' | 'knowledge';
   primary: string;
   secondary: string;
   link: string;
@@ -18,6 +18,7 @@ const KIND_META = {
   deal: { icon: Handshake, label: 'Deals' },
   job: { icon: Wrench, label: 'Jobs' },
   inventory: { icon: Package, label: 'Inventory' },
+  knowledge: { icon: BookOpen, label: 'Knowledge & Parts' },
 } as const;
 
 // ⌘K is also the do-things palette: create records and jump pages without
@@ -40,6 +41,7 @@ const ACTIONS: Action[] = [
   { label: 'Go to Schedule', sub: 'Service calendar', icon: Wrench, keywords: 'schedule service calendar jobs', run: n => n('/service') },
   { label: 'Go to Inbox', sub: 'Team chat + customer texts', icon: MessageSquare, keywords: 'inbox comms communication messages chat sms texts', run: n => n('/communication') },
   { label: 'Go to Reports', sub: 'Revenue, pipeline, aging', icon: BarChart3, keywords: 'reports analytics revenue', run: n => n('/reports') },
+  { label: 'Search Knowledge', sub: 'Parts, manuals, service, warranties', icon: BookOpen, keywords: 'knowledge parts manuals service warranty ari', run: n => n('/knowledge') },
   { label: 'Go to Settings', sub: 'Profile, team, notifications', icon: Settings, keywords: 'settings team invite notifications profile', run: n => n('/settings') },
 ];
 
@@ -58,7 +60,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
     if (!profile || q.trim().length < 2) { setHits([]); return; }
     setSearching(true);
     const term = `%${q.trim()}%`;
-    const [contacts, deals, jobs, inventory] = await Promise.all([
+    const [contacts, deals, jobs, inventory, knowledge] = await Promise.all([
       supabase.from('contacts').select('id, first_name, last_name, phone, customer_type')
         .eq('org_id', profile.org_id)
         .or(`first_name.ilike.${term},last_name.ilike.${term},phone.ilike.${term}`)
@@ -71,6 +73,13 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
         .eq('org_id', profile.org_id)
         .or(`product.ilike.${term},sku.ilike.${term},brand.ilike.${term}`)
         .limit(5),
+      supabase.rpc('search_knowledge_v2', {
+        p_org: profile.org_id,
+        p_query: q.trim(),
+        p_doc_types: null,
+        p_limit: 6,
+        p_access_scope: 'staff',
+      }),
     ]);
 
     const results: Hit[] = [
@@ -101,6 +110,17 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
         secondary: `${i.sku}${i.brand ? ` · ${i.brand}` : ''} · ${i.status}`,
         link: `/inventory/${i.id}`,
       })),
+      ...((knowledge.data ?? []) as Array<{
+        chunk_id: string; title: string; heading: string | null; manufacturer: string | null;
+        citation_label: string | null; page_start: number | null; page_end: number | null;
+        part_numbers: string[] | null;
+      }>).map((k) => ({
+        id: k.chunk_id,
+        kind: 'knowledge' as const,
+        primary: k.part_numbers?.find(part => part.toLowerCase().replace(/[^a-z0-9]/g, '') === q.toLowerCase().replace(/[^a-z0-9]/g, '')) ?? k.heading ?? k.title,
+        secondary: `${k.citation_label ?? k.title}${k.page_start ? ` · p. ${k.page_start}${k.page_end && k.page_end !== k.page_start ? `–${k.page_end}` : ''}` : ''}`,
+        link: `/knowledge?q=${encodeURIComponent(q.trim())}&chunk=${encodeURIComponent(k.chunk_id)}`,
+      })),
     ];
     setHits(results);
     setSearching(false);
@@ -122,7 +142,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
     ? ACTIONS
     : ACTIONS.filter(a => a.label.toLowerCase().includes(q) || a.keywords.includes(q));
 
-  const grouped = (['contact', 'deal', 'job', 'inventory'] as const)
+  const grouped = (['contact', 'deal', 'job', 'inventory', 'knowledge'] as const)
     .map(kind => ({ kind, items: hits.filter(h => h.kind === kind) }))
     .filter(g => g.items.length > 0);
 
@@ -156,7 +176,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search customers, deals, jobs, inventory…"
+            placeholder="Search customers, inventory, parts, manuals…"
             className="flex-1 py-3.5 bg-transparent text-sm text-ink-100 placeholder-ink-500 outline-none"
           />
           <kbd className="text-[10px] font-mono text-ink-500 bg-ink-950 border border-ink-700 rounded px-1.5 py-0.5 shrink-0">esc</kbd>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { DollarSign, TrendingUp, Wrench, Package } from 'lucide-react';
+import { AlertTriangle, DollarSign, TrendingUp, Wrench, Package } from 'lucide-react';
 import { useReports } from '@/hooks/useReports';
 import { PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
 
@@ -24,8 +24,26 @@ export default function Reports() {
     { title: 'Closed Revenue', value: money(r.totals.closedRevenue), sub: PERIOD_LABELS[period], icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
     { title: 'Open Pipeline', value: money(r.totals.pipelineValue), sub: 'Active deals', icon: TrendingUp, color: 'text-brand-400', bg: 'bg-brand-500/15' },
     { title: 'Open Jobs', value: String(r.totals.openJobs), sub: 'Not completed', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15' },
-    { title: 'In-Stock Value', value: money(r.totals.inventoryValue), sub: 'Current inventory', icon: Package, color: 'text-indigo-400', bg: 'bg-indigo-500/15' },
+    {
+      title: 'Recorded In-Stock Value',
+      value: r.totals.inventoryPricedCount > 0 ? money(r.totals.inventoryValue) : 'Not ready',
+      sub: `${r.totals.inventoryPricedCount} of ${r.totals.inventoryTotalCount} units have a value`,
+      icon: Package,
+      color: 'text-indigo-400',
+      bg: 'bg-indigo-500/15',
+    },
   ];
+
+  const readinessIssues = [
+    r.readiness.contacts.missingContactMethod > 0 && `${r.readiness.contacts.missingContactMethod} contacts have neither a usable phone nor email`,
+    (r.readiness.contacts.duplicatePhoneGroups + r.readiness.contacts.duplicateEmailGroups) > 0
+      && `${r.readiness.contacts.duplicatePhoneGroups} duplicate phone groups and ${r.readiness.contacts.duplicateEmailGroups} duplicate email groups need review`,
+    r.readiness.deals.missingExpectedClose > 0 && `${r.readiness.deals.missingExpectedClose} open deals need an expected close date`,
+    r.readiness.deals.missingAmount > 0 && `${r.readiness.deals.missingAmount} open deals have no forecast amount`,
+    r.readiness.jobs.unscheduledOpen > 0 && `${r.readiness.jobs.unscheduledOpen} open jobs are not scheduled`,
+    r.readiness.tasks.overdueOpen > 0 && `${r.readiness.tasks.overdueOpen} open tasks are overdue`,
+    r.readiness.inventory.missingFinancialValue > 0 && `${r.readiness.inventory.missingFinancialValue} inventory items have no cost, MSRP, or sale price`,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -33,6 +51,20 @@ export default function Reports() {
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           Some report data couldn't load — these numbers may be incomplete. ({r.loadError})
         </div>
+      )}
+      {readinessIssues.length > 0 && (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4" aria-label="Data readiness">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-sm font-semibold text-amber-200">Data readiness — values below are honest, but coverage is incomplete</h2>
+              <p className="mt-1 text-xs text-amber-200/70">Existing records were not guessed or silently changed. New contacts are duplicate-guarded and new deals now require an explicit forecast date.</p>
+              <ul className="mt-3 grid gap-1.5 text-xs text-amber-100/85 sm:grid-cols-2">
+                {readinessIssues.map(issue => <li key={issue}>• {issue}</li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
       )}
       <div className="flex items-center justify-between">
         <div>
@@ -152,7 +184,10 @@ export default function Reports() {
                     <tr key={s.status} className="border-b border-ink-800 last:border-0">
                       <td className="py-2 font-medium text-ink-300">{s.status}</td>
                       <td className="py-2 text-right text-ink-300">{s.count}</td>
-                      <td className="py-2 text-right text-ink-100 font-medium">{money(s.value)}</td>
+                      <td className="py-2 text-right text-ink-100 font-medium">
+                        {s.pricedCount > 0 ? money(s.value) : '—'}
+                        <span className="block text-[10px] font-normal text-ink-500">{s.pricedCount}/{s.count} valued</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

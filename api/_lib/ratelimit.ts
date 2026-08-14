@@ -9,16 +9,26 @@ export interface RateLimitResult {
   retryAfterSeconds: number;
 }
 
+export interface RateLimitOptions {
+  /** Staff tools may remain available during a limiter outage. Public or
+   * consequential endpoints must use the default fail-closed behavior. */
+  failOpen?: boolean;
+}
+
 /**
- * Consume one unit against `key`'s window. Fails OPEN on infrastructure errors
- * (availability beats strictness for staff tools) but logs loudly.
+ * Consume one unit against `key`'s window. Infrastructure failures fail closed
+ * unless the caller explicitly identifies an authenticated staff-only path.
  */
-export async function consumeRateLimit(key: string, max: number, windowSeconds: number): Promise<RateLimitResult> {
+export async function consumeRateLimit(key: string, max: number, windowSeconds: number, options: RateLimitOptions = {}): Promise<RateLimitResult> {
+  const unavailable = (): RateLimitResult => ({
+    allowed: options.failOpen === true,
+    retryAfterSeconds: options.failOpen === true ? 0 : 30,
+  });
   const supabaseUrl = envValue(process.env.VITE_SUPABASE_URL);
   const serviceKey = envValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!supabaseUrl || !serviceKey) {
-    console.error('ratelimit: missing Supabase env — allowing request');
-    return { allowed: true, retryAfterSeconds: 0 };
+    console.error('ratelimit: missing Supabase env', { failOpen: options.failOpen === true });
+    return unavailable();
   }
   try {
     const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/consume_rate_limit`, {
@@ -33,7 +43,7 @@ export async function consumeRateLimit(key: string, max: number, windowSeconds: 
     });
     if (!resp.ok) {
       console.error('ratelimit: rpc failed', resp.status, await resp.text().catch(() => ''));
-      return { allowed: true, retryAfterSeconds: 0 };
+      return unavailable();
     }
     const body = (await resp.json()) as { allowed?: boolean; retry_after_seconds?: number };
     return {
@@ -41,8 +51,8 @@ export async function consumeRateLimit(key: string, max: number, windowSeconds: 
       retryAfterSeconds: Number(body.retry_after_seconds) || 0,
     };
   } catch (err) {
-    console.error('ratelimit: error — allowing request', err);
-    return { allowed: true, retryAfterSeconds: 0 };
+    console.error('ratelimit: infrastructure error', { failOpen: options.failOpen === true, detail: err instanceof Error ? err.message : String(err) });
+    return unavailable();
   }
 }
 

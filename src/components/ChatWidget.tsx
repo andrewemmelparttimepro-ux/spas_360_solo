@@ -8,6 +8,7 @@ import MentionInput from '@/components/MentionInput';
 import MentionText from '@/components/MentionText';
 import AriAvatar from '@/components/AriAvatar';
 import AriArtifactCard from '@/components/AriArtifactCard';
+import MarkdownMessage from '@/components/MarkdownMessage';
 import { composeMentionBody, type PickedMention } from '@/lib/mentions';
 
 /**
@@ -411,7 +412,9 @@ export default function ChatWidget() {
                               <Sparkles className="w-3 h-3 mr-1" /> Using tools...
                             </div>
                           )}
-                          <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
+                          {msg.role === 'assistant'
+                            ? <MarkdownMessage body={msg.content} />
+                            : <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>}
                         </div>
                         {artifact && <AriArtifactCard artifact={artifact} className="mt-2" />}
                       </div>
@@ -500,7 +503,9 @@ export default function ChatWidget() {
                               ? 'bg-brand-500/10 border border-brand-500/30 text-ink-100 rounded-bl-md shadow-sm'
                               : 'bg-ink-900 border border-ink-700 text-ink-100 rounded-bl-md shadow-sm'
                         )}>
-                          <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>
+                          {isAriMsg
+                            ? <MarkdownMessage body={msg.content} />
+                            : <div className="whitespace-pre-wrap"><MentionText body={msg.content} /></div>}
                         </div>
                         <p className={cn('text-[9px] text-ink-500 mt-0.5', isMe ? 'text-right mr-1' : 'ml-1')}>
                           {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

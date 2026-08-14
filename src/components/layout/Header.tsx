@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -26,6 +26,7 @@ export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items:
 export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof LayoutDashboard }[] = [
   { name: 'Inbox', path: '/communication', icon: MessageSquare },
   { name: 'Citadel', path: '/citadel', icon: Building2 },
+  { name: 'Knowledge', path: '/knowledge', icon: BookOpen },
   { name: 'Reports', path: '/reports', icon: BarChart3 },
 ];
 

@@ -54,6 +54,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [amount, setAmount] = useState('');
+  const [expectedCloseDate, setExpectedCloseDate] = useState('');
   const [priority, setPriority] = useState<DealPriority>('Medium');
   const [followUpDays, setFollowUpDays] = useState<number>(1);
   const [saving, setSaving] = useState(false);
@@ -83,7 +84,10 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const toggleInterest = (i: string) =>
     setInterests(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
 
-  const canCreate = useMemo(() => !!contact && !!stage && title.trim().length > 0, [contact, stage, title]);
+  const canCreate = useMemo(
+    () => !!contact && !!stage && title.trim().length > 0 && expectedCloseDate.length > 0,
+    [contact, stage, title, expectedCloseDate]
+  );
 
   const handleCreate = async () => {
     if (!profile || !user || !contact || !canCreate || saving) return;
@@ -102,6 +106,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         priority,
         lead_source: contact.lead_source,
         product_interest: interests.length > 0 ? interests : null,
+        expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
         location_id: contact.location_id ?? profile.location_id ?? null,
         position: 0,
@@ -200,6 +205,12 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               <div className="flex flex-wrap gap-2">
                 {PRIORITIES.map(p => <Chip key={p.value} active={priority === p.value} onClick={() => setPriority(p.value)}>{p.label}</Chip>)}
               </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Expected close date *</p>
+              <input type="date" value={expectedCloseDate} onChange={e => setExpectedCloseDate(e.target.value)} className={inputClass} />
+              <p className="mt-1.5 text-[11px] text-ink-500">Required for an honest pipeline forecast; leave the deal uncreated if the date is not known yet.</p>
             </div>
 
             <div>

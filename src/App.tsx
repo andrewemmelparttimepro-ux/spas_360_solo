@@ -79,6 +79,14 @@ function AuthGate() {
     );
   }
 
+  if (session.user.app_metadata?.must_change_password === true) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <ResetPassword required />
+      </Suspense>
+    );
+  }
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>

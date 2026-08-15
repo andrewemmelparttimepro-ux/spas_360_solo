@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function ResetPassword() {
+interface ResetPasswordProps {
+  required?: boolean;
+}
+
+export default function ResetPassword({ required = false }: ResetPasswordProps) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,39 @@ export default function ResetPassword() {
       return;
     }
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    let updateError: Error | null = null;
+
+    if (required) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        updateError = new Error('Your session expired. Sign in again to finish setup.');
+      } else {
+        try {
+          const response = await fetch('/api/auth/complete-password-change', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ password }),
+          });
+          const payload = await response.json().catch(() => ({})) as { error?: string };
+          if (!response.ok) {
+            updateError = new Error(payload.error || 'Could not update your password.');
+          } else {
+            await supabase.auth.signOut({ scope: 'local' });
+          }
+        } catch {
+          updateError = new Error('Could not reach the secure password service. Try again.');
+        }
+      }
+    } else {
+      const result = await supabase.auth.updateUser({ password });
+      updateError = result.error;
+    }
+
     setLoading(false);
     if (updateError) setError(updateError.message);
     else setComplete(true);
@@ -37,13 +73,25 @@ export default function ResetPassword() {
           {complete ? (
             <div className="text-center">
               <div className="text-emerald-300 text-lg font-semibold mb-2">Password updated</div>
-              <p className="text-sm text-slate-400 mb-6">Your new password works in both SPAS 360 and Agent OS.</p>
-              <a href="/" className="inline-flex px-5 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg">Return to SPAS 360</a>
+              <p className="text-sm text-slate-400 mb-6">
+                {required
+                  ? 'Your temporary password is retired. Sign in again with your new password.'
+                  : 'Your new password works in both SPAS 360 and Agent OS.'}
+              </p>
+              <a href="/" className="inline-flex px-5 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-lg">
+                {required ? 'Sign in to SPAS 360' : 'Return to SPAS 360'}
+              </a>
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-semibold text-white mb-2">Choose a new password</h2>
-              <p className="text-sm text-slate-400 mb-6">This updates the same secure login used by both apps.</p>
+              <h2 className="text-xl font-semibold text-white mb-2">
+                {required ? 'Create your permanent password' : 'Choose a new password'}
+              </h2>
+              <p className="text-sm text-slate-400 mb-6">
+                {required
+                  ? 'Before continuing, replace the temporary password issued for your account.'
+                  : 'This updates the same secure login used by both apps.'}
+              </p>
               <form onSubmit={submit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">New password</label>

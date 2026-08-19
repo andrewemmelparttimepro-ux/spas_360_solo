@@ -20,6 +20,7 @@ describe('Media library file handling', () => {
     assert.equal(isSafeMediaPreview('animated.gif', 'image/gif'), true);
     assert.equal(isSafeMediaPreview('drawing.svg', 'image/svg+xml'), false);
     assert.equal(formatMediaLibrarySize('29142840'), '28 MB');
+    assert.equal(formatMediaLibrarySize('2.7 MB'), '2.7 MB');
   });
 
   it('scopes runtime reads to the exact human-created source post and report files', async () => {

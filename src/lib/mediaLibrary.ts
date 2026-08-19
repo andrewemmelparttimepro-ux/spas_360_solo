@@ -33,8 +33,9 @@ export function isSafeMediaPreview(name: string, mimeType: string): boolean {
 }
 
 export function formatMediaLibrarySize(value: string | null): string {
+  if (!value) return '';
   const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (!Number.isFinite(bytes) || bytes <= 0) return value;
   const units = ['B', 'KB', 'MB', 'GB'];
   let amount = bytes;
   let unit = 0;

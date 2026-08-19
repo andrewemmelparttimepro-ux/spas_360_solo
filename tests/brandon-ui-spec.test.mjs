@@ -43,7 +43,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(sidebar, /SECONDARY_NAV_ITEMS/);
   });
 
-  it('routes Parts to the existing parts-capable knowledge view and Media to an honest in-app view', async () => {
+  it('routes Parts to the existing parts-capable knowledge view and Media to the saved library', async () => {
     const [app, media] = await Promise.all([
       read('src/App.tsx'),
       read('src/pages/Media.tsx'),
@@ -53,7 +53,8 @@ describe('Brandon composite UI contract', () => {
     assert.match(app, /path="media" element=\{<Media \/>\}/);
     assert.match(media, />\s*Media\s*</);
     assert.match(media, /to="\/service"/);
-    assert.match(media, /there is no separate shared media library connected here/i);
+    assert.match(media, /Saved media library/);
+    assert.match(media, /Files stay private/);
   });
 
   it('keeps requested dashboard, deals, inventory, schedule, and priority wording', async () => {

@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen, PackageSearch, Images } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -10,7 +10,7 @@ import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 import SuggestionBox from '@/components/SuggestionBox';
 
-// Hierarchy: the top bar carries only the five floor-operations destinations a
+// Hierarchy: the top bar carries the floor-operations destinations a
 // salesperson or tech touches every hour. Everything else (Inbox, Citadel,
 // Reports, Settings) lives in the drawer — one calm menu, on every screen size.
 export type NavTone = 'sales' | 'service' | 'customers' | null;
@@ -21,6 +21,8 @@ export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items:
   { label: null, tone: 'sales', items: [{ name: 'Deals', path: '/deals', icon: Handshake }] },
   { label: null, tone: 'sales', items: [{ name: 'Inventory', path: '/inventory', icon: Package }] },
   { label: null, tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
+  { label: null, tone: 'service', items: [{ name: 'Parts', path: '/parts', icon: PackageSearch }] },
+  { label: null, tone: null, items: [{ name: 'Media', path: '/media', icon: Images }] },
 ];
 
 export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof LayoutDashboard }[] = [
@@ -132,8 +134,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </span>
       </NavLink>
 
-      {/* Nav (desktop) — the five floor-operations destinations only. */}
-      <nav className="hidden lg:flex items-center gap-1">
+      {/* Nav (desktop) — the floor-operations destinations only. */}
+      <nav className="hidden xl:flex items-center gap-1">
         {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
@@ -192,8 +194,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         aria-label="Search everything"
       >
         <Search className="w-3.5 h-3.5" />
-        <span className="hidden md:inline">Search</span>
-        <kbd className="hidden md:inline text-[10px] font-mono bg-ink-800 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
+        <span className="hidden 2xl:inline">Search</span>
+        <kbd className="hidden 2xl:inline text-[10px] font-mono bg-ink-800 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
       </button>
       {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
 
@@ -204,7 +206,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors"
         >
           <MapPin className="w-3.5 h-3.5 mr-1.5 text-brand-400" />
-          <span className="hidden sm:inline">{locationLabel}</span>
+          <span className="hidden 2xl:inline">{locationLabel}</span>
           <ChevronDown className="w-3 h-3 ml-1.5 text-ink-500" />
         </button>
         {locOpen && (
@@ -294,7 +296,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           onClick={() => setUserOpen(!userOpen)}
           className="flex items-center gap-2.5 pl-3 border-l border-ink-700 hover:bg-ink-800 rounded-lg pr-2 py-1 transition-colors"
         >
-          <div className="text-right hidden md:block">
+          <div className="text-right hidden 2xl:block">
             <div className="text-[13px] font-medium text-ink-100 leading-tight">
               {profile ? `${profile.first_name} ${profile.last_name}` : 'Loading...'}
             </div>

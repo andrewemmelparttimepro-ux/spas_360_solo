@@ -53,11 +53,11 @@ const pages = (result: Pick<KnowledgeResult, 'page_start' | 'page_end'>) => {
   return `p. ${result.page_start}${result.page_end && result.page_end !== result.page_start ? `–${result.page_end}` : ''}`;
 };
 
-export default function Knowledge() {
+export default function Knowledge({ defaultType = 'all' }: { defaultType?: string }) {
   const { profile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
-  const [type, setType] = useState(params.get('type') ?? 'all');
+  const [type, setType] = useState(params.get('type') ?? defaultType);
   const [results, setResults] = useState<KnowledgeResult[]>([]);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [searching, setSearching] = useState(false);

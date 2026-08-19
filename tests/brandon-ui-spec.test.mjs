@@ -18,17 +18,20 @@ describe('Brandon composite UI contract', () => {
     assert.match(layout, /bg-\[var\(--color-app-canvas\)\]/);
   });
 
-  // Updated 2026-08-08 per Andrew: the top bar carries only the five
-  // floor-operations destinations; Inbox, Citadel, and Reports live in the
-  // drawer. All eight destinations must stay reachable.
-  it('keeps five primary destinations in the top bar and three in the drawer', async () => {
+  // Updated 2026-08-19 per Brandon: Parts and Media follow Schedule in the
+  // top bar. The office destinations remain in the drawer, and every existing
+  // destination stays reachable.
+  it('keeps the requested primary destinations in order and office links in the drawer', async () => {
     const header = await read('src/components/layout/Header.tsx');
-    const primary = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule'];
+    const primary = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule', 'Parts', 'Media'];
     const secondary = ['Inbox', 'Citadel', 'Reports'];
 
     for (const destination of primary) {
       assert.match(header, new RegExp(`name: '${destination}'`));
     }
+    assert.match(header, /name: 'Schedule'[\s\S]*name: 'Parts'[\s\S]*name: 'Media'/);
+    assert.match(header, /name: 'Parts', path: '\/parts', icon: PackageSearch/);
+    assert.match(header, /name: 'Media', path: '\/media', icon: Images/);
     const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));
     for (const destination of secondary) {
       assert.match(secondaryBlock, new RegExp(`name: '${destination}'`));
@@ -37,6 +40,19 @@ describe('Brandon composite UI contract', () => {
 
     const sidebar = await read('src/components/layout/Sidebar.tsx');
     assert.match(sidebar, /SECONDARY_NAV_ITEMS/);
+  });
+
+  it('routes Parts to the existing parts-capable knowledge view and Media to an honest in-app view', async () => {
+    const [app, media] = await Promise.all([
+      read('src/App.tsx'),
+      read('src/pages/Media.tsx'),
+    ]);
+
+    assert.match(app, /path="parts" element=\{<Knowledge key="parts" defaultType="parts_catalog" \/>\}/);
+    assert.match(app, /path="media" element=\{<Media \/>\}/);
+    assert.match(media, />\s*Media\s*</);
+    assert.match(media, /to="\/service"/);
+    assert.match(media, /there is no separate shared media library connected here/i);
   });
 
   it('keeps requested dashboard, deals, inventory, schedule, and priority wording', async () => {

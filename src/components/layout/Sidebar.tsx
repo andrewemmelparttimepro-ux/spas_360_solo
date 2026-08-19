@@ -14,7 +14,7 @@ const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
 /**
  * The nav drawer — every screen size. On phones it's the whole navigation;
  * on desktop it's where the back-office destinations (Inbox, Citadel,
- * Reports, Settings) live so the top bar stays five calm pills.
+ * Reports, Settings) live so the top bar stays focused on floor operations.
  */
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (

@@ -40,6 +40,17 @@ type KnowledgeDocument = {
 };
 
 type PartsPdfResource = {
+  key: string;
+  postId: string;
+  attachmentId: string;
+  displayName: string;
+  attachment: PartsPdfAttachment | null;
+  loading: boolean;
+  opening: boolean;
+  error: string | null;
+};
+
+type PartsPdfAttachment = {
   id: string;
   post_id: string;
   name: string;
@@ -49,9 +60,29 @@ type PartsPdfResource = {
   purpose: string;
 };
 
-const PARTS_PDF_POST_ID = '3bc7f944-5dcc-4c66-9382-b70cd07964d3';
-const PARTS_PDF_ATTACHMENT_ID = 'da51ac8d-0368-40a5-b196-3824aa33e4e5';
 const PARTS_PDF_BUCKET = 'fix-it-files';
+const PARTS_PDF_RESOURCES = [
+  {
+    key: 'sun-parts-2016',
+    postId: '3bc7f944-5dcc-4c66-9382-b70cd07964d3',
+    attachmentId: 'da51ac8d-0368-40a5-b196-3824aa33e4e5',
+    displayName: 'Sun Parts 2016 +',
+  },
+  {
+    key: 'sundance-parts-2015-volume-1',
+    postId: '85507a1f-9b9e-487c-b7fb-0dd359ca4bfa',
+    attachmentId: 'e5a191d6-942c-4750-8d7e-79003e545bf6',
+    displayName: 'Sundance Parts 2015 Volume 1',
+  },
+] as const;
+
+const initialPartsPdfResources = (loading: boolean): PartsPdfResource[] => PARTS_PDF_RESOURCES.map(resource => ({
+  ...resource,
+  attachment: null,
+  loading,
+  opening: false,
+  error: null,
+}));
 
 const TYPES = [
   ['all', 'All sources'],
@@ -84,10 +115,7 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [searching, setSearching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [partsPdf, setPartsPdf] = useState<PartsPdfResource | null>(null);
-  const [partsPdfLoading, setPartsPdfLoading] = useState(isPartsView);
-  const [partsPdfError, setPartsPdfError] = useState<string | null>(null);
-  const [partsPdfOpening, setPartsPdfOpening] = useState(false);
+  const [partsPdfs, setPartsPdfs] = useState<PartsPdfResource[]>(() => initialPartsPdfResources(isPartsView));
   const selectedChunk = params.get('chunk');
 
   const loadDocuments = useCallback(async () => {
@@ -107,40 +135,41 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
 
   useEffect(() => {
     if (!isPartsView) {
-      setPartsPdf(null);
-      setPartsPdfLoading(false);
-      setPartsPdfError(null);
+      setPartsPdfs(initialPartsPdfResources(false));
       return;
     }
     if (!profile) return;
 
     let cancelled = false;
-    const loadPartsPdf = async () => {
-      setPartsPdfLoading(true);
-      setPartsPdfError(null);
-      const { data, error } = await supabase
-        .from('fix_it_attachments')
-        .select('id,post_id,name,mime_type,size,storage_path,purpose')
-        .eq('id', PARTS_PDF_ATTACHMENT_ID)
-        .eq('post_id', PARTS_PDF_POST_ID)
-        .eq('org_id', profile.org_id)
-        .eq('purpose', 'report')
-        .maybeSingle();
+    const loadPartsPdfs = async () => {
+      setPartsPdfs(initialPartsPdfResources(true));
+      const resources = await Promise.all(PARTS_PDF_RESOURCES.map(async resource => {
+        const { data, error } = await supabase
+          .from('fix_it_attachments')
+          .select('id,post_id,name,mime_type,size,storage_path,purpose')
+          .eq('id', resource.attachmentId)
+          .eq('post_id', resource.postId)
+          .eq('org_id', profile.org_id)
+          .eq('purpose', 'report')
+          .maybeSingle();
 
-      if (cancelled) return;
-      if (error) {
-        setPartsPdf(null);
-        setPartsPdfError('The Sun Parts catalog could not be loaded. Please try again.');
-      } else if (!data || data.mime_type !== 'application/pdf' || !data.storage_path) {
-        setPartsPdf(null);
-        setPartsPdfError('The Sun Parts catalog is currently unavailable.');
-      } else {
-        setPartsPdf(data as PartsPdfResource);
-      }
-      setPartsPdfLoading(false);
+        const attachment = data as PartsPdfAttachment | null;
+        const unavailable = !attachment || attachment.mime_type !== 'application/pdf' || !attachment.storage_path;
+        return {
+          ...resource,
+          attachment: unavailable ? null : attachment,
+          loading: false,
+          opening: false,
+          error: error
+            ? `${resource.displayName} could not be loaded. Reload this page to try again.`
+            : unavailable ? `${resource.displayName} is currently unavailable.` : null,
+        } satisfies PartsPdfResource;
+      }));
+
+      if (!cancelled) setPartsPdfs(resources);
     };
 
-    void loadPartsPdf();
+    void loadPartsPdfs();
     return () => { cancelled = true; };
   }, [isPartsView, profile]);
 
@@ -192,23 +221,28 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
     else window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const openPartsPdf = async () => {
-    if (!partsPdf?.storage_path || partsPdfOpening) return;
+  const openPartsPdf = async (resource: PartsPdfResource) => {
+    if (!resource.attachment?.storage_path || resource.opening) return;
     const pendingWindow = window.open('about:blank', '_blank');
     if (pendingWindow) pendingWindow.opener = null;
-    setPartsPdfOpening(true);
-    setPartsPdfError(null);
+    setPartsPdfs(current => current.map(item => item.key === resource.key
+      ? { ...item, opening: true, error: null }
+      : item));
 
     const { data, error } = await supabase.storage
       .from(PARTS_PDF_BUCKET)
-      .createSignedUrl(partsPdf.storage_path, 120);
+      .createSignedUrl(resource.attachment.storage_path, 120);
 
-    setPartsPdfOpening(false);
     if (error || !data?.signedUrl) {
       pendingWindow?.close();
-      setPartsPdfError('The Sun Parts catalog could not be opened. Please try again.');
+      setPartsPdfs(current => current.map(item => item.key === resource.key
+        ? { ...item, opening: false, error: `${resource.displayName} could not be opened. Please try again.` }
+        : item));
       return;
     }
+    setPartsPdfs(current => current.map(item => item.key === resource.key
+      ? { ...item, opening: false }
+      : item));
     if (pendingWindow) pendingWindow.location.replace(data.signedUrl);
     else window.location.assign(data.signedUrl);
   };
@@ -219,7 +253,7 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">Ari verified source library</p>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100"><BookOpen className="h-6 w-6 text-cyan-400" />{isPartsView ? 'Parts' : 'Knowledge'}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open the Sun Parts catalog or search verified parts literature by part number, model, and year.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
+          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search verified parts literature by part number, model, and year.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
         </div>
         <div className="flex gap-2 text-xs">
           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-semibold text-emerald-300"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Verified sources</span>
@@ -229,28 +263,38 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
 
       {isPartsView && (
         <section aria-labelledby="parts-pdf-heading" className="rounded-2xl border border-cyan-500/30 bg-ink-900 p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="rounded-xl bg-cyan-500/15 p-2.5 text-cyan-400"><FileText className="h-5 w-5" /></span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-400">Parts PDF library</p>
-                <h2 id="parts-pdf-heading" className="mt-0.5 text-sm font-bold text-ink-100">Sun Parts 2016 +</h2>
-                <p className="mt-1 text-xs text-ink-500">
-                  {partsPdfLoading ? 'Loading the private catalog…' : partsPdf ? `PDF${formatAttachmentSize(partsPdf.size) ? ` · ${formatAttachmentSize(partsPdf.size)}` : ''} · Signed access expires after opening` : 'Catalog access is unavailable.'}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => { void openPartsPdf(); }}
-              disabled={partsPdfLoading || !partsPdf || partsPdfOpening}
-              className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-bold text-cyan-300 transition-colors enabled:hover:border-cyan-400 enabled:hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {partsPdfLoading ? 'Loading…' : partsPdfOpening ? 'Opening…' : 'Open PDF'}
-              {!partsPdfLoading && !partsPdfOpening && <ExternalLink className="ml-1.5 inline h-3.5 w-3.5" />}
-            </button>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-400">Parts PDF library</p>
+            <h2 id="parts-pdf-heading" className="mt-0.5 text-sm font-bold text-ink-100">Manufacturer catalogs</h2>
           </div>
-          {partsPdfError && <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{partsPdfError}</p>}
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {partsPdfs.map(resource => (
+              <article key={resource.key} className="rounded-xl border border-ink-800 bg-ink-950/60 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="rounded-xl bg-cyan-500/15 p-2.5 text-cyan-400"><FileText className="h-5 w-5" /></span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-ink-100">{resource.displayName}</h3>
+                      <p className="mt-1 text-xs text-ink-500">
+                        {resource.loading ? 'Loading the private catalog…' : resource.attachment ? `PDF${formatAttachmentSize(resource.attachment.size) ? ` · ${formatAttachmentSize(resource.attachment.size)}` : ''} · Signed access expires after opening` : 'Catalog access is unavailable.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { void openPartsPdf(resource); }}
+                    disabled={resource.loading || !resource.attachment || resource.opening}
+                    aria-label={`Open ${resource.displayName} PDF`}
+                    className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-bold text-cyan-300 transition-colors enabled:hover:border-cyan-400 enabled:hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {resource.loading ? 'Loading…' : resource.opening ? 'Opening…' : 'Open PDF'}
+                    {!resource.loading && !resource.opening && <ExternalLink className="ml-1.5 inline h-3.5 w-3.5" />}
+                  </button>
+                </div>
+                {resource.error && <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{resource.error}</p>}
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

@@ -135,7 +135,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </NavLink>
 
       {/* Nav (desktop) — the floor-operations destinations only. */}
-      <nav className="hidden xl:flex items-center gap-1">
+      <nav className="hidden lg:flex items-center gap-1">
         {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (

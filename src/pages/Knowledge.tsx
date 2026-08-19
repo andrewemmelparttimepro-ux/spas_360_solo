@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, ExternalLink, FileKey2, FileText, Search, ShieldCheck, Wrench } from 'lucide-react';
+import { BookOpen, ExternalLink, FileKey2, FileText, Search, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { confirmLibraryDeletion, requestLibraryDeletion, type LibraryDeleteKind } from '@/lib/libraryDeletion';
 
 type KnowledgeResult = {
   chunk_id: string;
@@ -106,7 +107,7 @@ const formatAttachmentSize = (size: string | null) => {
 };
 
 export default function Knowledge({ defaultType = 'all' }: { defaultType?: string }) {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const isPartsView = defaultType === 'parts_catalog';
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
@@ -116,7 +117,12 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
   const [searching, setSearching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [partsPdfs, setPartsPdfs] = useState<PartsPdfResource[]>(() => initialPartsPdfResources(isPartsView));
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+  const deleteInFlight = useRef(false);
   const selectedChunk = params.get('chunk');
+  const canDeletePartsFiles = isPartsView && profile?.role === 'owner_manager';
 
   const loadDocuments = useCallback(async () => {
     if (!profile) return;
@@ -143,7 +149,7 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
     let cancelled = false;
     const loadPartsPdfs = async () => {
       setPartsPdfs(initialPartsPdfResources(true));
-      const resources = await Promise.all(PARTS_PDF_RESOURCES.map(async resource => {
+      const resources = (await Promise.all(PARTS_PDF_RESOURCES.map(async resource => {
         const { data, error } = await supabase
           .from('fix_it_attachments')
           .select('id,post_id,name,mime_type,size,storage_path,purpose')
@@ -154,6 +160,7 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
           .maybeSingle();
 
         const attachment = data as PartsPdfAttachment | null;
+        if (!error && !attachment) return null;
         const unavailable = !attachment || attachment.mime_type !== 'application/pdf' || !attachment.storage_path;
         return {
           ...resource,
@@ -164,7 +171,7 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
             ? `${resource.displayName} could not be loaded. Reload this page to try again.`
             : unavailable ? `${resource.displayName} is currently unavailable.` : null,
         } satisfies PartsPdfResource;
-      }));
+      }))).filter(Boolean) as PartsPdfResource[];
 
       if (!cancelled) setPartsPdfs(resources);
     };
@@ -247,6 +254,30 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
     else window.location.assign(data.signedUrl);
   };
 
+  const deletePartsFile = async (kind: LibraryDeleteKind, id: string, name: string) => {
+    if (!canDeletePartsFiles || deleteInFlight.current || !session?.access_token) return;
+    if (!confirmLibraryDeletion(name)) return;
+    deleteInFlight.current = true;
+    setDeletingId(id);
+    setDeleteError(null);
+    setDeleteNotice(null);
+    try {
+      await requestLibraryDeletion({ kind, id, name }, session.access_token);
+      if (kind === 'parts_attachment') {
+        setPartsPdfs(current => current.filter(resource => resource.attachment?.id !== id));
+      } else {
+        setDocuments(current => current.filter(document => document.id !== id));
+        setResults(current => current.filter(result => result.document_id !== id));
+      }
+      setDeleteNotice(`${name} was deleted.`);
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : 'The file could not be deleted. Please try again.');
+    } finally {
+      deleteInFlight.current = false;
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -260,6 +291,9 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
           <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-300"><FileKey2 className="mr-1 inline h-3.5 w-3.5" />Staff documents stay private</span>
         </div>
       </header>
+
+      {deleteNotice && <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{deleteNotice}</div>}
+      {deleteError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{deleteError}</div>}
 
       {isPartsView && (
         <section aria-labelledby="parts-pdf-heading" className="rounded-2xl border border-cyan-500/30 bg-ink-900 p-4 shadow-sm">
@@ -280,16 +314,30 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => { void openPartsPdf(resource); }}
-                    disabled={resource.loading || !resource.attachment || resource.opening}
-                    aria-label={`Open ${resource.displayName} PDF`}
-                    className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-bold text-cyan-300 transition-colors enabled:hover:border-cyan-400 enabled:hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {resource.loading ? 'Loading…' : resource.opening ? 'Opening…' : 'Open PDF'}
-                    {!resource.loading && !resource.opening && <ExternalLink className="ml-1.5 inline h-3.5 w-3.5" />}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { void openPartsPdf(resource); }}
+                      disabled={resource.loading || !resource.attachment || resource.opening || deletingId === resource.attachment?.id}
+                      aria-label={`Open ${resource.displayName} PDF`}
+                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-bold text-cyan-300 transition-colors enabled:hover:border-cyan-400 enabled:hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {resource.loading ? 'Loading…' : resource.opening ? 'Opening…' : 'Open PDF'}
+                      {!resource.loading && !resource.opening && <ExternalLink className="ml-1.5 inline h-3.5 w-3.5" />}
+                    </button>
+                    {canDeletePartsFiles && resource.attachment && (
+                      <button
+                        type="button"
+                        onClick={() => { void deletePartsFile('parts_attachment', resource.attachment!.id, resource.displayName); }}
+                        disabled={deletingId !== null}
+                        aria-label={`Delete ${resource.displayName}`}
+                        className="rounded-xl border border-red-500/40 px-3 py-2.5 text-xs font-bold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="mr-1.5 inline h-3.5 w-3.5" />
+                        {deletingId === resource.attachment.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {resource.error && <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{resource.error}</p>}
               </article>
@@ -361,14 +409,27 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
               <h3 className="mb-3 text-sm font-bold text-ink-200">{manufacturer}</h3>
               <div className="grid gap-2 lg:grid-cols-2">
                 {docs.map(document => (
-                  <button key={document.id} onClick={() => openSource(document)} disabled={!document.source_url && !document.storage_path} className="flex items-start gap-3 rounded-xl border border-ink-800 bg-ink-950/60 p-3 text-left transition-colors enabled:hover:border-cyan-600 disabled:cursor-default">
-                    <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold text-ink-200">{document.title}</span>
-                      <span className="mt-1 block text-[10px] uppercase tracking-wider text-ink-600">{document.doc_type.replaceAll('_', ' ')}{document.revision ? ` · ${document.revision}` : ''}</span>
-                    </span>
-                    <span className={cn('rounded px-1.5 py-0.5 text-[9px] font-bold uppercase', document.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{document.access_scope}</span>
-                  </button>
+                  <div key={document.id} className="flex items-stretch gap-2">
+                    <button onClick={() => openSource(document)} disabled={!document.source_url && !document.storage_path} className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-ink-800 bg-ink-950/60 p-3 text-left transition-colors enabled:hover:border-cyan-600 disabled:cursor-default">
+                      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold text-ink-200">{document.title}</span>
+                        <span className="mt-1 block text-[10px] uppercase tracking-wider text-ink-600">{document.doc_type.replaceAll('_', ' ')}{document.revision ? ` · ${document.revision}` : ''}</span>
+                      </span>
+                      <span className={cn('rounded px-1.5 py-0.5 text-[9px] font-bold uppercase', document.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{document.access_scope}</span>
+                    </button>
+                    {canDeletePartsFiles && document.storage_bucket === 'ari-knowledge-sources' && document.storage_path && (
+                      <button
+                        type="button"
+                        onClick={() => { void deletePartsFile('knowledge_document', document.id, document.title); }}
+                        disabled={deletingId !== null}
+                        aria-label={`Delete ${document.title}`}
+                        className="rounded-xl border border-red-500/40 px-3 text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

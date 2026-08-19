@@ -6,6 +6,7 @@ import {
   mediaLibraryKind,
   type MediaLibraryKind,
 } from '@/lib/mediaLibrary';
+import { requestLibraryDeletion } from '@/lib/libraryDeletion';
 
 const BUCKET = 'fix-it-files';
 const SIGNED_URL_SECONDS = 10 * 60;
@@ -35,8 +36,10 @@ export interface UseMediaLibraryResult {
   isLoading: boolean;
   error: string | null;
   unavailableCount: number;
+  canDelete: boolean;
   refresh: () => Promise<void>;
   download: (asset: MediaLibraryAsset) => Promise<void>;
+  deleteAsset: (asset: MediaLibraryAsset) => Promise<void>;
 }
 
 const makeDownload = (url: string) => {
@@ -50,7 +53,7 @@ const makeDownload = (url: string) => {
 };
 
 export function useMediaLibrary(): UseMediaLibraryResult {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const [assets, setAssets] = useState<MediaLibraryAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,5 +149,25 @@ export function useMediaLibrary(): UseMediaLibraryResult {
     makeDownload(data.signedUrl);
   }, []);
 
-  return { assets, isLoading, error, unavailableCount, refresh, download };
+  const deleteAsset = useCallback(async (asset: MediaLibraryAsset) => {
+    if (profile?.role !== 'owner_manager' || !session?.access_token) {
+      throw new Error('Only an owner / manager can delete saved files.');
+    }
+    await requestLibraryDeletion(
+      { kind: 'media_attachment', id: asset.id, name: asset.name },
+      session.access_token,
+    );
+    await refresh();
+  }, [profile?.role, refresh, session?.access_token]);
+
+  return {
+    assets,
+    isLoading,
+    error,
+    unavailableCount,
+    canDelete: profile?.role === 'owner_manager',
+    refresh,
+    download,
+    deleteAsset,
+  };
 }

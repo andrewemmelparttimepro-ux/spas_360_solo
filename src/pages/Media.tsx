@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Download,
@@ -8,11 +8,13 @@ import {
   Images,
   LockKeyhole,
   RefreshCw,
+  Trash2,
   Wrench,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMediaLibrary, type MediaLibraryAsset } from '@/hooks/useMediaLibrary';
 import { formatMediaLibrarySize, isSafeMediaPreview } from '@/lib/mediaLibrary';
+import { confirmLibraryDeletion } from '@/lib/libraryDeletion';
 
 function AssetPreview({ asset }: { asset: MediaLibraryAsset }) {
   const [failed, setFailed] = useState(false);
@@ -43,9 +45,20 @@ function AssetPreview({ asset }: { asset: MediaLibraryAsset }) {
   );
 }
 
-function MediaCard({ asset, onDownload }: { asset: MediaLibraryAsset; onDownload: (asset: MediaLibraryAsset) => Promise<void> }) {
+function MediaCard({
+  asset,
+  onDownload,
+  onDelete,
+}: {
+  asset: MediaLibraryAsset;
+  onDownload: (asset: MediaLibraryAsset) => Promise<void>;
+  onDelete?: (asset: MediaLibraryAsset) => Promise<void>;
+}) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
   const size = formatMediaLibrarySize(asset.size);
 
   const startDownload = async () => {
@@ -57,6 +70,20 @@ function MediaCard({ asset, onDownload }: { asset: MediaLibraryAsset; onDownload
       setDownloadError(caught instanceof Error ? caught.message : 'The download could not be prepared.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const startDelete = async () => {
+    if (!onDelete || deleteInFlight.current || !confirmLibraryDeletion(asset.name)) return;
+    deleteInFlight.current = true;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete(asset);
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : 'The file could not be deleted. Please try again.');
+      deleteInFlight.current = false;
+      setDeleting(false);
     }
   };
 
@@ -96,14 +123,32 @@ function MediaCard({ asset, onDownload }: { asset: MediaLibraryAsset; onDownload
             <Download className="h-3.5 w-3.5" /> {downloading ? 'Preparing…' : 'Download'}
           </button>
         </div>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => { void startDelete(); }}
+            disabled={deleting}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`Delete ${asset.name}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> {deleting ? 'Deleting…' : 'Delete file'}
+          </button>
+        )}
         {downloadError && <p role="alert" className="text-xs text-red-600">{downloadError}</p>}
+        {deleteError && <p role="alert" className="text-xs text-red-400">{deleteError}</p>}
       </div>
     </article>
   );
 }
 
 export default function Media() {
-  const { assets, isLoading, error, unavailableCount, refresh, download } = useMediaLibrary();
+  const { assets, isLoading, error, unavailableCount, canDelete, refresh, download, deleteAsset } = useMediaLibrary();
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
+
+  const handleDelete = async (asset: MediaLibraryAsset) => {
+    await deleteAsset(asset);
+    setDeleteNotice(`${asset.name} was deleted.`);
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-5">
@@ -129,6 +174,8 @@ export default function Media() {
         <LockKeyhole className="h-4 w-4 shrink-0 text-emerald-600" />
         Files stay private. Access links are temporary and created only while you are signed in.
       </div>
+
+      {deleteNotice && <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{deleteNotice}</div>}
 
       {error && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700">
@@ -159,7 +206,14 @@ export default function Media() {
         </section>
       ) : !error ? (
         <section aria-label="Saved media library" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {assets.map(asset => <MediaCard key={asset.id} asset={asset} onDownload={download} />)}
+          {assets.map(asset => (
+            <MediaCard
+              key={asset.id}
+              asset={asset}
+              onDownload={download}
+              onDelete={canDelete ? handleDelete : undefined}
+            />
+          ))}
         </section>
       ) : null}
 

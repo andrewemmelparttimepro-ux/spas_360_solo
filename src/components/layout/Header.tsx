@@ -166,7 +166,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                       )
                     }
                   >
-                    <item.icon className="hidden h-[15px] w-[15px] 2xl:block" />
+                    <item.icon
+                      className={cn(
+                        'h-[15px] w-[15px] shrink-0',
+                        item.path !== '/parts' && item.path !== '/media' && 'hidden 2xl:block',
+                      )}
+                    />
                     <span>{item.name}</span>
                   </NavLink>
                 );

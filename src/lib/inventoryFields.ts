@@ -28,3 +28,40 @@ export const serialNumberForDisplay = (serial: string) => {
 
 export const joinSerialAndFlooring = (serial: string, flooring: string) =>
   flooring.trim() ? `${serial.trim()} "${flooring.trim()}"`.trim() : serial.trim();
+
+const CUSTOMER_SEGMENT = /((?:^|·)\s*Customer:\s*)(.*?)(?=\s*·|$)/i;
+
+export const inventoryCustomerOrStock = (
+  notes: string | null,
+  customerId: string | null,
+) => {
+  const importedCustomer = notes?.match(CUSTOMER_SEGMENT)?.[2]?.trim();
+  if (importedCustomer) {
+    return importedCustomer.toUpperCase() === 'STOCK' ? 'Stock' : importedCustomer;
+  }
+  return customerId ? 'Customer' : 'Stock';
+};
+
+export const updateInventoryCustomerOrStock = (
+  notes: string | null,
+  value: string,
+) => {
+  const storedValue = value.trim();
+  const customerOrStock = !storedValue || storedValue.toUpperCase() === 'STOCK'
+    ? 'STOCK'
+    : storedValue;
+  const currentNotes = notes ?? '';
+  const match = CUSTOMER_SEGMENT.exec(currentNotes);
+
+  if (!match || match.index === undefined) {
+    return currentNotes
+      ? `${currentNotes} · Customer: ${customerOrStock}`
+      : `Customer: ${customerOrStock}`;
+  }
+
+  const valueStart = match.index + match[1].length;
+  const valueEnd = valueStart + match[2].length;
+  const suffix = currentNotes.slice(valueEnd);
+  const separator = suffix.startsWith('·') ? ' ' : '';
+  return `${currentNotes.slice(0, valueStart)}${customerOrStock}${separator}${suffix}`;
+};

@@ -33,4 +33,14 @@ describe('inventory inline edit persistence contract', () => {
     assert.match(hook, /if \(error \|\| !data \|\| data\.length === 0\)/);
     assert.match(hook, /return false;/);
   });
+
+  it('routes Customer\/Stock edits through notes persistence and the shared error-capable editor', async () => {
+    const inventory = await read('src/pages/Inventory.tsx');
+
+    assert.match(inventory, /function CustomerStockCell\(/);
+    assert.match(inventory, /const value = inventoryCustomerOrStock\(item\.notes, item\.customer_id\);/);
+    assert.match(inventory, /notes: updateInventoryCustomerOrStock\(item\.notes, nextValue\)/);
+    assert.match(inventory, /<EditableCell value=\{value\} field="customer_stock" itemId=\{item\.id\} onSave=\{handleSave\} \/>/);
+    assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);
+  });
 });

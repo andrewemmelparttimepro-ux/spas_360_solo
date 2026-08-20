@@ -8,9 +8,11 @@ import InventoryEditor from '@/components/InventoryEditor';
 import type { InventoryItem } from '@/types/database';
 import { cn } from '@/lib/utils';
 import {
+  inventoryCustomerOrStock,
   joinSerialAndFlooring,
   serialNumberForDisplay,
   splitSerialAndFlooring,
+  updateInventoryCustomerOrStock,
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 
@@ -153,14 +155,6 @@ function EditableCell({
   );
 }
 
-const importedCustomerOrStock = (item: InventoryItem) => {
-  const importedCustomer = item.notes?.match(/(?:^|·)\s*Customer:\s*(.*?)(?=\s*·|$)/i)?.[1]?.trim();
-  if (importedCustomer) {
-    return importedCustomer.toUpperCase() === 'STOCK' ? 'Stock' : importedCustomer;
-  }
-  return item.customer_id ? 'Customer' : 'Stock';
-};
-
 function InventoryTextCell({
   item,
   part,
@@ -186,6 +180,24 @@ function InventoryTextCell({
     : parsed.flooring;
 
   return <EditableCell value={displayValue} field={part} itemId={item.id} onSave={handleSave} />;
+}
+
+function CustomerStockCell({
+  item,
+  onSave,
+}: {
+  item: InventoryItem;
+  onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
+}) {
+  const value = inventoryCustomerOrStock(item.notes, item.customer_id);
+  const handleSave = (id: string, updates: Partial<InventoryItem>) => {
+    const nextValue = String((updates as Record<string, unknown>).customer_stock ?? '');
+    return onSave(id, {
+      notes: updateInventoryCustomerOrStock(item.notes, nextValue),
+    });
+  };
+
+  return <EditableCell value={value} field="customer_stock" itemId={item.id} onSave={handleSave} />;
 }
 
 function OnHandCell({
@@ -342,7 +354,9 @@ export default function Inventory() {
                   <td className="p-4 text-sm text-ink-300">
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">{importedCustomerOrStock(item)}</td>
+                  <td className="p-4 text-sm text-ink-300">
+                    <CustomerStockCell item={item} onSave={updateItem} />
+                  </td>
                   <td className="p-4 text-sm text-ink-300">
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
                   </td>

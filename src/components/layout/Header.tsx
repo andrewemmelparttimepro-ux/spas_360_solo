@@ -131,13 +131,13 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Brand */}
       <NavLink to="/dashboard" className="flex items-center gap-2 shrink-0" aria-label="Go to Dashboard">
         <img src="/logo-mark.png" alt="SPAS 360" className="h-7 w-auto object-contain" />
-        <span className="text-[15px] font-bold text-ink-100 tracking-tight hidden md:block">
+        <span className="text-[15px] font-bold text-ink-100 tracking-tight hidden 2xl:block">
           SPAS <span className="text-brand-400">360</span>
         </span>
       </NavLink>
 
       {/* Nav (desktop) — the floor-operations destinations only. */}
-      <nav className="hidden min-[1400px]:flex items-center gap-1">
+      <nav className="hidden lg:flex items-center gap-1">
         {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
@@ -158,7 +158,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     {...(isDropNav ? { 'data-cdrop': 'nav', 'data-cdrop-nav': item.path } : {})}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-1.5 px-2.5 py-[7px] rounded-lg text-[12px] font-semibold transition-all',
+                        'flex items-center gap-1 px-1.5 py-[7px] rounded-lg text-[11px] font-semibold transition-all 2xl:gap-1.5 2xl:px-2.5 2xl:text-[12px]',
                         isActive ? tone.active : tone.idle,
                         // A customer card is in flight — light up the landing zones
                         dragging && isDropNav && 'ring-2 ring-violet-400/50',
@@ -166,7 +166,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                       )
                     }
                   >
-                    <item.icon className="w-[15px] h-[15px]" />
+                    <item.icon className="hidden h-[15px] w-[15px] 2xl:block" />
                     <span>{item.name}</span>
                   </NavLink>
                 );

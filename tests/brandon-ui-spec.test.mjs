@@ -34,7 +34,9 @@ describe('Brandon composite UI contract', () => {
     assert.match(header, /name: 'Media', path: '\/media', icon: Images/);
     assert.match(header, /name: 'Documents', path: '\/documents', icon: Files/);
     assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown/);
-    assert.match(header, /<nav className="hidden min-\[1400px\]:flex items-center gap-1">/);
+    assert.match(header, /<nav className="hidden lg:flex items-center gap-1">/);
+    assert.match(header, /px-1\.5[^"]*text-\[11px\][^"]*2xl:px-2\.5[^"]*2xl:text-\[12px\]/);
+    assert.match(header, /className="hidden h-\[15px\] w-\[15px\] 2xl:block"/);
     const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));
     for (const destination of secondary) {
       assert.match(secondaryBlock, new RegExp(`name: '${destination}'`));

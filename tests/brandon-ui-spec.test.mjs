@@ -104,7 +104,9 @@ describe('Brandon composite UI contract', () => {
     assert.match(deals, /className="max-h-\[60vh\] overflow-auto"/);
     assert.match(deals, /aria-label="Active deals table"/);
     assert.match(deals, />Expected close</);
-    assert.match(inventory, /const BRAND_OPTIONS = \['Sundance Spas', 'Master Spas', 'Platinum Spas', 'Eco Spas'\]/);
+    assert.match(inventory, /const brandOptions = Array\.from\(new Set\(items\.map/);
+    assert.match(inventory, /return compare\(a\.brand, b\.brand\)[\s\S]*compare\(a\.color_finish, b\.color_finish\)/);
+    assert.match(inventory, />Brand</);
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);
     assert.match(inventory, /Customer:\\s\*\(\.\*\?\)\(\?=\\s\*·\|\$\)/);

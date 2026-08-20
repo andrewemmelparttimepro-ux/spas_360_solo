@@ -1,6 +1,6 @@
 import { Search, Plus, Package, X, Check, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import StoreSwitcher from '@/components/StoreSwitcher';
@@ -12,6 +12,7 @@ import {
   serialNumberForDisplay,
   splitSerialAndFlooring,
 } from '@/lib/inventoryFields';
+import { groupInventoryItems } from '@/lib/inventoryGrouping';
 
 // --------------- Inline editable cell ---------------
 function EditableCell({
@@ -228,16 +229,9 @@ export default function Inventory() {
   ];
   const brandOptions = Array.from(new Set(items.map(item => item.brand?.trim()).filter((brand): brand is string => Boolean(brand))))
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
-  const visibleItems = (brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter))
-    .slice()
-    .sort((a, b) => {
-      const compare = (left: string | null | undefined, right: string | null | undefined) =>
-        (left ?? '').localeCompare(right ?? '', undefined, { sensitivity: 'base', numeric: true });
-      return compare(a.brand, b.brand)
-        || compare(a.color_finish, b.color_finish)
-        || compare(a.model ?? a.product, b.model ?? b.product)
-        || compare(a.sku, b.sku);
-    });
+  const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
+  const groupedItems = groupInventoryItems(visibleItems);
+  const columnCount = showStore ? 8 : 7;
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -301,7 +295,6 @@ export default function Inventory() {
           <table className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Brand</th>
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
                 {showStore && <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Store</th>}
                 <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Color Combination</th>
@@ -314,10 +307,20 @@ export default function Inventory() {
             </thead>
             <tbody className="divide-y divide-ink-800">
               {visibleItems.length === 0 ? (
-                <tr><td colSpan={showStore ? 9 : 8} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
-              ) : visibleItems.map(item => (
-                <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className="hover:bg-ink-800/60 transition-colors">
-                  <td className="p-4 text-sm font-semibold text-ink-200">{item.brand || '—'}</td>
+                <tr><td colSpan={columnCount} className="p-8 text-center text-ink-500">No inventory items found</td></tr>
+              ) : groupedItems.map(group => (
+                <Fragment key={group.key}>
+                  <tr className={cn('border-y border-ink-700', group.headerClassName)}>
+                    <th colSpan={columnCount} scope="rowgroup" className="px-4 py-2 text-left">
+                      <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em]">
+                        <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', group.dotClassName)} />
+                        {group.label}
+                        <span className="font-semibold tracking-normal opacity-70">{group.items.length}</span>
+                      </span>
+                    </th>
+                  </tr>
+                  {group.items.map(item => (
+                    <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className={cn('transition-colors', group.tintClassName)}>
                   <td className="p-4 text-sm text-ink-300">
                     <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
                       {item.model || item.product}
@@ -346,7 +349,9 @@ export default function Inventory() {
                   <td className="p-4 text-sm font-semibold text-ink-200">
                     <OnHandCell item={item} onSave={updateItem} />
                   </td>
-                </tr>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

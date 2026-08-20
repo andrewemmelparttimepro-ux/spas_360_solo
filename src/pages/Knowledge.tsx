@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, ExternalLink, FileKey2, FileText, Search, ShieldCheck, Trash2, Wrench } from 'lucide-react';
+import { BookOpen, ExternalLink, FileKey2, Files, FileText, Search, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -106,9 +106,10 @@ const formatAttachmentSize = (size: string | null) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-export default function Knowledge({ defaultType = 'all' }: { defaultType?: string }) {
+export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge' }: { defaultType?: string; pageTitle?: 'Knowledge' | 'Documents' }) {
   const { profile, session } = useAuth();
   const isPartsView = defaultType === 'parts_catalog';
+  const isDocumentsView = pageTitle === 'Documents';
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
   const [type, setType] = useState(params.get('type') ?? defaultType);
@@ -282,9 +283,12 @@ export default function Knowledge({ defaultType = 'all' }: { defaultType?: strin
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">Ari verified source library</p>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100"><BookOpen className="h-6 w-6 text-cyan-400" />{isPartsView ? 'Parts' : 'Knowledge'}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search verified parts literature by part number, model, and year.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">{isDocumentsView ? 'Dealership document library' : 'Ari verified source library'}</p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100">
+            {isDocumentsView ? <Files className="h-6 w-6 text-cyan-400" /> : <BookOpen className="h-6 w-6 text-cyan-400" />}
+            {isPartsView ? 'Parts' : pageTitle}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search verified parts literature by part number, model, and year.' : isDocumentsView ? 'Open and search the dealership’s verified manuals, warranties, technical bulletins, and other staff documents.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
         </div>
         <div className="flex gap-2 text-xs">
           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-semibold text-emerald-300"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Verified sources</span>

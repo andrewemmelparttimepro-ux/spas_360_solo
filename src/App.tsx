@@ -21,6 +21,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Citadel = lazy(() => import('./pages/Citadel'));
 const Knowledge = lazy(() => import('./pages/Knowledge'));
 const Media = lazy(() => import('./pages/Media'));
+const OwnersCorner = lazy(() => import('./pages/OwnersCorner'));
 
 function PageLoader() {
   const [timedOut, setTimedOut] = useState(false);
@@ -113,6 +114,8 @@ function AuthGate() {
           <Route path="knowledge" element={<Knowledge />} />
           <Route path="parts" element={<Knowledge key="parts" defaultType="parts_catalog" />} />
           <Route path="media" element={<Media />} />
+          <Route path="documents" element={<Knowledge key="documents" pageTitle="Documents" />} />
+          <Route path="owners-corner" element={<OwnersCorner />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

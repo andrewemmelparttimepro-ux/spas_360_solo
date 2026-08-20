@@ -1,4 +1,4 @@
-import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen, PackageSearch, Images } from 'lucide-react';
+import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen, PackageSearch, Images, Files, Crown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,6 +23,8 @@ export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items:
   { label: null, tone: 'service', items: [{ name: 'Schedule', path: '/service', icon: Wrench }] },
   { label: null, tone: 'service', items: [{ name: 'Parts', path: '/parts', icon: PackageSearch }] },
   { label: null, tone: null, items: [{ name: 'Media', path: '/media', icon: Images }] },
+  { label: null, tone: null, items: [{ name: 'Documents', path: '/documents', icon: Files }] },
+  { label: null, tone: null, items: [{ name: 'Owners Corner', path: '/owners-corner', icon: Crown }] },
 ];
 
 export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof LayoutDashboard }[] = [
@@ -135,7 +137,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </NavLink>
 
       {/* Nav (desktop) — the floor-operations destinations only. */}
-      <nav className="hidden lg:flex items-center gap-1">
+      <nav className="hidden min-[1400px]:flex items-center gap-1">
         {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (

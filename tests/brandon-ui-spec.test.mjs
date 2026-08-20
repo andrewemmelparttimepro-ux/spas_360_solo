@@ -18,21 +18,23 @@ describe('Brandon composite UI contract', () => {
     assert.match(layout, /bg-\[var\(--color-app-canvas\)\]/);
   });
 
-  // Updated 2026-08-19 per Brandon: Parts and Media follow Schedule in the
+  // Updated 2026-08-19 per Brandon: Parts, Media, Documents, and Owners Corner follow Schedule in the
   // top bar. The office destinations remain in the drawer, and every existing
   // destination stays reachable.
   it('keeps the requested primary destinations in order and office links in the drawer', async () => {
     const header = await read('src/components/layout/Header.tsx');
-    const primary = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule', 'Parts', 'Media'];
+    const primary = ['Dashboard', 'Customers', 'Deals', 'Inventory', 'Schedule', 'Parts', 'Media', 'Documents', 'Owners Corner'];
     const secondary = ['Inbox', 'Citadel', 'Reports'];
 
     for (const destination of primary) {
       assert.match(header, new RegExp(`name: '${destination}'`));
     }
-    assert.match(header, /name: 'Schedule'[\s\S]*name: 'Parts'[\s\S]*name: 'Media'/);
+    assert.match(header, /name: 'Schedule'[\s\S]*name: 'Parts'[\s\S]*name: 'Media'[\s\S]*name: 'Documents'[\s\S]*name: 'Owners Corner'/);
     assert.match(header, /name: 'Parts', path: '\/parts', icon: PackageSearch/);
     assert.match(header, /name: 'Media', path: '\/media', icon: Images/);
-    assert.match(header, /<nav className="hidden lg:flex items-center gap-1">/);
+    assert.match(header, /name: 'Documents', path: '\/documents', icon: Files/);
+    assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown/);
+    assert.match(header, /<nav className="hidden min-\[1400px\]:flex items-center gap-1">/);
     const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));
     for (const destination of secondary) {
       assert.match(secondaryBlock, new RegExp(`name: '${destination}'`));
@@ -41,6 +43,25 @@ describe('Brandon composite UI contract', () => {
 
     const sidebar = await read('src/components/layout/Sidebar.tsx');
     assert.match(sidebar, /SECONDARY_NAV_ITEMS/);
+  });
+
+  it('routes Documents and Owners Corner to functional, policy-safe destinations', async () => {
+    const [app, knowledge, ownersCorner] = await Promise.all([
+      read('src/App.tsx'),
+      read('src/pages/Knowledge.tsx'),
+      read('src/pages/OwnersCorner.tsx'),
+    ]);
+
+    assert.match(app, /path="documents" element=\{<Knowledge key="documents" pageTitle="Documents" \/>\}/);
+    assert.match(app, /path="owners-corner" element=\{<OwnersCorner \/>\}/);
+    assert.match(knowledge, /pageTitle === 'Documents'/);
+    assert.match(knowledge, /Dealership document library/);
+    assert.match(ownersCorner, /profile\?\.role === 'owner_manager'/);
+    assert.match(ownersCorner, /Owner access required/);
+    assert.match(ownersCorner, /to="\/dashboard"/);
+    assert.match(ownersCorner, /path: '\/reports'/);
+    assert.match(ownersCorner, /path: '\/citadel'/);
+    assert.match(ownersCorner, /path: '\/settings'/);
   });
 
   it('routes Parts to the existing parts-capable knowledge view and Media to the saved library', async () => {

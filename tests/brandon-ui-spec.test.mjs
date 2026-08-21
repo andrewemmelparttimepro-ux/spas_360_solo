@@ -121,6 +121,23 @@ describe('Brandon composite UI contract', () => {
     assert.match(dealDetail, />Priority</);
   });
 
+  it('makes a newly created customer immediately visible in the active store', async () => {
+    const [customers, customerCards, wizard] = await Promise.all([
+      read('src/pages/Customers.tsx'),
+      read('src/hooks/useCustomerCards.ts'),
+      read('src/components/NewCustomerWizard.tsx'),
+    ]);
+
+    assert.match(customerCards, /const fetchSeq = useRef\(0\)/);
+    assert.match(customerCards, /const seq = \+\+fetchSeq\.current/);
+    assert.match(customerCards, /if \(seq !== fetchSeq\.current\) return;/);
+    assert.match(customers, /onCreated=\{\(\) => refresh\(\)\}/);
+    assert.match(wizard, /const creationLocationId = activeLocationId \?\? profile\.location_id \?\? null/);
+    assert.match(wizard, /p_location_id: creationLocationId/);
+    assert.match(wizard, /location_id: creationLocationId/);
+    assert.match(wizard, /await onCreated\?\.\(deal\.id\);[\s\S]*onClose\(\);/);
+  });
+
   it('keeps the calendar as a high-contrast dark surface inside the light canvas', async () => {
     const [css, service] = await Promise.all([
       read('src/index.css'),

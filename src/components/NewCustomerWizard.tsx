@@ -65,9 +65,9 @@ function Chip({ active, onClick, children, hint }: { active: boolean; onClick: (
 
 const inputClass = 'w-full px-3 py-2 bg-ink-950 border border-ink-700 rounded-lg text-sm text-ink-100 placeholder-ink-500 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40 transition-all';
 
-export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () => void; onCreated?: (dealId: string | null) => void }) {
+export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () => void; onCreated?: (dealId: string | null) => void | Promise<void> }) {
   const { dialogRef, dialogProps } = useModal(onClose);
-  const { profile, user } = useAuth();
+  const { profile, user, activeLocationId } = useAuth();
   const { toast } = useToast();
 
   const [first, setFirst] = useState('');
@@ -125,6 +125,8 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
     if (!profile || !user || !canCreate) return;
     setSaving(true);
     try {
+      const creationLocationId = activeLocationId ?? profile.location_id ?? null;
+
       // 1. Contact — reuse the existing record if one was selected
       let contactId = existing ? existing.id : null;
       let contactFirst = existing ? existing.first_name : first.trim();
@@ -135,7 +137,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
           p_phone: phone.trim(),
           p_email: email.trim() || null,
           p_lead_source: source,
-          p_location_id: profile.location_id ?? null,
+          p_location_id: creationLocationId,
           p_assigned_to: user.id,
           p_customer_type: 'Lead',
         });
@@ -169,7 +171,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
         product_interest: interests,
         expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
-        location_id: profile.location_id ?? null,
+        location_id: creationLocationId,
         position: 0,
       }).select('id').single();
       if (dealErr) throw new Error(dealErr.message);
@@ -209,7 +211,9 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       }
 
       toast(`${contactFirst} added — follow-up scheduled`, 'success');
-      onCreated?.(deal.id);
+      // The caller's post-create refresh is the handoff to customer search.
+      // Wait for it so the wizard cannot disappear while the old list is still visible.
+      await onCreated?.(deal.id);
       onClose();
     } catch (err) {
       toast(`Couldn't create customer: ${(err as Error).message}`, 'error');

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,10 +29,12 @@ export function useCustomerCards() {
   const [equipAgg, setEquipAgg] = useState<Map<string, number>>(new Map());
   const [followUps, setFollowUps] = useState<Set<string>>(new Set()); // contact ids with an open task
   const [isLoading, setIsLoading] = useState(true);
+  const fetchSeq = useRef(0);
 
   const fetchAll = useCallback(async () => {
     if (!profile) return;
     setIsLoading(true);
+    const seq = ++fetchSeq.current; // stale realtime reads must not replace a newer post-create refresh
 
     const fetchEveryContact = async () => {
       const pageSize = 1000;
@@ -61,6 +63,8 @@ export function useCustomerCards() {
       supabase.from('inventory_items').select('customer_id').eq('org_id', profile.org_id).not('customer_id', 'is', null),
       supabase.from('tasks').select('contact_id, deal_id').eq('org_id', profile.org_id).in('status', ['Pending', 'In Progress']),
     ]);
+
+    if (seq !== fetchSeq.current) return;
 
     if (contactRes.error) console.error('Error fetching customers:', contactRes.error);
     setContacts((contactRes.data as typeof contacts) ?? []);

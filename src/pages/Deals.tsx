@@ -14,9 +14,10 @@ import NewCustomerWizard from '@/components/NewCustomerWizard';
 import QuickDealModal from '@/components/QuickDealModal';
 import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
 import DialogKeys from '@/components/ui/DialogKeys';
+import { activePipelineStages, isActiveDeal, outcomeStage } from '@/lib/dealStage';
 
 export default function Deals() {
-  const { stages, deals, salespeople, followUpsByDeal, isLoading, moveDeal, refresh } = usePipeline();
+  const { stages, deals, salespeople, followUpsByDeal, isLoading, moveDeal, moveDealToStage, refresh } = usePipeline();
   const { profile } = useAuth();
   const { toast } = useToast();
   const { dragging, activeTarget, setDropHandler } = useCustomerDrag();
@@ -28,6 +29,7 @@ export default function Deals() {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [dealSearch, setDealSearch] = useState('');
+  const [movingDealId, setMovingDealId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
@@ -106,9 +108,11 @@ export default function Deals() {
     return `${deal.title} ${contactName} ${ownerName}`.toLowerCase().includes(searchNeedle);
   };
   const visibleDeals = deals.filter(matchesOwnerAndSearch);
-  const closedStageIds = new Set(stages.filter(stage => stage.is_won || stage.is_lost).map(stage => stage.id));
+  const editableStages = activePipelineStages(stages);
+  const wonStage = outcomeStage(stages, 'won');
+  const lostStage = outcomeStage(stages, 'lost');
   const activeDeals = visibleDeals
-    .filter(deal => !closedStageIds.has(deal.stage_id))
+    .filter(deal => isActiveDeal(deal, stages))
     .sort((a, b) => {
       const stateRank: Record<FollowUpState, number> = { overdue: 0, missing: 1, today: 2, scheduled: 3 };
       const aFollowUp = followUpsByDeal.get(a.id);
@@ -123,6 +127,16 @@ export default function Deals() {
   const missingFollowUps = activeDeals.filter(deal => !followUpsByDeal.has(deal.id)).length;
   const overdueFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'overdue').length;
   const dueToday = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'today').length;
+
+  const changeDealStage = async (deal: PipelineDeal, stageId: string) => {
+    if (movingDealId || deal.stage_id === stageId) return;
+    setMovingDealId(deal.id);
+    try {
+      await moveDealToStage(deal.id, stageId);
+    } finally {
+      setMovingDealId(null);
+    }
+  };
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -255,11 +269,11 @@ export default function Deals() {
                 <th className="px-5 py-3">Priority</th>
                 <th className="px-5 py-3">Expected close</th>
                 <th className="px-5 py-3">Open tasks</th>
+                <th className="px-5 py-3">Outcome</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800/80">
               {activeDeals.map((deal) => {
-                const stage = stages.find((entry) => entry.id === deal.stage_id);
                 const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : 'Unassigned';
                 const ownerName = deal.assigned ? `${deal.assigned.first_name} ${deal.assigned.last_name}` : 'Unassigned';
                 const followUp = followUpsByDeal.get(deal.id);
@@ -270,7 +284,17 @@ export default function Deals() {
                       <Link to={`/deals/${deal.id}`} className="font-medium text-ink-100 hover:text-brand-400">{deal.title}</Link>
                     </td>
                     <td className="px-5 py-3 text-ink-300">{contactName}</td>
-                    <td className="px-5 py-3 text-ink-400">{stage?.name ?? 'Unknown stage'}</td>
+                    <td className="min-w-[180px] px-5 py-3">
+                      <select
+                        value={deal.stage_id}
+                        onChange={(event) => changeDealStage(deal, event.target.value)}
+                        disabled={movingDealId !== null}
+                        aria-label={`Stage for ${deal.title}`}
+                        className="w-full rounded-lg border border-ink-700 bg-ink-950 px-2.5 py-2 text-xs font-semibold text-ink-200 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {editableStages.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+                      </select>
+                    </td>
                     <td className="px-5 py-3 text-ink-300">{ownerName}</td>
                     <td className="min-w-[210px] px-5 py-3">
                       {followUp ? (
@@ -288,12 +312,34 @@ export default function Deals() {
                     <td className="px-5 py-3"><span className="rounded-full border border-ink-700 bg-ink-950 px-2.5 py-1 text-xs font-medium text-ink-300">{deal.priority}</span></td>
                     <td className="px-5 py-3 text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : 'Open-ended'}</td>
                     <td className="px-5 py-3 text-center font-mono text-ink-300">{followUp?.openTaskCount ?? 0}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => wonStage && changeDealStage(deal, wonStage.id)}
+                          disabled={!wonStage || movingDealId !== null}
+                          aria-label={`Mark ${deal.title} won`}
+                          className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Won
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => lostStage && changeDealStage(deal, lostStage.id)}
+                          disabled={!lostStage || movingDealId !== null}
+                          aria-label={`Mark ${deal.title} lost`}
+                          className="rounded-lg border border-red-500/35 bg-red-500/10 px-2.5 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Lost
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
               {activeDeals.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-ink-500">
+                  <td colSpan={10} className="px-5 py-10 text-center text-sm text-ink-500">
                     No active deals match this salesperson and search.
                   </td>
                 </tr>

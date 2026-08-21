@@ -107,17 +107,21 @@ export function usePipeline() {
     return deals.filter(d => d.stage_id === stageId);
   }, [deals]);
 
-  const moveDeal = useCallback(async (result: DropResult) => {
-    const { destination, source, draggableId } = result;
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+  const moveDealToStage = useCallback(async (dealId: string, stageId: string, position?: number) => {
+    const currentDeal = deals.find(deal => deal.id === dealId);
+    if (!currentDeal) return false;
+    if (currentDeal.stage_id === stageId && position === undefined) return true;
+
+    const targetPosition = position ?? deals.filter(deal => deal.stage_id === stageId && deal.id !== dealId).length;
+    const sourceStage = stages.find(stage => stage.id === currentDeal.stage_id);
+    const destinationStage = stages.find(stage => stage.id === stageId);
 
     // Optimistic update
     setDeals(prev => {
       const updated = [...prev];
-      const dealIdx = updated.findIndex(d => d.id === draggableId);
+      const dealIdx = updated.findIndex(d => d.id === dealId);
       if (dealIdx === -1) return prev;
-      updated[dealIdx] = { ...updated[dealIdx], stage_id: destination.droppableId, position: destination.index };
+      updated[dealIdx] = { ...updated[dealIdx], stage_id: stageId, position: targetPosition };
       return updated;
     });
 
@@ -125,25 +129,33 @@ export function usePipeline() {
     // the entire won-deal handoff (delivery job, customer promotion, manager
     // pings) — identical no matter which path wins the deal.
     const { error } = await supabase.rpc('move_deal', {
-      p_deal_id: draggableId,
-      p_stage_id: destination.droppableId,
-      p_position: destination.index,
+      p_deal_id: dealId,
+      p_stage_id: stageId,
+      p_position: targetPosition,
     });
 
     if (error) {
       console.error('Error moving deal:', error);
       toast(`Couldn't move that deal: ${error.message}`, 'error');
       fetchPipeline(); // Revert on error
-      return;
+      return false;
     }
 
     // Celebrate the non-won → won crossing (the work already happened in the DB)
-    const destStage = stages.find(s => s.id === destination.droppableId);
-    const sourceStage = stages.find(s => s.id === source.droppableId);
-    if (destStage?.is_won && !sourceStage?.is_won) {
+    if (destinationStage?.is_won && !sourceStage?.is_won) {
       toast('Deal won 🎉 Delivery job sent to the Service queue', 'success');
+    } else if (destinationStage?.is_lost && !sourceStage?.is_lost) {
+      toast('Deal marked lost and saved in the customer history', 'success');
     }
-  }, [stages, fetchPipeline, toast]);
+    return true;
+  }, [deals, stages, fetchPipeline, toast]);
+
+  const moveDeal = useCallback(async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    await moveDealToStage(draggableId, destination.droppableId, destination.index);
+  }, [moveDealToStage]);
 
   const createDeal = useCallback(async (deal: Partial<Deal>) => {
     if (!profile) return null;
@@ -169,6 +181,7 @@ export function usePipeline() {
     isLoading,
     getDealsForStage,
     moveDeal,
+    moveDealToStage,
     createDeal,
     refresh: fetchPipeline,
   };

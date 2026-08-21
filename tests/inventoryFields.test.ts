@@ -77,6 +77,13 @@ describe('inventory customer or stock field', () => {
     assert.equal(inventoryCustomerOrStock('Manual inventory note', null), 'Stock');
   });
 
+  it('prefers the current linked customer over stale imported note text', () => {
+    assert.equal(
+      inventoryCustomerOrStock('Customer: Previous Owner', 'customer-id', 'Current Owner'),
+      'Current Owner',
+    );
+  });
+
   it('edits only the Customer segment and preserves all unrelated notes', () => {
     assert.equal(
       updateInventoryCustomerOrStock(

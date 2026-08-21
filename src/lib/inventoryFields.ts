@@ -34,7 +34,11 @@ const CUSTOMER_SEGMENT = /((?:^|·)\s*Customer:\s*)(.*?)(?=\s*·|$)/i;
 export const inventoryCustomerOrStock = (
   notes: string | null,
   customerId: string | null,
+  currentCustomerName?: string | null,
 ) => {
+  const assignedCustomer = currentCustomerName?.trim();
+  if (customerId && assignedCustomer) return assignedCustomer;
+
   const importedCustomer = notes?.match(CUSTOMER_SEGMENT)?.[2]?.trim();
   if (importedCustomer) {
     return importedCustomer.toUpperCase() === 'STOCK' ? 'Stock' : importedCustomer;

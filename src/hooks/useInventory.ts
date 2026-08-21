@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { sanitizeSearchTerm } from '@/lib/utils';
-import type { InventoryItem } from '@/types/database';
+import type { Contact, InventoryItem } from '@/types/database';
+
+export type InventoryListItem = InventoryItem & {
+  customer: Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone' | 'customer_type'> | null;
+};
 
 export function useInventory() {
   const { profile, activeLocationId } = useAuth();
-  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [items, setItems] = useState<InventoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -16,7 +20,7 @@ export function useInventory() {
 
     let query = supabase
       .from('inventory_items')
-      .select('*, locations:location_id(name)')
+      .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false });
 
@@ -31,7 +35,7 @@ export function useInventory() {
 
     const { data, error } = await query;
     if (error) console.error('Error fetching inventory:', error);
-    setItems(data ?? []);
+    setItems((data ?? []) as InventoryListItem[]);
     setIsLoading(false);
   }, [profile, activeLocationId, searchQuery]);
 

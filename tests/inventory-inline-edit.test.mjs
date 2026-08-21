@@ -34,13 +34,18 @@ describe('inventory inline edit persistence contract', () => {
     assert.match(hook, /return false;/);
   });
 
-  it('routes Customer\/Stock edits through notes persistence and the shared error-capable editor', async () => {
+  it('searches current customer data and persists the real Customer\/Stock assignment', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
+    const hook = await read('src/hooks/useInventory.ts');
 
     assert.match(inventory, /function CustomerStockCell\(/);
-    assert.match(inventory, /const value = inventoryCustomerOrStock\(item\.notes, item\.customer_id\);/);
-    assert.match(inventory, /notes: updateInventoryCustomerOrStock\(item\.notes, nextValue\)/);
-    assert.match(inventory, /<EditableCell value=\{value\} field="customer_stock" itemId=\{item\.id\} onSave=\{handleSave\} \/>/);
+    assert.match(inventory, /\.from\('contacts'\)/);
+    assert.match(inventory, /\.eq\('org_id', profile\.org_id\)/);
+    assert.match(inventory, /filterCustomersByNamePrefix\(\(data \?\? \[\]\) as CustomerChoice\[\], normalized\)/);
+    assert.match(inventory, /customer_id: customer\?\.id \?\? null/);
+    assert.match(inventory, /notes: updateInventoryCustomerOrStock\(item\.notes, label\)/);
+    assert.match(inventory, /const canChooseStock = item\.status !== 'Sold';/);
     assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);
+    assert.match(hook, /customer:customer_id\(id, first_name, last_name, phone, customer_type\)/);
   });
 });

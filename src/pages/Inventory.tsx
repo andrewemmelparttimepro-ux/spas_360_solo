@@ -1,12 +1,14 @@
-import { Search, Plus, Package, X, Check, Pencil } from 'lucide-react';
+import { Search, Plus, Package, X, Check, Pencil, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Fragment, useState, useRef, useEffect } from 'react';
-import { useInventory } from '@/hooks/useInventory';
+import { useInventory, type InventoryListItem } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import InventoryEditor from '@/components/InventoryEditor';
-import type { InventoryItem } from '@/types/database';
-import { cn } from '@/lib/utils';
+import type { Contact, InventoryItem } from '@/types/database';
+import { cn, sanitizeSearchTerm } from '@/lib/utils';
+import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
+import { supabase } from '@/lib/supabase';
 import {
   inventoryCustomerOrStock,
   joinSerialAndFlooring,
@@ -186,19 +188,168 @@ function CustomerStockCell({
   item,
   onSave,
 }: {
-  item: InventoryItem;
+  item: InventoryListItem;
   onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
 }) {
-  const value = inventoryCustomerOrStock(item.notes, item.customer_id);
-  const handleSave = (id: string, updates: Partial<InventoryItem>) => {
-    const nextValue = String((updates as Record<string, unknown>).customer_stock ?? '');
-    return onSave(id, {
-      notes: updateInventoryCustomerOrStock(item.notes, nextValue),
-    });
+  const { profile } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [matches, setMatches] = useState<CustomerChoice[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const currentCustomerName = item.customer
+    ? `${item.customer.first_name} ${item.customer.last_name}`.trim()
+    : null;
+  const value = inventoryCustomerOrStock(item.notes, item.customer_id, currentCustomerName);
+
+  useEffect(() => {
+    if (!editing) return;
+    setQuery('');
+    setDebouncedQuery('');
+    setMatches([]);
+    setSaveError(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 200);
+    return () => window.clearTimeout(timer);
+  }, [editing, query]);
+
+  useEffect(() => {
+    if (!editing || !profile) return;
+    const normalized = sanitizeSearchTerm(debouncedQuery);
+    if (normalized.length < 2) {
+      setMatches([]);
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const searchCustomers = async () => {
+      setSearching(true);
+      const prefix = normalized.split(' ')[0];
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, phone, customer_type')
+        .eq('org_id', profile.org_id)
+        .or(`first_name.ilike.${prefix}%,last_name.ilike.${prefix}%`)
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true })
+        .limit(20);
+      if (cancelled) return;
+      if (error) {
+        console.error('Error searching customers for inventory:', error);
+        setMatches([]);
+        setSaveError('Could not search customers. Try again.');
+      } else {
+        setSaveError(null);
+        setMatches(filterCustomersByNamePrefix((data ?? []) as CustomerChoice[], normalized).slice(0, 8));
+      }
+      setSearching(false);
+    };
+    void searchCustomers();
+    return () => { cancelled = true; };
+  }, [debouncedQuery, editing, profile]);
+
+  const saveChoice = async (customer: CustomerChoice | null) => {
+    if (saving) return;
+    const label = customer ? `${customer.first_name} ${customer.last_name}`.trim() : 'Stock';
+    setSaving(true);
+    setSaveError(null);
+    let saved = false;
+    try {
+      saved = await onSave(item.id, {
+        customer_id: customer?.id ?? null,
+        notes: updateInventoryCustomerOrStock(item.notes, label),
+      });
+    } catch {
+      saved = false;
+    } finally {
+      setSaving(false);
+    }
+    if (saved) {
+      setEditing(false);
+      return;
+    }
+    setSaveError('Could not save. Try again.');
   };
 
-  return <EditableCell value={value} field="customer_stock" itemId={item.id} onSave={handleSave} />;
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="group inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 -mx-1.5 text-left transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30"
+        title="Choose a customer or Stock"
+        aria-label={`Edit Customer or Stock for ${item.model || item.product}`}
+      >
+        <span>{value}</span>
+        <Pencil className="h-3 w-3 shrink-0 text-ink-300 opacity-0 transition-opacity group-hover:opacity-100" />
+      </button>
+    );
+  }
+
+  const normalizedQuery = sanitizeSearchTerm(query);
+  const canChooseStock = item.status !== 'Sold';
+  return (
+    <div className="relative min-w-[240px]" onKeyDown={event => { if (event.key === 'Escape') setEditing(false); }}>
+      <div className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={event => { setQuery(event.target.value); setSaveError(null); }}
+          placeholder="Type a customer name…"
+          aria-label="Search customers"
+          disabled={saving}
+          className="w-full rounded-lg border border-brand-500 bg-ink-950 px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-500/30"
+        />
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={saving}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-ink-700 text-ink-400 hover:bg-ink-800 disabled:opacity-50"
+          aria-label="Cancel customer selection"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-ink-700 bg-ink-950 shadow-xl">
+        <button
+          type="button"
+          onClick={() => void saveChoice(null)}
+          disabled={!canChooseStock || saving}
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-ink-200 hover:bg-ink-800 disabled:cursor-not-allowed disabled:text-ink-600"
+        >
+          <span>Stock</span>
+          {!canChooseStock && <span className="font-normal">Sold unit</span>}
+        </button>
+        {searching && <div className="flex items-center gap-2 border-t border-ink-800 px-3 py-2 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Searching customers…</div>}
+        {!searching && normalizedQuery.length < 2 && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">Type at least 2 characters.</p>}
+        {!searching && normalizedQuery.length >= 2 && matches.length === 0 && !saveError && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">No matching customers.</p>}
+        {matches.map(customer => (
+          <button
+            key={customer.id}
+            type="button"
+            onClick={() => void saveChoice(customer)}
+            disabled={saving}
+            className="block w-full border-t border-ink-800 px-3 py-2 text-left hover:bg-brand-500/10 disabled:opacity-50"
+          >
+            <span className="block text-xs font-semibold text-ink-200">{customer.first_name} {customer.last_name}</span>
+            <span className="block text-[10px] text-ink-500">{customer.phone} · {customer.customer_type}</span>
+          </button>
+        ))}
+        {saveError && <p role="alert" className="border-t border-ink-800 px-3 py-2 text-[11px] font-medium text-red-400">{saveError}</p>}
+      </div>
+    </div>
+  );
 }
+
+type CustomerChoice = Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone' | 'customer_type'>;
 
 function OnHandCell({
   item,

@@ -32,7 +32,7 @@ QuickBooks, which stays as the accounting source (sync is a future milestone).
 | Supabase | **dedicated** project `spas-360`, ref **`kxyqgkimcdxvfkceoixs`**, us-east-1 ($10/mo) |
 | Storage | Supabase bucket `job-photos` (public read, authenticated write) |
 | Twilio | number **+1 701 929 9194** (trial account — see §8 blocked items) |
-| Dev server | preview name `spas360`, port 3009, defined in `~/Desktop/.claude/launch.json` |
+| Dev server | preview name `spas360`, port 3000 (`npm run dev`), defined in `~/Desktop/.claude/launch.json` |
 | Accounts | Andrew (andrew@ndai.pro) + Brandon (brandon_solem@hotmail.com) — both **owner_manager**, verified in DB |
 
 **⚠ History lesson:** prod was once wrongly pointed at Supabase ref `ldhzkdqznccfgpdvqyfk` — that is the
@@ -62,10 +62,15 @@ api/
   sms-inbound.ts   Twilio webhook: HMAC signature check → match contact by phone (or create Unknown
                    Lead) → file into sms thread → notify assigned + managers. Service-role writes.
 src/
-  index.css        DESIGN SYSTEM. Tailwind @theme tokens: `ink-*` dark neutrals (#0a0a0f page,
-                   #111116 card, #2A2A32 border) + `brand-*` = Magic City Home Leisure blue
-                   (#1075b8 / light #34a0ff / navy #002e56). Inter + JetBrains Mono. Modeled on
-                   SandPro OMP's design language; accent swapped from SandPro orange to MCHL blue.
+  index.css        DESIGN SYSTEM — LIGHT since Brandon's 7/16 spec. The `ink-*` scale is
+                   re-mapped to a LIGHT ramp (ink-950 = canvas #EEF3F8 … ink-100 = primary text
+                   #101827) so old dark-era class names still work; page canvas = #D1D5DB
+                   (Brandon's spec). `.app-header`, `.admin-rail`, and `.schedule-calendar`
+                   scopes re-override the tokens back to DARK (the "dark operational frame").
+                   `brand-*` = MCHL blue #1075b8. Inter + JetBrains Mono. Amber-100 etc.
+                   outside the @theme block fall back to Tailwind defaults — pale on light,
+                   don't use them for text. One accent per pillar: Customers violet, Sales
+                   brand blue, Service emerald; Parts/Media/Documents use brand blue.
   App.tsx          Routes + RoleLanding (tech→/service, salesperson→/deals, managers→/dashboard).
   contexts/AuthContext.tsx   Auth + profile + locations + activeLocationId (global store filter).
                    Contains the DEV-ONLY preview harness (see §6).
@@ -124,7 +129,10 @@ src/
   pages/
     Dashboard.tsx    Manager KPIs, real closed-won revenue chart, Requires Attention feed
                      (overdue tasks + stagnant parts ≥14d with per-job links).
-    Deals.tsx        Kanban (11 Brandon stages) + SalesBoard + wizard. Cards: priority edge,
+    Deals.tsx        TWO views behind a List/Board toggle (localStorage spas360.dealsView,
+                     default list; a customer drag in flight force-shows the board). List =
+                     HubSpot-style follow-up table w/ clickable stat filters, inline stage
+                     select, Won/Lost buttons. Board = SalesBoard + kanban (11 Brandon stages). Cards: priority edge,
                      interest tags, "No follow-up" red flag, "going cold" idle flag, IKEA
                      highlight pulse on newly created cards. DRAGGING TO CLOSED-WON fires the
                      sales→service bridge (see usePipeline.handleDealWon).

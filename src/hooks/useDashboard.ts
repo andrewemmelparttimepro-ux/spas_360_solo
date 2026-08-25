@@ -10,6 +10,12 @@ import {
   type DashboardFilterPeriod,
   type DashboardRevenuePoint,
 } from '@/lib/dashboardPeriods';
+import {
+  taskOwnerName,
+  upcomingTaskLink,
+  type TaskOwnerOption,
+  type UpcomingTaskItem,
+} from '@/lib/upcomingTasks';
 
 export { PERIOD_LABELS, type DashboardPeriod } from '@/lib/dashboardPeriods';
 
@@ -20,15 +26,6 @@ interface DashboardStats {
   overduePartsCount: number;
 }
 
-interface ActionItem {
-  id: string;
-  title: string;
-  desc: string;
-  time: string;
-  type: 'task' | 'part' | 'invoice' | 'lead';
-  link?: string;
-}
-
 export function useDashboardStats(
   period: DashboardFilterPeriod = 'week',
   customRange?: DashboardCustomRange | null,
@@ -37,7 +34,8 @@ export function useDashboardStats(
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0, activeDeals: 0, unscheduledJobs: 0, overduePartsCount: 0,
   });
-  const [actions, setActions] = useState<ActionItem[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<UpcomingTaskItem[]>([]);
+  const [taskOwners, setTaskOwners] = useState<TaskOwnerOption[]>([]);
   const [revenueData, setRevenueData] = useState<DashboardRevenuePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,20 +52,31 @@ export function useDashboardStats(
       return;
     }
 
-    // Money and counts aggregate in SQL (no 1,000-row cap can understate them);
-    // the two list queries below only feed the Requires Attention feed.
-    const [summaryRes, partsRes, tasksRes] = await Promise.all([
+    // Money and counts aggregate in SQL (no 1,000-row cap can understate them).
+    // Task rows and owner choices are both explicitly scoped to this dealership.
+    const [summaryRes, tasksRes, ownersRes] = await Promise.all([
       supabase.rpc('dashboard_summary', {
         p_start: range.start.toISOString(),
         p_end: range.end.toISOString(),
       }),
-      supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']).limit(200),
-      supabase.from('tasks').select('id, title, status, due_at, deal_id').eq('assigned_to', profile.id).in('status', ['Pending', 'Overdue']).order('due_at').limit(10),
+      supabase
+        .from('tasks')
+        .select('id, title, status, due_at, deal_id, contact_id, job_id, assigned_to, assigned:assigned_to(id, first_name, last_name)')
+        .eq('org_id', profile.org_id)
+        .in('status', ['Pending', 'In Progress', 'Overdue'])
+        .order('due_at', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .eq('org_id', profile.org_id)
+        .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .order('first_name', { ascending: true })
+        .order('last_name', { ascending: true }),
     ]);
     if (sequence !== fetchSequence.current) return;
 
     // Zeros on the money tiles must mean "zero", never "the query failed"
-    const firstError = summaryRes.error ?? partsRes.error ?? tasksRes.error;
+    const firstError = summaryRes.error ?? tasksRes.error ?? ownersRes.error;
     if (firstError) console.error('Error loading dashboard:', firstError);
     setLoadError(firstError ? firstError.message : null);
 
@@ -78,10 +87,6 @@ export function useDashboardStats(
       unscheduled_jobs?: number;
       overdue_parts?: number;
     };
-    const parts = partsRes.data ?? [];
-    const tasks = tasksRes.data ?? [];
-    const now = new Date();
-
     if (!summaryRes.error) {
       setStats({
         totalRevenue: Number(summary.total_revenue) || 0,
@@ -91,39 +96,30 @@ export function useDashboardStats(
       });
     }
 
-    // Action items: overdue/pending tasks + parts sitting too long
-    const taskActions: ActionItem[] = tasks.map((t: Record<string, unknown>) => ({
-      id: t.id as string,
-      title: t.title as string,
-      desc: t.deal_id ? 'Follow-up task' : 'General task',
-      time: t.due_at ? formatRelativeTime(new Date(t.due_at as string)) : '',
-      type: 'task' as const,
-    }));
+    if (!ownersRes.error) {
+      setTaskOwners((ownersRes.data ?? []) as TaskOwnerOption[]);
+    }
 
-    const STAGNANT_DAYS = 14;
-    const partActions: ActionItem[] = parts
-      .filter((p: Record<string, unknown>) => {
-        const arrival = p.expected_arrival ? new Date(p.expected_arrival as string) : null;
-        const ordered = p.order_date ? new Date(p.order_date as string) : null;
-        const overdue = arrival !== null && arrival < now;
-        const stagnant = !arrival && ordered !== null && (now.getTime() - ordered.getTime()) > STAGNANT_DAYS * 86400000;
-        return overdue || stagnant;
-      })
-      .slice(0, 5)
-      .map((p: Record<string, unknown>) => {
-        const arrival = p.expected_arrival ? new Date(p.expected_arrival as string) : null;
-        const overdue = arrival !== null && arrival < now;
+    if (!tasksRes.error) {
+      setUpcomingTasks((tasksRes.data ?? []).map((row: Record<string, unknown>) => {
+        const assignedRelation = Array.isArray(row.assigned) ? row.assigned[0] : row.assigned;
+        const assigned = assignedRelation as TaskOwnerOption | null;
+        const assignedTo = row.assigned_to as string;
         return {
-          id: p.id as string,
-          title: `Part ${p.part_number} ${overdue ? 'overdue' : `stagnant ${Math.floor((now.getTime() - new Date(p.order_date as string).getTime()) / 86400000)}d`}${p.status === 'Backordered' ? ' (backordered)' : ''}`,
-          desc: (p.description as string) || 'Chase the supplier',
-          time: arrival ? formatRelativeTime(arrival) : '',
-          type: 'part' as const,
-          link: p.job_id ? `/service/${p.job_id}` : '/service',
+          id: row.id as string,
+          title: row.title as string,
+          desc: row.deal_id ? 'Deal follow-up' : row.contact_id ? 'Customer follow-up' : row.job_id ? 'Service task' : 'General task',
+          time: row.due_at ? formatRelativeTime(new Date(row.due_at as string)) : '',
+          assignedTo,
+          assignedName: assigned ? taskOwnerName(assigned) : 'Unassigned owner',
+          link: upcomingTaskLink({
+            deal_id: (row.deal_id as string | null) ?? null,
+            contact_id: (row.contact_id as string | null) ?? null,
+            job_id: (row.job_id as string | null) ?? null,
+          }),
         };
-      });
-
-    setActions([...partActions, ...taskActions].slice(0, 10));
+      }));
+    }
 
     // Real revenue chart from closed-won deals (server-aggregated per local day)
     if (!summaryRes.error) {
@@ -135,7 +131,7 @@ export function useDashboardStats(
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
-  return { stats, actions, revenueData, isLoading, loadError, refresh: fetchStats };
+  return { stats, upcomingTasks, taskOwners, revenueData, isLoading, loadError, refresh: fetchStats };
 }
 
 function formatRelativeTime(date: Date): string {

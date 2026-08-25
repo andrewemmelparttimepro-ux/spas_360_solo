@@ -10,6 +10,7 @@ import {
   type DashboardFilterPeriod,
 } from '@/lib/dashboardPeriods';
 import QuickCreate from '@/components/QuickCreate';
+import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -21,11 +22,6 @@ const statMeta = [
   { key: 'overduePartsCount', title: 'Parts On Order', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/inventory' },
 ] as const;
 
-type ActionType = 'task' | 'part' | 'invoice' | 'lead';
-
-const actionDotColors: Record<ActionType, string> = { task: 'bg-amber-500', part: 'bg-brand-400', invoice: 'bg-emerald-500', lead: 'bg-purple-500' };
-const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inventory', invoice: '/deals', lead: '/deals' };
-
 export default function Dashboard() {
   const { profile } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<DashboardFilterPeriod>('month');
@@ -35,7 +31,7 @@ export default function Dashboard() {
   const [appliedCustomRange, setAppliedCustomRange] = useState<DashboardCustomRange | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const { stats, actions, revenueData, isLoading, loadError, refresh } = useDashboardStats(
+  const { stats, upcomingTasks, taskOwners, revenueData, isLoading, loadError, refresh } = useDashboardStats(
     appliedPeriod,
     appliedPeriod === 'custom' ? appliedCustomRange : null,
   );
@@ -235,25 +231,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-ink-700 bg-ink-850/70">
-            <h2 className="text-base font-semibold text-ink-100">Requires Attention</h2>
-          </div>
-          <div className="space-y-3 p-4">
-            {actions.length === 0 ? (
-              <p className="text-sm text-ink-500 text-center py-6">All caught up!</p>
-            ) : actions.map((action) => (
-              <Link key={action.id} to={action.link ?? actionLinks[action.type] ?? '/service'} className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-ink-700/70 hover:border-brand-500/30 group">
-                <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${actionDotColors[action.type]}`} />
-                <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{action.title}</p>
-                  <p className="text-xs text-ink-400 mt-0.5">{action.desc}</p>
-                </div>
-                <span className="text-xs font-medium text-ink-500">{action.time}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
+        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} />
       </div>
     </div>
   );

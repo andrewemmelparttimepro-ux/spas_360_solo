@@ -112,7 +112,8 @@ describe('Brandon composite UI contract', () => {
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);
     assert.match(inventory, /inventoryCustomerOrStock\(item\.notes, item\.customer_id, currentCustomerName\)/);
-    assert.match(inventory, /updateInventoryCustomerOrStock\(item\.notes, label\)/);
+    assert.match(inventory, /inventoryCustomerStockUpdate\(item\.notes, selection\)/);
+    assert.match(inventory, /INVENTORY_STATIONARY_CHOICES\.map\(choice =>/);
     assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);
     assert.doesNotMatch(inventory, /â/);
     assert.doesNotMatch(inventoryEditor, />SKU</);

@@ -42,9 +42,11 @@ describe('inventory inline edit persistence contract', () => {
     assert.match(inventory, /\.from\('contacts'\)/);
     assert.match(inventory, /\.eq\('org_id', profile\.org_id\)/);
     assert.match(inventory, /filterCustomersByNamePrefix\(\(data \?\? \[\]\) as CustomerChoice\[\], normalized\)/);
-    assert.match(inventory, /customer_id: customer\?\.id \?\? null/);
-    assert.match(inventory, /notes: updateInventoryCustomerOrStock\(item\.notes, label\)/);
-    assert.match(inventory, /const canChooseStock = item\.status !== 'Sold';/);
+    assert.match(inventory, /INVENTORY_STATIONARY_CHOICES\.map\(choice =>/);
+    assert.match(inventory, /saveChoice\(\{ kind: 'stationary', value: choice \}\)/);
+    assert.match(inventory, /customerId: customer\.id/);
+    assert.match(inventory, /inventoryCustomerStockUpdate\(item\.notes, selection\)/);
+    assert.match(inventory, /const canChooseStationary = item\.status !== 'Sold';/);
     assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);
     assert.match(hook, /customer:customer_id\(id, first_name, last_name, phone, customer_type\)/);
   });

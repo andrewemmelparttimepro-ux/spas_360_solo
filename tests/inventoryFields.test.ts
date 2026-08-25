@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  INVENTORY_STATIONARY_CHOICES,
+  inventoryCustomerStockUpdate,
   inventoryCustomerOrStock,
   joinSerialAndFlooring,
   serialNumberForDisplay,
@@ -67,6 +69,38 @@ describe('inventory serial and flooring fields', () => {
 });
 
 describe('inventory customer or stock field', () => {
+  it('persists each stationary choice as a distinct unassigned value', () => {
+    assert.deepEqual(INVENTORY_STATIONARY_CHOICES, ['Stock', 'Need To Order', 'On Order']);
+
+    const updates = INVENTORY_STATIONARY_CHOICES.map(value =>
+      inventoryCustomerStockUpdate('Import metadata · Customer: Jane Doe · Keep me', {
+        kind: 'stationary',
+        value,
+      }),
+    );
+
+    assert.deepEqual(updates, [
+      { customer_id: null, notes: 'Import metadata · Customer: STOCK · Keep me' },
+      { customer_id: null, notes: 'Import metadata · Customer: Need To Order · Keep me' },
+      { customer_id: null, notes: 'Import metadata · Customer: On Order · Keep me' },
+    ]);
+    assert.deepEqual(
+      updates.map(update => inventoryCustomerOrStock(update.notes, update.customer_id)),
+      ['Stock', 'Need To Order', 'On Order'],
+    );
+  });
+
+  it('keeps real customer assignments linked to the chosen current customer', () => {
+    assert.deepEqual(
+      inventoryCustomerStockUpdate('Customer: STOCK · Keep me', {
+        kind: 'customer',
+        customerId: 'customer-123',
+        customerName: ' Brandon Solem ',
+      }),
+      { customer_id: 'customer-123', notes: 'Customer: Brandon Solem · Keep me' },
+    );
+  });
+
   it('renders the imported customer value and normalizes the Stock label', () => {
     assert.equal(inventoryCustomerOrStock('Import metadata · Customer: Jane Doe · Need to order: No', null), 'Jane Doe');
     assert.equal(inventoryCustomerOrStock('Import metadata · Customer: STOCK', null), 'Stock');

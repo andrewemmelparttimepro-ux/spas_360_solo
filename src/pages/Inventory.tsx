@@ -10,11 +10,13 @@ import { cn, sanitizeSearchTerm } from '@/lib/utils';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import { supabase } from '@/lib/supabase';
 import {
+  INVENTORY_STATIONARY_CHOICES,
+  inventoryCustomerStockUpdate,
   inventoryCustomerOrStock,
   joinSerialAndFlooring,
   serialNumberForDisplay,
   splitSerialAndFlooring,
-  updateInventoryCustomerOrStock,
+  type InventoryCustomerStockSelection,
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 
@@ -256,17 +258,13 @@ function CustomerStockCell({
     return () => { cancelled = true; };
   }, [debouncedQuery, editing, profile]);
 
-  const saveChoice = async (customer: CustomerChoice | null) => {
+  const saveChoice = async (selection: InventoryCustomerStockSelection) => {
     if (saving) return;
-    const label = customer ? `${customer.first_name} ${customer.last_name}`.trim() : 'Stock';
     setSaving(true);
     setSaveError(null);
     let saved = false;
     try {
-      saved = await onSave(item.id, {
-        customer_id: customer?.id ?? null,
-        notes: updateInventoryCustomerOrStock(item.notes, label),
-      });
+      saved = await onSave(item.id, inventoryCustomerStockUpdate(item.notes, selection));
     } catch {
       saved = false;
     } finally {
@@ -295,7 +293,7 @@ function CustomerStockCell({
   }
 
   const normalizedQuery = sanitizeSearchTerm(query);
-  const canChooseStock = item.status !== 'Sold';
+  const canChooseStationary = item.status !== 'Sold';
   return (
     <div className="relative min-w-[240px]" onKeyDown={event => { if (event.key === 'Escape') setEditing(false); }}>
       <div className="flex items-center gap-1">
@@ -319,15 +317,18 @@ function CustomerStockCell({
         </button>
       </div>
       <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-ink-700 bg-ink-950 shadow-xl">
-        <button
-          type="button"
-          onClick={() => void saveChoice(null)}
-          disabled={!canChooseStock || saving}
-          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-ink-200 hover:bg-ink-800 disabled:cursor-not-allowed disabled:text-ink-600"
-        >
-          <span>Stock</span>
-          {!canChooseStock && <span className="font-normal">Sold unit</span>}
-        </button>
+        {INVENTORY_STATIONARY_CHOICES.map(choice => (
+          <button
+            key={choice}
+            type="button"
+            onClick={() => void saveChoice({ kind: 'stationary', value: choice })}
+            disabled={!canChooseStationary || saving}
+            className="flex w-full items-center justify-between border-b border-ink-800 px-3 py-2 text-left text-xs font-semibold text-ink-200 hover:bg-ink-800 disabled:cursor-not-allowed disabled:text-ink-600"
+          >
+            <span>{choice}</span>
+            {!canChooseStationary && <span className="font-normal">Sold unit</span>}
+          </button>
+        ))}
         {searching && <div className="flex items-center gap-2 border-t border-ink-800 px-3 py-2 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Searching customers…</div>}
         {!searching && normalizedQuery.length < 2 && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">Type at least 2 characters.</p>}
         {!searching && normalizedQuery.length >= 2 && matches.length === 0 && !saveError && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">No matching customers.</p>}
@@ -335,7 +336,11 @@ function CustomerStockCell({
           <button
             key={customer.id}
             type="button"
-            onClick={() => void saveChoice(customer)}
+            onClick={() => void saveChoice({
+              kind: 'customer',
+              customerId: customer.id,
+              customerName: `${customer.first_name} ${customer.last_name}`.trim(),
+            })}
             disabled={saving}
             className="block w-full border-t border-ink-800 px-3 py-2 text-left hover:bg-brand-500/10 disabled:opacity-50"
           >

@@ -31,6 +31,13 @@ export const joinSerialAndFlooring = (serial: string, flooring: string) =>
 
 const CUSTOMER_SEGMENT = /((?:^|·)\s*Customer:\s*)(.*?)(?=\s*·|$)/i;
 
+export const INVENTORY_STATIONARY_CHOICES = ['Stock', 'Need To Order', 'On Order'] as const;
+export type InventoryStationaryChoice = typeof INVENTORY_STATIONARY_CHOICES[number];
+
+export type InventoryCustomerStockSelection =
+  | { kind: 'customer'; customerId: string; customerName: string }
+  | { kind: 'stationary'; value: InventoryStationaryChoice };
+
 export const inventoryCustomerOrStock = (
   notes: string | null,
   customerId: string | null,
@@ -68,4 +75,16 @@ export const updateInventoryCustomerOrStock = (
   const suffix = currentNotes.slice(valueEnd);
   const separator = suffix.startsWith('·') ? ' ' : '';
   return `${currentNotes.slice(0, valueStart)}${customerOrStock}${separator}${suffix}`;
+};
+
+export const inventoryCustomerStockUpdate = (
+  notes: string | null,
+  selection: InventoryCustomerStockSelection,
+) => {
+  const customerId = selection.kind === 'customer' ? selection.customerId : null;
+  const label = selection.kind === 'customer' ? selection.customerName.trim() : selection.value;
+  return {
+    customer_id: customerId,
+    notes: updateInventoryCustomerOrStock(notes, label),
+  };
 };

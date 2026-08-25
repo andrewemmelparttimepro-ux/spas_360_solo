@@ -2,9 +2,10 @@ import type { Profile, Task, TaskStatus } from '@/types/database';
 
 export const ALL_TASK_OWNERS = 'all' as const;
 export const PAST_DUE_TASKS = 'past-due' as const;
+export const NO_TASK_SCHEDULED = 'no-task-scheduled' as const;
 export const THRAWN_PROFILE_ID = '79ea8493-7436-46ab-a210-26cccdac4f2e';
 
-export type TaskOwnerFilter = typeof ALL_TASK_OWNERS | typeof PAST_DUE_TASKS | string;
+export type TaskOwnerFilter = typeof ALL_TASK_OWNERS | typeof PAST_DUE_TASKS | typeof NO_TASK_SCHEDULED | string;
 
 export type TaskOwnerOption = Pick<Profile, 'id' | 'first_name' | 'last_name'>;
 
@@ -17,6 +18,15 @@ export interface UpcomingTaskItem {
   assignedName: string;
   dueAt: string | null;
   status: TaskStatus;
+  dealId: string | null;
+  link: string;
+}
+
+export interface OpenDealTaskCoverage {
+  id: string;
+  title: string;
+  assignedTo: string;
+  assignedName: string;
   link: string;
 }
 
@@ -45,6 +55,25 @@ export function isPastDueTask(task: UpcomingTaskItem, now: Date = new Date()): b
   if (!INCOMPLETE_TASK_STATUSES.has(task.status) || !task.dueAt) return false;
   const dueAt = new Date(task.dueAt);
   return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() < now.getTime();
+}
+
+export function dealsWithoutUpcomingTasks(
+  deals: OpenDealTaskCoverage[],
+  tasks: UpcomingTaskItem[],
+  now: Date = new Date(),
+): OpenDealTaskCoverage[] {
+  const dealsWithUpcomingTasks = new Set(
+    tasks
+      .filter(task => task.dealId && isIncompleteFutureTask(task, now))
+      .map(task => task.dealId as string),
+  );
+  return deals.filter(deal => !dealsWithUpcomingTasks.has(deal.id));
+}
+
+function isIncompleteFutureTask(task: UpcomingTaskItem, now: Date): boolean {
+  if (!INCOMPLETE_TASK_STATUSES.has(task.status) || !task.dueAt) return false;
+  const dueAt = new Date(task.dueAt);
+  return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() >= now.getTime();
 }
 
 export function filterTaskOwnerOptions(owners: TaskOwnerOption[]): TaskOwnerOption[] {

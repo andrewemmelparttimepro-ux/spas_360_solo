@@ -17,6 +17,7 @@ import {
   upcomingTaskLink,
   type TaskOwnerOption,
   type UpcomingTaskItem,
+  type OpenDealTaskCoverage,
 } from '@/lib/upcomingTasks';
 import {
   dashboardRevenueRpcParams,
@@ -45,6 +46,7 @@ export function useDashboardStats(
   });
   const [upcomingTasks, setUpcomingTasks] = useState<UpcomingTaskItem[]>([]);
   const [taskOwners, setTaskOwners] = useState<TaskOwnerOption[]>([]);
+  const [openDeals, setOpenDeals] = useState<OpenDealTaskCoverage[]>([]);
   const [revenueData, setRevenueData] = useState<DashboardRevenuePoint[]>([]);
   const [revenueOwners, setRevenueOwners] = useState<DashboardRevenueFilterOption[]>([]);
   const [revenueStores, setRevenueStores] = useState<DashboardRevenueFilterOption[]>([]);
@@ -68,7 +70,7 @@ export function useDashboardStats(
 
     // Money and counts aggregate in SQL (no 1,000-row cap can understate them).
     // Task rows and owner choices are both explicitly scoped to this dealership.
-    const [summaryRes, tasksRes, ownersRes] = await Promise.all([
+    const [summaryRes, tasksRes, ownersRes, dealsRes] = await Promise.all([
       supabase.rpc('dashboard_summary', {
         p_start: range.start.toISOString(),
         p_end: range.end.toISOString(),
@@ -87,11 +89,18 @@ export function useDashboardStats(
         .neq('id', THRAWN_PROFILE_ID)
         .order('first_name', { ascending: true })
         .order('last_name', { ascending: true }),
+      supabase
+        .from('deals')
+        .select('id, title, assigned_to, assigned:assigned_to(id, first_name, last_name), pipeline_stages!inner(is_won, is_lost)')
+        .eq('org_id', profile.org_id)
+        .eq('pipeline_stages.is_won', false)
+        .eq('pipeline_stages.is_lost', false)
+        .order('updated_at', { ascending: false }),
     ]);
     if (sequence !== fetchSequence.current) return;
 
     // Zeros on the money tiles must mean "zero", never "the query failed"
-    const firstError = summaryRes.error ?? tasksRes.error ?? ownersRes.error;
+    const firstError = summaryRes.error ?? tasksRes.error ?? ownersRes.error ?? dealsRes.error;
     if (firstError) console.error('Error loading dashboard:', firstError);
     setLoadError(firstError ? firstError.message : null);
 
@@ -129,11 +138,26 @@ export function useDashboardStats(
           assignedName: assigned ? taskOwnerName(assigned) : 'Unassigned owner',
           dueAt: (row.due_at as string | null) ?? null,
           status: row.status as UpcomingTaskItem['status'],
+          dealId: (row.deal_id as string | null) ?? null,
           link: upcomingTaskLink({
             deal_id: (row.deal_id as string | null) ?? null,
             contact_id: (row.contact_id as string | null) ?? null,
             job_id: (row.job_id as string | null) ?? null,
           }),
+        };
+      }));
+    }
+
+    if (!dealsRes.error) {
+      setOpenDeals((dealsRes.data ?? []).map((row: Record<string, unknown>) => {
+        const assignedRelation = Array.isArray(row.assigned) ? row.assigned[0] : row.assigned;
+        const assigned = assignedRelation as TaskOwnerOption | null;
+        return {
+          id: row.id as string,
+          title: row.title as string,
+          assignedTo: row.assigned_to as string,
+          assignedName: assigned ? taskOwnerName(assigned) : 'Unassigned owner',
+          link: `/deals/${row.id as string}`,
         };
       }));
     }
@@ -196,6 +220,7 @@ export function useDashboardStats(
     stats,
     upcomingTasks,
     taskOwners,
+    openDeals,
     revenueData,
     revenueOwners,
     revenueStores,

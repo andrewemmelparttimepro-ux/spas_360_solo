@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   ALL_TASK_OWNERS,
+  dealsWithoutUpcomingTasks,
   filterTaskOwnerOptions,
   filterUpcomingTasks,
   PAST_DUE_TASKS,
+  NO_TASK_SCHEDULED,
   THRAWN_PROFILE_ID,
   upcomingTaskLink,
   type UpcomingTaskItem,
@@ -14,11 +16,11 @@ import {
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 const tasks: UpcomingTaskItem[] = [
-  { id: 'a', title: 'Call Alice', desc: 'Deal follow-up', time: '2h ago', assignedTo: 'owner-a', assignedName: 'Alice Adams', dueAt: '2026-08-25T12:00:00Z', status: 'Pending', link: '/deals/deal-a' },
-  { id: 'b', title: 'Call Bob', desc: 'Customer follow-up', time: 'In 3h', assignedTo: 'owner-b', assignedName: 'Bob Brown', dueAt: '2026-08-25T18:00:00Z', status: 'In Progress', link: '/customers/customer-b' },
+  { id: 'a', title: 'Call Alice', desc: 'Deal follow-up', time: '2h ago', assignedTo: 'owner-a', assignedName: 'Alice Adams', dueAt: '2026-08-25T12:00:00Z', status: 'Pending', dealId: 'deal-a', link: '/deals/deal-a' },
+  { id: 'b', title: 'Call Bob', desc: 'Customer follow-up', time: 'In 3h', assignedTo: 'owner-b', assignedName: 'Bob Brown', dueAt: '2026-08-25T18:00:00Z', status: 'In Progress', dealId: 'deal-b', link: '/customers/customer-b' },
 ];
 const completedTask: UpcomingTaskItem = {
-  id: 'c', title: 'Completed task', desc: 'General task', time: '2d ago', assignedTo: 'owner-a', assignedName: 'Alice Adams', dueAt: '2026-08-23T12:00:00Z', status: 'Completed', link: '/dashboard',
+  id: 'c', title: 'Completed task', desc: 'General task', time: '2d ago', assignedTo: 'owner-a', assignedName: 'Alice Adams', dueAt: '2026-08-23T12:00:00Z', status: 'Completed', dealId: 'deal-c', link: '/dashboard',
 };
 
 describe('Dashboard upcoming tasks', () => {
@@ -41,6 +43,16 @@ describe('Dashboard upcoming tasks', () => {
     assert.deepEqual(filterTaskOwnerOptions(owners), [owners[0]]);
   });
 
+  it('finds every open deal without an incomplete task due now or later', () => {
+    const now = new Date('2026-08-25T14:00:00Z');
+    const openDeals = [
+      { id: 'deal-a', title: 'Deal A', assignedTo: 'owner-a', assignedName: 'Alice Adams', link: '/deals/deal-a' },
+      { id: 'deal-b', title: 'Deal B', assignedTo: 'owner-b', assignedName: 'Bob Brown', link: '/deals/deal-b' },
+      { id: 'deal-c', title: 'Deal C', assignedTo: 'owner-a', assignedName: 'Alice Adams', link: '/deals/deal-c' },
+    ];
+    assert.deepEqual(dealsWithoutUpcomingTasks(openDeals, [...tasks, completedTask], now), [openDeals[0], openDeals[2]]);
+  });
+
   it('links task cards to their real business record', () => {
     assert.equal(upcomingTaskLink({ deal_id: 'deal-a', contact_id: null, job_id: null }), '/deals/deal-a');
     assert.equal(upcomingTaskLink({ deal_id: null, contact_id: 'customer-b', job_id: null }), '/customers/customer-b');
@@ -55,14 +67,16 @@ describe('Dashboard upcoming tasks', () => {
       read('src/components/dashboard/UpcomingTasksPanel.tsx'),
     ]);
 
-    assert.match(dashboard, /<UpcomingTasksPanel tasks=\{upcomingTasks\} owners=\{taskOwners\}/);
+    assert.match(dashboard, /<UpcomingTasksPanel tasks=\{upcomingTasks\} owners=\{taskOwners\} openDeals=\{openDeals\}/);
     assert.match(panel, />Upcoming Tasks</);
     assert.match(panel, /<option value=\{ALL_TASK_OWNERS\}>All Tasks<\/option>/);
     assert.match(panel, /<option value=\{PAST_DUE_TASKS\}>Past Due Tasks<\/option>/);
+    assert.match(panel, /<option value=\{NO_TASK_SCHEDULED\}>No Task Scheduled<\/option>/);
     assert.match(panel, /filterUpcomingTasks\(tasks, ownerFilter, now\)/);
     assert.match(panel, /No upcoming tasks assigned to/);
     assert.match(hook, /from\('tasks'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*assigned_to/);
     assert.match(hook, /from\('profiles'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*owner_manager[\s\S]*salesperson/);
     assert.match(hook, /\.neq\('id', THRAWN_PROFILE_ID\)/);
+    assert.match(hook, /from\('deals'\)[\s\S]*pipeline_stages!inner\(is_won, is_lost\)[\s\S]*pipeline_stages\.is_won[\s\S]*pipeline_stages\.is_lost/);
   });
 });

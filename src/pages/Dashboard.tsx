@@ -42,6 +42,7 @@ export default function Dashboard() {
     stats,
     upcomingTasks,
     taskOwners,
+    openDeals,
     revenueData,
     revenueOwners,
     revenueStores,
@@ -309,7 +310,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} />
+        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} openDeals={openDeals} />
       </div>
     </div>
   );

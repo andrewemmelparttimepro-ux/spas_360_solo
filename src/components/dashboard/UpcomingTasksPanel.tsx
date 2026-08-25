@@ -2,25 +2,29 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ALL_TASK_OWNERS,
+  NO_TASK_SCHEDULED,
   PAST_DUE_TASKS,
+  dealsWithoutUpcomingTasks,
   filterUpcomingTasks,
   taskOwnerName,
   type TaskOwnerFilter,
   type TaskOwnerOption,
   type UpcomingTaskItem,
+  type OpenDealTaskCoverage,
 } from '@/lib/upcomingTasks';
 
 interface UpcomingTasksPanelProps {
   tasks: UpcomingTaskItem[];
   owners: TaskOwnerOption[];
+  openDeals: OpenDealTaskCoverage[];
 }
 
-export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanelProps) {
+export default function UpcomingTasksPanel({ tasks, owners, openDeals }: UpcomingTasksPanelProps) {
   const [ownerFilter, setOwnerFilter] = useState<TaskOwnerFilter>(ALL_TASK_OWNERS);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    if (ownerFilter !== PAST_DUE_TASKS) return;
+    if (ownerFilter !== PAST_DUE_TASKS && ownerFilter !== NO_TASK_SCHEDULED) return;
     setNow(new Date());
     const interval = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(interval);
@@ -31,6 +35,11 @@ export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanel
     [tasks, ownerFilter, now],
   );
   const selectedOwner = owners.find(owner => owner.id === ownerFilter);
+  const dealsMissingTasks = useMemo(
+    () => dealsWithoutUpcomingTasks(openDeals, tasks, now),
+    [openDeals, tasks, now],
+  );
+  const showingDealsMissingTasks = ownerFilter === NO_TASK_SCHEDULED;
 
   return (
     <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
@@ -44,13 +53,30 @@ export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanel
         >
           <option value={ALL_TASK_OWNERS}>All Tasks</option>
           <option value={PAST_DUE_TASKS}>Past Due Tasks</option>
+          <option value={NO_TASK_SCHEDULED}>No Task Scheduled</option>
           {owners.map(owner => (
             <option key={owner.id} value={owner.id}>{taskOwnerName(owner)}</option>
           ))}
         </select>
       </div>
       <div className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
-        {filteredTasks.length === 0 ? (
+        {showingDealsMissingTasks ? (
+          dealsMissingTasks.length === 0 ? (
+            <p className="text-sm text-ink-500 text-center py-6">Every active deal has an upcoming task.</p>
+          ) : dealsMissingTasks.map(deal => (
+            <Link
+              key={deal.id}
+              to={deal.link}
+              className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-ink-700/70 hover:border-brand-500/30 group"
+            >
+              <div className="w-2 h-2 mt-2 rounded-full flex-shrink-0 bg-red-400" />
+              <div className="ml-3 min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{deal.title}</p>
+                <p className="text-xs text-ink-400 mt-0.5">No upcoming task · {deal.assignedName}</p>
+              </div>
+            </Link>
+          ))
+        ) : filteredTasks.length === 0 ? (
           <p className="text-sm text-ink-500 text-center py-6">
             {ownerFilter === PAST_DUE_TASKS
               ? 'No past due tasks.'

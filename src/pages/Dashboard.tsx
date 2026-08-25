@@ -258,7 +258,7 @@ export default function Dashboard() {
                   }))}
                   className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs font-medium normal-case tracking-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
                 >
-                  <option value="">All Owners</option>
+                  <option value="">All Sales Associates</option>
                   {revenueOwners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}
                 </select>
               </label>

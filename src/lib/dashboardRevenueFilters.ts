@@ -1,6 +1,6 @@
 import type { DashboardDateRange } from '@/lib/dashboardPeriods';
 
-export type DashboardRevenueOutcome = 'closed_won' | 'all_closed';
+export type DashboardRevenueOutcome = 'closed_won' | 'closed_lost';
 
 export interface DashboardRevenueFilters {
   outcome: DashboardRevenueOutcome;
@@ -15,7 +15,7 @@ export interface DashboardRevenueFilterOption {
 
 export const DASHBOARD_REVENUE_OUTCOME_LABELS: Record<DashboardRevenueOutcome, string> = {
   closed_won: 'Closed-Won',
-  all_closed: 'All Closed',
+  closed_lost: 'Closed-Lost',
 };
 
 export const DEFAULT_DASHBOARD_REVENUE_FILTERS: DashboardRevenueFilters = {
@@ -43,7 +43,7 @@ export function dashboardRevenueFilterSummary(
   stores: DashboardRevenueFilterOption[],
 ): string {
   const outcome = DASHBOARD_REVENUE_OUTCOME_LABELS[filters.outcome];
-  const owner = owners.find((option) => option.id === filters.assignedTo)?.name ?? 'All Owners';
+  const owner = owners.find((option) => option.id === filters.assignedTo)?.name ?? 'All Sales Associates';
   const store = stores.find((option) => option.id === filters.locationId)?.name ?? 'All Stores';
   return `${outcome} · ${owner} · ${store}`;
 }

@@ -117,7 +117,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   }, []);
 
   return (
-    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-3 sm:px-5 gap-3 sm:gap-4 shrink-0 z-40">
+    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-1.5 sm:gap-4 shrink-0 z-40">
       {/* Menu — on desktop it holds Inbox, Citadel, Reports, Settings */}
       <button
         onClick={onMenuClick}
@@ -166,12 +166,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                       )
                     }
                   >
-                    <item.icon
-                      className={cn(
-                        'h-[15px] w-[15px] shrink-0',
-                        item.path !== '/parts' && item.path !== '/media' && 'hidden 2xl:block',
-                      )}
-                    />
+                    <item.icon className="h-[15px] w-[15px] shrink-0 hidden 2xl:block" />
                     <span>{item.name}</span>
                   </NavLink>
                 );
@@ -186,7 +181,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. */}
       <button
         onClick={() => setSuggestionOpen(true)}
-        className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors"
+        className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors hidden sm:block"
         aria-label="Open Suggestion Box"
         title="Suggestion Box"
       >
@@ -197,7 +192,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Global search */}
       <button
         onClick={() => setSearchOpen(true)}
-        className="flex items-center gap-2 text-[13px] text-ink-400 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors shrink-0"
+        className="flex items-center gap-2 text-[13px] text-ink-400 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-2.5 sm:px-3 py-1.5 rounded-full transition-colors shrink-0"
         aria-label="Search everything"
       >
         <Search className="w-3.5 h-3.5" />
@@ -210,9 +205,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="relative shrink-0" ref={locRef}>
         <button
           onClick={() => setLocOpen(!locOpen)}
-          className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-3 py-1.5 rounded-full transition-colors"
+          className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-2.5 sm:px-3 py-1.5 rounded-full transition-colors"
         >
-          <MapPin className="w-3.5 h-3.5 mr-1.5 text-brand-400" />
+          <MapPin className="w-3.5 h-3.5 mr-0 2xl:mr-1.5 text-brand-400" />
           <span className="hidden 2xl:inline">{locationLabel}</span>
           <ChevronDown className="w-3 h-3 ml-1.5 text-ink-500" />
         </button>
@@ -301,7 +296,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="relative shrink-0" ref={userRef}>
         <button
           onClick={() => setUserOpen(!userOpen)}
-          className="flex items-center gap-2.5 pl-3 border-l border-ink-700 hover:bg-ink-800 rounded-lg pr-2 py-1 transition-colors"
+          className="flex items-center gap-2.5 pl-2 sm:pl-3 sm:border-l border-ink-700 hover:bg-ink-800 rounded-lg pr-1 sm:pr-2 py-1 transition-colors"
         >
           <div className="text-right hidden 2xl:block">
             <div className="text-[13px] font-medium text-ink-100 leading-tight">

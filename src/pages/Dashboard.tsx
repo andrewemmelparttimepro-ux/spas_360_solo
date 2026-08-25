@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Wrench, AlertCircle, Plus, BarChart3 } from 'lucide-react';
+import { DollarSign, Users, Wrench, Package, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats } from '@/hooks/useDashboard';
 import {
@@ -10,7 +10,6 @@ import {
   type DashboardFilterPeriod,
 } from '@/lib/dashboardPeriods';
 import {
-  dashboardRevenueFilterSummary,
   DASHBOARD_REVENUE_OUTCOME_LABELS,
   DEFAULT_DASHBOARD_REVENUE_FILTERS,
   type DashboardRevenueOutcome,
@@ -25,7 +24,8 @@ const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
   { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
-  { key: 'overduePartsCount', title: 'Parts On Order', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/inventory' },
+  // A neutral count, not an alarm — red implied something was wrong at 0 parts
+  { key: 'overduePartsCount', title: 'Parts On Order', icon: Package, color: 'text-violet-400', bg: 'bg-violet-500/15', format: (v: number) => String(v), link: '/inventory' },
 ] as const;
 
 export default function Dashboard() {
@@ -66,7 +66,6 @@ export default function Dashboard() {
   const appliedPeriodLabel = appliedPeriod === 'custom' && appliedCustomRange
     ? `${DASHBOARD_PERIOD_LABELS.custom}: ${appliedCustomRange.startDate} to ${appliedCustomRange.endDate}`
     : DASHBOARD_PERIOD_LABELS[appliedPeriod];
-  const revenueFilterLabel = dashboardRevenueFilterSummary(revenueFilters, revenueOwners, revenueStores);
 
   const handlePeriodChange = (nextPeriod: DashboardFilterPeriod) => {
     setSelectedPeriod(nextPeriod);
@@ -192,31 +191,33 @@ export default function Dashboard() {
 
       {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
 
-      <section className="dashboard-welcome overflow-hidden rounded-2xl border border-ink-700 bg-[radial-gradient(circle_at_top_left,_rgba(16,117,184,0.22),_transparent_45%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.86))] p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-200">Spas 360</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
+      {/* Personal, not monumental: one calm strip with the shop's logo, then straight to the numbers. */}
+      <section className="dashboard-welcome overflow-hidden rounded-2xl border border-ink-700 bg-[radial-gradient(circle_at_top_left,_rgba(16,117,184,0.22),_transparent_45%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.86))] px-5 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white truncate">
               Welcome back{profile ? `, ${profile.first_name}` : ''}
             </h2>
-            <p className="mt-2 text-sm text-ink-300">Your dealership pulse, personalized for the team.</p>
+            <p className="mt-0.5 text-[13px] text-ink-300 truncate">Your dealership pulse, personalized for the team.</p>
           </div>
-          <div className="flex h-24 w-36 shrink-0 items-center justify-center rounded-2xl bg-white p-3 shadow-sm">
+          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
             <img src={logoUrl ?? '/logo-mark.png'} alt="Spas 360 business logo" className="max-h-full max-w-full object-contain" />
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statMeta.map((meta) => {
           const value = stats[meta.key];
           return (
-            <Link key={meta.key} to={meta.link} className="dashboard-stat-card bg-ink-900 rounded-xl border border-ink-700 p-5 flex items-start justify-between gap-3 hover:border-brand-500/50 hover:bg-ink-850 transition-all group">
+            <Link key={meta.key} to={meta.link} className="dashboard-stat-card relative bg-ink-900 rounded-xl border border-ink-700 p-4 sm:p-5 flex items-start justify-between gap-3 hover:border-brand-500/50 hover:bg-ink-850 transition-all group">
+              {/* Numbers are doors — Brandon clicks a stat expecting to land on those rows */}
+              <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-1.5">{meta.title}</p>
-                <h3 className="text-[24px] leading-none font-bold text-ink-100 group-hover:text-brand-500 transition-colors">{meta.format(value)}</h3>
+                <h3 className="text-[22px] sm:text-[24px] leading-none font-bold text-ink-100 group-hover:text-brand-500 transition-colors">{meta.format(value)}</h3>
               </div>
-              <div className={`p-2.5 rounded-[10px] shrink-0 ${meta.bg}`}>
+              <div className={`p-2.5 rounded-[10px] shrink-0 hidden sm:block ${meta.bg}`}>
                 <meta.icon className={`w-5 h-5 ${meta.color}`} />
               </div>
             </Link>
@@ -229,7 +230,8 @@ export default function Dashboard() {
           <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-850/70 px-6 py-4">
             <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
               <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
-              <span className="text-xs font-medium text-ink-500">{appliedPeriodLabel} · {revenueFilterLabel}</span>
+              {/* The selects below already announce outcome/owner/store — only the period needs saying */}
+              <span className="text-xs font-medium text-ink-500">{appliedPeriodLabel}</span>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Revenue Overview filters">
               <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500">

@@ -283,16 +283,17 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-400">{isDocumentsView ? 'Dealership document library' : 'Ari verified source library'}</p>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-brand-500">{isDocumentsView ? 'Dealership document library' : 'Ari verified source library'}</p>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100">
-            {isDocumentsView ? <Files className="h-6 w-6 text-cyan-400" /> : <BookOpen className="h-6 w-6 text-cyan-400" />}
+            {isDocumentsView ? <Files className="h-6 w-6 text-brand-500" /> : <BookOpen className="h-6 w-6 text-brand-500" />}
             {isPartsView ? 'Parts' : pageTitle}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search verified parts literature by part number, model, and year.' : isDocumentsView ? 'Open and search the dealership’s verified manuals, warranties, technical bulletins, and other staff documents.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
         </div>
-        <div className="flex gap-2 text-xs">
-          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 font-semibold text-emerald-300"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Verified sources</span>
-          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 font-semibold text-amber-300"><FileKey2 className="mr-1 inline h-3.5 w-3.5" />Staff documents stay private</span>
+        {/* Reassurance, not decoration — these read as quiet footnotes, not controls */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-ink-500">
+          <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" />Verified sources</span>
+          <span className="inline-flex items-center gap-1"><FileKey2 className="h-3.5 w-3.5" />Staff documents stay private</span>
         </div>
       </header>
 
@@ -300,9 +301,9 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
       {deleteError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{deleteError}</div>}
 
       {isPartsView && (
-        <section aria-labelledby="parts-pdf-heading" className="rounded-2xl border border-cyan-500/30 bg-ink-900 p-4 shadow-sm">
+        <section aria-labelledby="parts-pdf-heading" className="rounded-2xl border border-ink-700 bg-ink-900 p-4 shadow-sm">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-400">Parts PDF library</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-500">Parts PDF library</p>
             <h2 id="parts-pdf-heading" className="mt-0.5 text-sm font-bold text-ink-100">Manufacturer catalogs</h2>
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -310,7 +311,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
               <article key={resource.key} className="rounded-xl border border-ink-800 bg-ink-950/60 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className="rounded-xl bg-cyan-500/15 p-2.5 text-cyan-400"><FileText className="h-5 w-5" /></span>
+                    <span className="rounded-xl bg-brand-500/15 p-2.5 text-brand-500"><FileText className="h-5 w-5" /></span>
                     <div className="min-w-0">
                       <h3 className="text-sm font-bold text-ink-100">{resource.displayName}</h3>
                       <p className="mt-1 text-xs text-ink-500">
@@ -324,7 +325,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                       onClick={() => { void openPartsPdf(resource); }}
                       disabled={resource.loading || !resource.attachment || resource.opening || deletingId === resource.attachment?.id}
                       aria-label={`Open ${resource.displayName} PDF`}
-                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-xs font-bold text-cyan-300 transition-colors enabled:hover:border-cyan-400 enabled:hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-xl border border-brand-500/40 bg-brand-500/10 px-4 py-2.5 text-xs font-bold text-brand-400 transition-colors enabled:hover:border-brand-400 enabled:hover:bg-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {resource.loading ? 'Loading…' : resource.opening ? 'Opening…' : 'Open PDF'}
                       {!resource.loading && !resource.opening && <ExternalLink className="ml-1.5 inline h-3.5 w-3.5" />}
@@ -335,10 +336,10 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                         onClick={() => { void deletePartsFile('parts_attachment', resource.attachment!.id, resource.displayName); }}
                         disabled={deletingId !== null}
                         aria-label={`Delete ${resource.displayName}`}
-                        className="rounded-xl border border-red-500/40 px-3 py-2.5 text-xs font-bold text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={`Delete ${resource.displayName}`}
+                        className="rounded-xl border border-ink-700 px-3 py-2.5 text-xs font-bold text-ink-500 transition-colors hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Trash2 className="mr-1.5 inline h-3.5 w-3.5" />
-                        {deletingId === resource.attachment.id ? 'Deleting…' : 'Delete'}
+                        {deletingId === resource.attachment.id ? 'Deleting…' : <Trash2 className="h-3.5 w-3.5" />}
                       </button>
                     )}
                   </div>
@@ -358,10 +359,10 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Part number, model, error code, procedure…"
-              className="w-full rounded-xl border border-ink-700 bg-ink-950 py-2.5 pl-10 pr-3 text-sm text-ink-100 outline-none placeholder:text-ink-600 focus:border-cyan-500"
+              className="w-full rounded-xl border border-ink-700 bg-ink-950 py-2.5 pl-10 pr-3 text-sm text-ink-100 outline-none placeholder:text-ink-500 focus:border-brand-500"
             />
           </label>
-          <select value={type} onChange={event => setType(event.target.value)} className="rounded-xl border border-ink-700 bg-ink-950 px-3 py-2.5 text-sm text-ink-200 outline-none focus:border-cyan-500">
+          <select value={type} onChange={event => setType(event.target.value)} className="rounded-xl border border-ink-700 bg-ink-950 px-3 py-2.5 text-sm text-ink-200 outline-none focus:border-brand-500">
             {TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
@@ -382,11 +383,11 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
               <p className="mt-1 text-xs text-ink-500">Try the exact part number, a broader model name, or remove the source filter.</p>
             </div>
           ) : results.map(result => (
-            <article id={`knowledge-${result.chunk_id}`} key={result.chunk_id} className={cn('rounded-2xl border bg-ink-900 p-4 shadow-sm', selectedChunk === result.chunk_id ? 'border-cyan-400 ring-2 ring-cyan-500/20' : 'border-ink-700')}>
+            <article id={`knowledge-${result.chunk_id}`} key={result.chunk_id} className={cn('rounded-2xl border bg-ink-900 p-4 shadow-sm', selectedChunk === result.chunk_id ? 'border-brand-400 ring-2 ring-brand-500/20' : 'border-ink-700')}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-300">{result.doc_type.replaceAll('_', ' ')}</span>
+                    <span className="rounded-md bg-brand-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-400">{result.doc_type.replaceAll('_', ' ')}</span>
                     <span className={cn('rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', result.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{result.access_scope}</span>
                     {result.part_numbers?.slice(0, 6).map(part => <code key={part} className="rounded bg-ink-950 px-1.5 py-0.5 text-[11px] text-violet-300">{part}</code>)}
                   </div>
@@ -394,11 +395,11 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                   <p className="mt-0.5 text-xs text-ink-500">{result.citation_label ?? result.title}{pages(result) ? ` · ${pages(result)}` : ''}</p>
                 </div>
                 {(result.source_url || documents.some(doc => doc.id === result.document_id && doc.storage_path)) && (
-                  <button onClick={() => openSource(result)} className="rounded-lg border border-ink-700 px-2.5 py-1.5 text-xs font-semibold text-ink-300 hover:border-cyan-500 hover:text-cyan-300">Open source <ExternalLink className="ml-1 inline h-3 w-3" /></button>
+                  <button onClick={() => openSource(result)} className="rounded-lg border border-ink-700 px-2.5 py-1.5 text-xs font-semibold text-ink-300 hover:border-brand-500 hover:text-brand-400">Open source <ExternalLink className="ml-1 inline h-3 w-3" /></button>
                 )}
               </div>
               <p className="mt-3 line-clamp-6 whitespace-pre-wrap text-xs leading-relaxed text-ink-400">{result.content}</p>
-              {result.models && result.models.length > 0 && <p className="mt-3 text-[11px] text-ink-600">Indexed models: {result.models.slice(0, 10).join(' · ')}</p>}
+              {result.models && result.models.length > 0 && <p className="mt-3 text-[11px] text-ink-500">Indexed models: {result.models.slice(0, 10).join(' · ')}</p>}
             </article>
           ))}
         </section>
@@ -406,7 +407,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
         <section className="space-y-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">Indexed source library</h2>
-            <p className="mt-1 text-xs text-ink-600">{documents.length} active source{documents.length === 1 ? '' : 's'}; staff-only literature is never available to the public chat.</p>
+            <p className="mt-1 text-xs text-ink-500">{documents.length} active source{documents.length === 1 ? '' : 's'}; staff-only literature is never available to the public chat.</p>
           </div>
           {groupedDocuments.map(([manufacturer, docs]) => (
             <div key={manufacturer} className="rounded-2xl border border-ink-700 bg-ink-900 p-4">
@@ -414,11 +415,12 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
               <div className="grid gap-2 lg:grid-cols-2">
                 {docs.map(document => (
                   <div key={document.id} className="flex items-stretch gap-2">
-                    <button onClick={() => openSource(document)} disabled={!document.source_url && !document.storage_path} className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-ink-800 bg-ink-950/60 p-3 text-left transition-colors enabled:hover:border-cyan-600 disabled:cursor-default">
-                      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                    <button onClick={() => openSource(document)} disabled={!document.source_url && !document.storage_path} className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-ink-800 bg-ink-950/60 p-3 text-left transition-colors enabled:hover:border-brand-500 disabled:cursor-default">
+                      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-xs font-semibold text-ink-200">{document.title}</span>
-                        <span className="mt-1 block text-[10px] uppercase tracking-wider text-ink-600">{document.doc_type.replaceAll('_', ' ')}{document.revision ? ` · ${document.revision}` : ''}</span>
+                        {/* revision "0" is import filler, not information */}
+                        <span className="mt-1 block text-[10px] uppercase tracking-wider text-ink-500">{document.doc_type.replaceAll('_', ' ')}{document.revision && document.revision !== '0' ? ` · ${document.revision}` : ''}</span>
                       </span>
                       <span className={cn('rounded px-1.5 py-0.5 text-[9px] font-bold uppercase', document.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{document.access_scope}</span>
                     </button>
@@ -428,7 +430,8 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                         onClick={() => { void deletePartsFile('knowledge_document', document.id, document.title); }}
                         disabled={deletingId !== null}
                         aria-label={`Delete ${document.title}`}
-                        className="rounded-xl border border-red-500/40 px-3 text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={`Delete ${document.title}`}
+                        className="rounded-xl border border-ink-700 px-3 text-ink-500 transition-colors hover:border-red-400 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

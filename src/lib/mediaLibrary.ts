@@ -32,6 +32,23 @@ export function isSafeMediaPreview(name: string, mimeType: string): boolean {
   ].includes(mime) || ['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'webp'].includes(ext);
 }
 
+/**
+ * Camera rolls and AirDrop hand us names like
+ * "03BDDF11-EF6C-4628-BDD8-8AA7442EB34C-5664-0000067016F96592.GIF".
+ * Nobody recognizes a file by that — show "Photo · 03BDDF11" and keep the full
+ * name in the tooltip/download. Human-given names just lose their extension.
+ */
+export function mediaLibraryDisplayName(name: string, kind: MediaLibraryKind): string {
+  const base = name.replace(/\.[a-z0-9]+$/i, '').trim();
+  if (!base) return name;
+  const machineNamed = /^[0-9a-f]{8}[0-9a-f-]{12,}$/i.test(base.replace(/[_\s]/g, '-'));
+  if (machineNamed) {
+    const label = kind === 'image' ? 'Photo' : kind === 'pdf' ? 'PDF' : 'File';
+    return `${label} · ${base.slice(0, 8).toUpperCase()}`;
+  }
+  return base;
+}
+
 export function formatMediaLibrarySize(value: string | null): string {
   if (!value) return '';
   const bytes = Number(value);

@@ -1,4 +1,4 @@
-import { Search, Plus, Package, X, Check, Pencil, Loader2 } from 'lucide-react';
+import { Search, Plus, X, Check, Pencil, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Fragment, useState, useRef, useEffect } from 'react';
 import { useInventory, type InventoryListItem } from '@/hooks/useInventory';
@@ -385,10 +385,10 @@ export default function Inventory() {
   };
 
   const summaryCards = [
-    { label: 'Total Units in Stock', value: totalInStock, color: 'bg-brand-500/15 text-brand-400' },
-    { label: 'Sold (Awaiting Delivery)', value: awaitingDelivery, color: 'bg-amber-500/15 text-amber-400' },
-    { label: 'On Order', value: onOrder, color: 'bg-purple-500/15 text-purple-400' },
-    { label: 'Low Stock Alerts', value: lowStockAlerts, color: 'bg-red-500/15 text-red-400' },
+    { label: 'In Stock', value: totalInStock },
+    { label: 'Sold, Awaiting Delivery', value: awaitingDelivery },
+    { label: 'On Order', value: onOrder },
+    { label: 'Low Stock', value: lowStockAlerts },
   ];
   const brandOptions = Array.from(new Set(items.map(item => item.brand?.trim()).filter((brand): brand is string => Boolean(brand))))
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
@@ -401,20 +401,21 @@ export default function Inventory() {
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-6 shrink-0">
+      {/* Compact chrome: this page IS the table — everything above it stays one line tall. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600">Sales</p>
           <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Inventory</h1>
-          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Track units, parts, and chemicals across locations &mdash; click any cell to edit</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {summaryCards.map(card => (
+            <div key={card.label} className="flex items-baseline gap-2">
+              <span className="text-lg font-bold text-ink-100 tabular-nums">{card.value}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{card.label}</span>
+            </div>
+          ))}
           <button onClick={() => setEditorTarget('new')} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
-      </div>
-
-      {/* One-tap Minot ↔ Bismarck switcher with live unit counts */}
-      <div className="mb-6 shrink-0">
-        <StoreSwitcher />
       </div>
 
       {editorTarget !== null && (
@@ -426,22 +427,14 @@ export default function Inventory() {
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6 shrink-0">
-        {summaryCards.map(card => (
-          <div key={card.label} className="bg-ink-900 p-4 rounded-xl border border-ink-700 shadow-sm flex items-center">
-            <div className={`p-2.5 rounded-lg mr-3 ${card.color}`}><Package className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{card.label}</p><p className="text-xl font-bold text-ink-100">{card.value}</p></div>
-          </div>
-        ))}
-      </div>
-
       <div className="flex-1 bg-ink-900 rounded-xl border border-ink-700 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-ink-700 flex flex-wrap items-center justify-between gap-3 bg-ink-950">
-          <div className="relative w-72">
+        <div className="px-4 py-3 border-b border-ink-700 flex flex-wrap items-center gap-3 bg-ink-950">
+          <StoreSwitcher />
+          <div className="relative flex-1 min-w-[220px] max-w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search serial number, model, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
           </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-ink-400">
+          <label className="ml-auto flex items-center gap-2 text-sm font-medium text-ink-400">
             Brand
             <select
               value={brandFilter}
@@ -458,14 +451,14 @@ export default function Inventory() {
           <table className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Model</th>
-                {showStore && <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Store</th>}
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Color Combination</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Serial Number</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Inventory Flooring Status</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Customer/Stock</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">Delivery Date</th>
-                <th className="p-4 text-xs font-semibold text-ink-400 uppercase tracking-wider">On Hand Y/N</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Model</th>
+                {showStore && <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Store</th>}
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Color Combination</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Serial Number</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Inventory Flooring Status</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Customer/Stock</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Delivery Date</th>
+                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">On Hand Y/N</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
@@ -484,34 +477,37 @@ export default function Inventory() {
                   </tr>
                   {group.items.map(item => (
                     <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className={cn('transition-colors', group.tintClassName)}>
-                  <td className="p-4 text-sm text-ink-300">
+                  <td className="px-4 py-2.5 text-sm text-ink-300 whitespace-nowrap">
                     <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
                       {item.model || item.product}
                     </Link>
                   </td>
                   {showStore && (
-                    <td className="p-4 text-sm text-ink-300">
-                      <span className="inline-flex items-center rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium">
-                        {((item as unknown as { locations?: { name?: string } }).locations?.name) ?? '—'}
+                    <td className="px-4 py-2.5 text-sm text-ink-300">
+                      <span
+                        className="inline-flex items-center whitespace-nowrap rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium"
+                        title={((item as unknown as { locations?: { name?: string } }).locations?.name) ?? undefined}
+                      >
+                        {(((item as unknown as { locations?: { name?: string } }).locations?.name) ?? '—').split(' (')[0]}
                       </span>
                     </td>
                   )}
-                  <td className="p-4 text-sm text-ink-400">
+                  <td className="px-4 py-2.5 text-sm text-ink-400">
                     <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">
+                  <td className="px-4 py-2.5 text-sm text-ink-300">
                     <InventoryTextCell item={item} part="serial" onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">
+                  <td className="px-4 py-2.5 text-sm text-ink-300">
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">
+                  <td className="px-4 py-2.5 text-sm text-ink-300">
                     <CustomerStockCell item={item} onSave={updateItem} />
                   </td>
-                  <td className="p-4 text-sm text-ink-300">
+                  <td className="px-4 py-2.5 text-sm text-ink-300">
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
                   </td>
-                  <td className="p-4 text-sm font-semibold text-ink-200">
+                  <td className="px-4 py-2.5 text-sm font-semibold text-ink-200">
                     <OnHandCell item={item} onSave={updateItem} />
                   </td>
                     </tr>

@@ -451,12 +451,13 @@ export default function Service() {
                               onClick={() => { setCurrentDate(day); setViewMode('day'); }}
                               className={cn(
                                 'min-h-[104px] border-b border-r border-ink-800 p-1.5 cursor-pointer transition-colors',
-                                !isCurrentMonth && 'bg-ink-950/60 opacity-50',
+                                // Adjacent-month days stay distinct but readable — 50% opacity made them vanish on the dark board
+                                !isCurrentMonth && 'bg-ink-950/60 opacity-75',
                                 snapshot.isDraggingOver ? 'bg-brand-500/15 ring-1 ring-inset ring-brand-500/50' : 'hover:bg-ink-800/40'
                               )}
                             >
                               <div className="flex items-center justify-between mb-1">
-                                <span className={cn('text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full', isToday ? 'bg-brand-500 text-white' : 'text-ink-300')}>
+                                <span className={cn('text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full', isToday ? 'bg-brand-500 text-white' : 'text-ink-200')}>
                                   {format(day, 'd')}
                                 </span>
                                 {dayJobs.length > 0 && (

@@ -36,7 +36,8 @@ describe('Brandon composite UI contract', () => {
     assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown/);
     assert.match(header, /<nav className="hidden lg:flex items-center gap-1">/);
     assert.match(header, /px-1\.5[^"]*text-\[11px\][^"]*2xl:px-2\.5[^"]*2xl:text-\[12px\]/);
-    assert.match(header, /item\.path !== '\/parts' && item\.path !== '\/media' && 'hidden 2xl:block'/);
+    // Every destination now wears the same icon rule — no per-tab exemptions
+    assert.match(header, /<item\.icon className="h-\[15px\] w-\[15px\] shrink-0 hidden 2xl:block" \/>/);
     const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));
     for (const destination of secondary) {
       assert.match(secondaryBlock, new RegExp(`name: '${destination}'`));
@@ -99,9 +100,9 @@ describe('Brandon composite UI contract', () => {
     assert.match(salesBoard, /label: 'Active Deals'/);
     assert.match(salesBoard, /label: 'Overdue Sales Tasks'/);
     assert.match(deals, /value=\{activeDeals\.length\}/);
-    assert.match(deals, /\{activeDeals\.map\(\(deal\) =>/);
+    assert.match(deals, /\{filteredActiveDeals\.map\(\(deal\) =>/);
     assert.match(deals, /mb-5 shrink-0 overflow-hidden/);
-    assert.match(deals, /className="max-h-\[60vh\] overflow-auto"/);
+    assert.match(deals, /className="max-h-\[68vh\] overflow-auto"/);
     assert.match(deals, /aria-label="Active deals table"/);
     assert.match(deals, />Expected close</);
     assert.match(inventory, /const brandOptions = Array\.from\(new Set\(items\.map/);

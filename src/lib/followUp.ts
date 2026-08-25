@@ -87,6 +87,13 @@ export function filterDealsByFollowUp<T extends { id: string }>(
   return deals.filter((deal) => matchesFollowUpFilter(followUpsByDeal.get(deal.id), filter, now));
 }
 
+// Imported/auto-created tasks carry a placeholder timestamp that lands between
+// midnight and 6 AM local — nobody schedules a 4:00 AM follow-up, so a small-hours
+// time is noise and the date alone is the honest display.
+function hasMeaningfulTime(dueAt: Date) {
+  return dueAt.getHours() >= 6;
+}
+
 export function formatFollowUpDue(followUp: DealFollowUp | null | undefined, now = new Date()) {
   if (!followUp) return 'Not scheduled';
 
@@ -94,12 +101,15 @@ export function formatFollowUpDue(followUp: DealFollowUp | null | undefined, now
   if (Number.isNaN(dueAt.getTime())) return 'Not scheduled';
 
   const state = getFollowUpState(followUp, now);
+  const withTime = hasMeaningfulTime(dueAt);
   const time = dueAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (state === 'today') return `Today, ${time}`;
+  if (state === 'today') return withTime ? `Today, ${time}` : 'Today';
   if (state === 'overdue') {
-    return `Overdue · ${dueAt.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+    const date = dueAt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return withTime ? `Overdue · ${date}, ${time}` : `Overdue · ${date}`;
   }
 
+  if (!withTime) return dueAt.toLocaleDateString([], { month: 'short', day: 'numeric' });
   return dueAt.toLocaleString([], {
     month: 'short',
     day: 'numeric',

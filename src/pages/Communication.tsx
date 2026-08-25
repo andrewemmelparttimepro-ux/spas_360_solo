@@ -447,7 +447,7 @@ export default function Communication() {
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">The Office</p>
-          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Communication</h1>
+          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Inbox</h1>
           <p className="text-[13px] text-ink-400 mt-0.5">Team messaging and customer conversations</p>
         </div>
       </div>

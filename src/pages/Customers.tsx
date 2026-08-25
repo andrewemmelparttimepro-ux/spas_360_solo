@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import { formatCustomerAddress } from '@/lib/customerAddress';
 import { filterCustomersByNamePrefix, normalizeCustomerNameQuery } from '@/lib/customerSearch';
 import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/useCustomerCards';
@@ -90,7 +90,7 @@ export default function Customers() {
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">Relationships</p>
           <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Customers</h1>
           <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">
-            {cards.length} relationships — grab a card and drag it onto <span className="text-brand-300 font-medium">Deals</span> or <span className="text-emerald-300 font-medium">Schedule</span> up top
+            Drag any customer onto <span className="text-brand-300 font-medium">Deals</span> or <span className="text-emerald-300 font-medium">Schedule</span> up top to start work
           </p>
         </div>
         <button
@@ -268,21 +268,22 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
         </span>
       </td>
       <td className="px-4 py-3">
-        <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300">{c.phone}</a>
+        <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300 whitespace-nowrap">{formatPhone(c.phone)}</a>
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-ink-100">
         ${(c.openDealValue + c.serviceAmount).toLocaleString()}
         {c.openDealCount > 0 && <span className="text-[10px] font-medium text-ink-500 ml-1">({c.openDealCount})</span>}
         {c.serviceLevel != null && (
           <span
-            className="ml-1.5 px-1 py-px rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold align-middle"
+            className="ml-1.5 px-1.5 py-px rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold align-middle whitespace-nowrap"
             title={`Active service job, invoice not yet estimated — level ${c.serviceLevel} of 3 expected cost`}
           >
-            SVC&nbsp;L{c.serviceLevel}
+            In service
           </span>
         )}
       </td>
-      <td className="px-4 py-3 text-right font-mono text-sm font-bold text-emerald-300">${c.wonValue.toLocaleString()}</td>
+      {/* A book full of green $0s reads as noise — only real spend earns the color */}
+      <td className={cn('px-4 py-3 text-right font-mono text-sm font-bold', c.wonValue > 0 ? 'text-emerald-300' : 'text-ink-600')}>${c.wonValue.toLocaleString()}</td>
       <td className="px-4 py-3 min-w-[260px] max-w-[360px]">
         {c.majorUnits.length > 0 ? (
           <ul className="space-y-1.5">
@@ -362,7 +363,7 @@ function CustomerCardView({ customer: c, onNewDeal }: { customer: CustomerCard; 
       {/* Reach */}
       <div className="space-y-1 mb-3">
         <a href={`tel:${c.phone}`} className="flex items-center gap-1.5 text-xs text-ink-300 hover:text-brand-300 w-fit">
-          <Phone className="w-3 h-3 text-ink-500 shrink-0" />{c.phone}
+          <Phone className="w-3 h-3 text-ink-500 shrink-0" />{formatPhone(c.phone)}
         </a>
         {c.email && (
           <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-brand-300 w-fit min-w-0">

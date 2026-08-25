@@ -84,20 +84,23 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
               ? `No upcoming tasks assigned to ${taskOwnerName(selectedOwner)}.`
               : 'No upcoming tasks.'}
           </p>
-        ) : filteredTasks.map(task => (
+        ) : filteredTasks.map(task => {
+          const overdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < now.getTime());
+          return (
           <Link
             key={task.id}
             to={task.link}
             className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-ink-700/70 hover:border-brand-500/30 group"
           >
-            <div className="w-2 h-2 mt-2 rounded-full flex-shrink-0 bg-amber-500" />
+            <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${overdue ? 'bg-red-400' : 'bg-amber-500'}`} />
             <div className="ml-3 min-w-0 flex-1">
               <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{task.title}</p>
               <p className="text-xs text-ink-400 mt-0.5">{task.desc} · {task.assignedName}</p>
             </div>
-            <span className="ml-2 shrink-0 text-xs font-medium text-ink-500">{task.time}</span>
+            <span className={`ml-2 shrink-0 text-xs font-medium ${overdue ? 'text-red-400' : 'text-ink-500'}`}>{task.time}</span>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

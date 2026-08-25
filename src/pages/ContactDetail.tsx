@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useState, useRef, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import type { Contact, ContactType } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import QuickDealModal from '@/components/QuickDealModal';
@@ -266,7 +266,7 @@ export default function ContactDetail() {
         <div className="flex-1">
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{contact.first_name} {contact.last_name}</h1>
           <div className="flex items-center space-x-4 mt-1 text-sm text-ink-400">
-            <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{contact.phone}</span>
+            <span className="flex items-center"><Phone className="w-3.5 h-3.5 mr-1" />{formatPhone(contact.phone)}</span>
             {contact.email && <span className="flex items-center"><Mail className="w-3.5 h-3.5 mr-1" />{contact.email}</span>}
           </div>
         </div>

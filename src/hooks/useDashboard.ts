@@ -235,14 +235,19 @@ export function useDashboardStats(
 function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
+  const hourMs = 1000 * 60 * 60;
   if (diff < 0) {
     // Due in the future — floor on a negative diff would overshoot by an hour
-    const hoursAhead = Math.floor(-diff / (1000 * 60 * 60));
-    return hoursAhead === 0 ? 'Within the hour' : `In ${hoursAhead}h`;
+    const hoursAhead = Math.floor(-diff / hourMs);
+    if (hoursAhead === 0) return 'Within the hour';
+    if (hoursAhead < 24) return `In ${hoursAhead}h`;
+    const daysAhead = Math.round(hoursAhead / 24);
+    return daysAhead === 1 ? 'Tomorrow' : `In ${daysAhead} days`;
   }
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours === 0) return 'Just now';
-  if (hours < 24) return `${hours}h ago`;
+  // A past-due task under an "Upcoming" heading must say overdue, not "ago"
+  const hours = Math.floor(diff / hourMs);
+  if (hours === 0) return 'Due now';
+  if (hours < 24) return `${hours}h overdue`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}d overdue`;
 }

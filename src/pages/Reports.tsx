@@ -52,20 +52,6 @@ export default function Reports() {
           Some report data couldn't load — these numbers may be incomplete. ({r.loadError})
         </div>
       )}
-      {readinessIssues.length > 0 && (
-        <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4" aria-label="Data readiness">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
-            <div>
-              <h2 className="text-sm font-semibold text-amber-200">Data readiness — values below are honest, but coverage is incomplete</h2>
-              <p className="mt-1 text-xs text-amber-200/70">Existing records were not guessed or silently changed. New contacts are duplicate-guarded and new deals now require an explicit forecast date.</p>
-              <ul className="mt-3 grid gap-1.5 text-xs text-amber-100/85 sm:grid-cols-2">
-                {readinessIssues.map(issue => <li key={issue}>• {issue}</li>)}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">The Office</p>
@@ -81,6 +67,22 @@ export default function Reports() {
           ))}
         </select>
       </div>
+
+      {readinessIssues.length > 0 && (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4" aria-label="Data readiness">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h2 className="text-sm font-semibold text-amber-200">Data readiness — values below are honest, but coverage is incomplete</h2>
+              <p className="mt-1 text-xs text-amber-200/80">Existing records were not guessed or silently changed. New contacts are duplicate-guarded and new deals now require an explicit forecast date.</p>
+              {/* amber-200 resolves to a dark, readable brown in the light shell — amber-100/85 did not */}
+              <ul className="mt-3 grid gap-1.5 text-xs text-amber-200 sm:grid-cols-2">
+                {readinessIssues.map(issue => <li key={issue}>• {issue}</li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

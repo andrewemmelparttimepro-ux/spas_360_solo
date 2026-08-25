@@ -37,7 +37,7 @@ export default function StoreSwitcher() {
   ];
 
   return (
-    <div className="flex items-stretch gap-1 bg-ink-950 border border-ink-700 rounded-xl p-1 mb-5 shrink-0">
+    <div className="flex items-stretch gap-1 bg-ink-950 border border-ink-700 rounded-xl p-1 shrink-0">
       {options.map(opt => {
         const active = activeLocationId === opt.id;
         return (
@@ -45,14 +45,15 @@ export default function StoreSwitcher() {
             key={opt.id ?? 'all'}
             onClick={() => setActiveLocation(opt.id)}
             className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 sm:py-3 rounded-lg text-[13px] sm:text-sm font-bold transition-all min-w-0',
+              'flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-[13px] font-bold transition-all min-w-0',
               active
                 ? 'bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/50'
                 : 'text-ink-400 hover:text-ink-200 hover:bg-ink-800'
             )}
           >
             {opt.id !== null && <MapPin className={cn('hidden sm:block w-4 h-4 shrink-0', active ? 'text-brand-400' : 'text-ink-500')} />}
-            <span className="truncate">{opt.label}</span>
+            {/* "Bismarck (Spa's Etc)" earns its full name in the tooltip, not the tab */}
+            <span className="truncate" title={opt.label}>{opt.label.split(' (')[0]}</span>
             <span className={cn(
               'text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-md shrink-0',
               active ? 'bg-brand-500/20 text-brand-300' : 'bg-ink-800 text-ink-500'

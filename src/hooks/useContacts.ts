@@ -34,7 +34,11 @@ export function useContacts(enabled = true) {
         .from('contacts')
         .select('*')
         .eq('org_id', profile.org_id)
+        // Bulk-imported contacts share identical updated_at values; without a
+        // stable tiebreaker Postgres may order ties differently per page fetch,
+        // duplicating some contacts across pages and dropping others entirely.
         .order('updated_at', { ascending: false })
+        .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
 
       if (activeLocationId) {
@@ -57,7 +61,10 @@ export function useContacts(enabled = true) {
       if (page.length < pageSize) break;
     }
     if (seq !== fetchSeq.current) return;
-    setContacts(allContacts);
+    // Belt and suspenders: a row that changed mid-fetch can still straddle two
+    // pages, and duplicate ids break React keys downstream.
+    const seen = new Set<string>();
+    setContacts(allContacts.filter(c => !seen.has(c.id) && (seen.add(c.id), true)));
     setIsLoading(false);
   }, [profile, activeLocationId, debouncedQuery, enabled]);
 

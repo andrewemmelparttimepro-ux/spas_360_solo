@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Contact, ChevronLeft, ChevronRight, Search, Plus, ExternalLink, Wrench } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import { useContacts } from '@/hooks/useContacts';
 import { useFixItFeed, useFixItActiveCount } from '@/hooks/useFixItFeed';
 import { useAuth } from '@/contexts/AuthContext';
@@ -135,7 +135,7 @@ export default function AdminRail() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-medium text-ink-100 truncate">{c.first_name} {c.last_name}</span>
-                      <span className="block text-[11px] text-ink-500 truncate">{c.phone}</span>
+                      <span className="block text-[11px] text-ink-500 truncate">{formatPhone(c.phone)}</span>
                     </span>
                     <span className={cn('text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0', typeColors[c.customer_type] ?? 'bg-ink-800 text-ink-400')}>
                       {c.customer_type}

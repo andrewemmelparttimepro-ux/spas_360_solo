@@ -1,5 +1,5 @@
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Plus, MoreHorizontal, CalendarClock, AlertTriangle, User, Snowflake, Link2, X, Search, UsersRound } from 'lucide-react';
+import { Plus, MoreHorizontal, CalendarClock, AlertTriangle, User, Snowflake, Link2, X, Search, UsersRound, List, Columns3 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,15 @@ export default function Deals() {
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [dealSearch, setDealSearch] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('all');
+  // One pipeline view at a time: the follow-up list (Brandon's HubSpot muscle
+  // memory) leads; the drag board is one click away, never stacked below.
+  const [view, setView] = useState<'list' | 'board'>(() =>
+    localStorage.getItem('spas360.dealsView') === 'board' ? 'board' : 'list');
+  const switchView = (next: 'list' | 'board') => {
+    setView(next);
+    localStorage.setItem('spas360.dealsView', next);
+  };
+  const effectiveView = dragging ? 'board' : view;
   const [movingDealId, setMovingDealId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -141,6 +150,41 @@ export default function Deals() {
     }
   };
 
+  const filterControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="relative min-w-[220px]">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+        <input
+          value={dealSearch}
+          onChange={(event) => setDealSearch(event.target.value)}
+          placeholder="Search active deals"
+          aria-label="Search active deals"
+          className="w-full rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-3 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+        />
+      </label>
+      {isManager ? (
+        <label className="relative">
+          <UsersRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+          <select
+            value={ownerFilter}
+            onChange={(event) => setOwnerFilter(event.target.value)}
+            aria-label="Filter by salesperson"
+            className="appearance-none rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-8 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+          >
+            <option value="all">All salespeople</option>
+            {salespeople.map(person => (
+              <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <span className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-300">
+          <UsersRound className="h-4 w-4 text-ink-500" /> My deals
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -149,11 +193,38 @@ export default function Deals() {
           <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Deals</h1>
           <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Every customer, every stage — live</p>
         </div>
-        {/* Violet = customer action, everywhere it appears (page color system) */}
-        <button onClick={() => setShowWizard(true)} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
-          <Plus className="w-4 h-4 mr-2" />
-          New Customer
-        </button>
+        <div className="flex items-center gap-3">
+          {/* A customer drag in flight needs stage columns to land on, so the board takes over */}
+          <div className="flex items-center rounded-lg border border-ink-700 bg-ink-950 p-0.5" role="group" aria-label="Pipeline view">
+            <button
+              type="button"
+              onClick={() => switchView('list')}
+              aria-pressed={effectiveView === 'list'}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                effectiveView === 'list' ? 'bg-brand-500 text-white shadow-sm' : 'text-ink-400 hover:text-ink-200',
+              )}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('board')}
+              aria-pressed={effectiveView === 'board'}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                effectiveView === 'board' ? 'bg-brand-500 text-white shadow-sm' : 'text-ink-400 hover:text-ink-200',
+              )}
+            >
+              <Columns3 className="h-3.5 w-3.5" /> Board
+            </button>
+          </div>
+          {/* Violet = customer action, everywhere it appears (page color system) */}
+          <button onClick={() => setShowWizard(true)} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
+            <Plus className="w-4 h-4 mr-2" />
+            New Customer
+          </button>
+        </div>
       </div>
 
       {showWizard && (
@@ -208,45 +279,14 @@ export default function Deals() {
         </div>
       )}
 
+      {effectiveView === 'list' && (
       <div className="mb-5 shrink-0 overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/90 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-950/80 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-300">Sales follow-up control</p>
-            <h2 className="mt-1 text-lg font-semibold text-ink-100">Active leads and their next activity</h2>
-            <p className="mt-1 text-sm text-ink-400">Every open lead needs a dated next step. Missing and overdue follow-ups rise to the top automatically.</p>
+            <h2 className="text-base font-semibold text-ink-100">Active leads and their next activity</h2>
+            <p className="mt-0.5 text-[13px] text-ink-400">Missing and overdue follow-ups rise to the top automatically.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="relative min-w-[220px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-              <input
-                value={dealSearch}
-                onChange={(event) => setDealSearch(event.target.value)}
-                placeholder="Search active deals"
-                aria-label="Search active deals"
-                className="w-full rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-3 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </label>
-            {isManager ? (
-              <label className="relative">
-                <UsersRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-                <select
-                  value={ownerFilter}
-                  onChange={(event) => setOwnerFilter(event.target.value)}
-                  aria-label="Filter by salesperson"
-                  className="appearance-none rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-8 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  <option value="all">All salespeople</option>
-                  {salespeople.map(person => (
-                    <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-300">
-                <UsersRound className="h-4 w-4 text-ink-500" /> My deals
-              </span>
-            )}
-          </div>
+          {filterControls}
         </div>
         <div className="grid grid-cols-2 divide-x divide-ink-800 border-b border-ink-800 bg-ink-950/40 sm:grid-cols-4">
           <FollowUpStat label="Active leads" value={activeDeals.length} tone="neutral" filter="all" selected={followUpFilter === 'all'} onSelect={setFollowUpFilter} />
@@ -256,7 +296,7 @@ export default function Deals() {
         </div>
         <div
           id="active-deals-table"
-          className="max-h-[60vh] overflow-auto"
+          className="max-h-[68vh] overflow-auto"
           role="region"
           aria-label="Active deals table"
           tabIndex={0}
@@ -313,8 +353,15 @@ export default function Deals() {
                       )}
                     </td>
                     <td className="px-5 py-3 font-mono text-ink-100">${(Number(deal.amount) || 0).toLocaleString()}</td>
-                    <td className="px-5 py-3"><span className="rounded-full border border-ink-700 bg-ink-950 px-2.5 py-1 text-xs font-medium text-ink-300">{deal.priority}</span></td>
-                    <td className="px-5 py-3 text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : 'Open-ended'}</td>
+                    <td className="px-5 py-3">
+                      <span className={cn(
+                        'rounded-full border px-2.5 py-1 text-xs font-medium',
+                        deal.priority === 'High' ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                          : deal.priority === 'Medium' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                          : 'border-ink-700 bg-ink-950 text-ink-300',
+                      )}>{deal.priority}</span>
+                    </td>
+                    <td className="px-5 py-3 text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '—'}</td>
                     <td className="px-5 py-3 text-center font-mono text-ink-300">{followUp?.openTaskCount ?? 0}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
@@ -352,7 +399,10 @@ export default function Deals() {
           </table>
         </div>
       </div>
+      )}
 
+      {effectiveView === 'board' && (<>
+      <div className="mb-4">{filterControls}</div>
       {/* The live board, realtime scoreboard above the pipeline */}
       <SalesBoard deals={visibleDeals} stages={stages} followUpsByDeal={followUpsByDeal} />
 
@@ -406,6 +456,7 @@ export default function Deals() {
           </div>
         </DragDropContext>
       </div>
+      </>)}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigate, type NavigateFunction } from 'react-router-dom';
 import { Search, Contact, Users, Wrench, Package, CornerDownLeft, Plus, LayoutDashboard, Handshake, MessageSquare, BarChart3, Settings, Zap, BookOpen } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 
 interface Hit {
   id: string;
@@ -86,7 +86,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
       ...(contacts.data ?? []).map((c) => ({
         id: c.id, kind: 'contact' as const,
         primary: `${c.first_name} ${c.last_name}`,
-        secondary: `${c.phone} · ${c.customer_type}`,
+        secondary: `${formatPhone(c.phone)} · ${c.customer_type}`,
         link: `/customers/${c.id}`,
       })),
       ...(deals.data ?? []).map((d) => {

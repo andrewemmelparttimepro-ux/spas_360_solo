@@ -53,14 +53,20 @@ export function useCustomerCards() {
           .from('contacts')
           .select('*, assigned:assigned_to(first_name, last_name)')
           .eq('org_id', profile.org_id)
+          // Stable tiebreaker: imported contacts share updated_at values, and
+          // unstable tie order across page fetches duplicates/drops rows.
           .order('updated_at', { ascending: false })
+          .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
         if (activeLocationId) query = query.eq('location_id', activeLocationId);
         const { data, error } = await query;
         if (error) return { data: rows, error };
         const page = (data ?? []) as typeof contacts;
         rows.push(...page);
-        if (page.length < pageSize) return { data: rows, error: null };
+        if (page.length < pageSize) {
+          const seen = new Set<string>();
+          return { data: rows.filter(c => !seen.has(c.id) && (seen.add(c.id), true)), error: null };
+        }
       }
     };
 

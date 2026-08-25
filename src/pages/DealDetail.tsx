@@ -1,6 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3 } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
+import { supabase } from '@/lib/supabase';
+import { activePipelineStages, outcomeStage } from '@/lib/dealStage';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useState, useRef, useEffect } from 'react';
@@ -64,8 +66,35 @@ export default function DealDetail() {
   const [newTaskDueAt, setNewTaskDueAt] = useState(() => defaultFollowUpInputValue());
   const [newTaskPriority, setNewTaskPriority] = useState<DealPriority>('Medium');
   const taskSectionRef = useRef<HTMLDivElement>(null);
+  // Stage lives here too — closing a deal shouldn't require going back to the list
+  const [stages, setStages] = useState<{ id: string; name: string; is_won: boolean; is_lost: boolean }[]>([]);
+
+  useEffect(() => {
+    if (!profile) return;
+    let alive = true;
+    supabase
+      .from('pipeline_stages')
+      .select('id,name,is_won,is_lost')
+      .eq('org_id', profile.org_id)
+      .order('position')
+      .then(({ data }) => { if (alive) setStages((data ?? []) as typeof stages); });
+    return () => { alive = false; };
+  }, [profile]);
 
   const saveDeal = async (updates: Partial<Deal>) => { await updateDeal(updates); toast('Deal updated'); };
+
+  // Stage changes go through the same atomic RPC as the board — it renumbers
+  // positions and the DB trigger runs the won-deal handoff either way.
+  const changeStage = async (stageId: string) => {
+    if (!id || !stageId || stageId === deal?.stage_id) return;
+    const { error } = await supabase.rpc('move_deal', { p_deal_id: id, p_stage_id: stageId, p_position: 0 });
+    if (error) { toast(`Couldn't change stage: ${error.message}`, 'error'); return; }
+    const target = stages.find(stage => stage.id === stageId);
+    toast(target?.is_won ? 'Deal won 🎉 Delivery job sent to the Service queue'
+      : target?.is_lost ? 'Deal marked lost and saved in the customer history'
+      : `Stage → ${target?.name ?? 'updated'}`, 'success');
+    // No manual refetch: useDeal's realtime subscription picks up the RPC's update
+  };
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
@@ -180,9 +209,48 @@ export default function DealDetail() {
       <div className="flex items-center space-x-4">
         <Link to="/deals" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300 mt-1 inline-block">{contact.first_name} {contact.last_name} · {contact.phone}</Link>}</div>
-        <div className="flex flex-col items-start gap-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Priority</span>
-          <EditablePriority value={deal.priority} onSave={saveDeal} />
+        <div className="flex flex-wrap items-end gap-4">
+          {stages.length > 0 && (
+            <div className="flex flex-col items-start gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Stage</span>
+              <div className="flex items-center gap-2">
+                <select
+                  value={deal.stage_id}
+                  onChange={e => changeStage(e.target.value)}
+                  aria-label="Deal stage"
+                  className="rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-1.5 text-xs font-semibold text-ink-200 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                >
+                  {activePipelineStages(stages).map(stage => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
+                  {/* A closed deal still shows its own stage even though it's not selectable-active */}
+                  {stages.some(stage => stage.id === deal.stage_id && (stage.is_won || stage.is_lost)) && (
+                    <option value={deal.stage_id}>{stages.find(stage => stage.id === deal.stage_id)?.name}</option>
+                  )}
+                </select>
+                {!stages.some(stage => stage.id === deal.stage_id && (stage.is_won || stage.is_lost)) && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { const won = outcomeStage(stages, 'won'); if (won) changeStage(won.id); }}
+                      className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                    >
+                      Won
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { const lost = outcomeStage(stages, 'lost'); if (lost) changeStage(lost.id); }}
+                      className="rounded-lg border border-red-500/35 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
+                    >
+                      Lost
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col items-start gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Priority</span>
+            <EditablePriority value={deal.priority} onSave={saveDeal} />
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

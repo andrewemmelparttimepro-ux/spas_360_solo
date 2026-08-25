@@ -9,6 +9,12 @@ import {
   type DashboardCustomRange,
   type DashboardFilterPeriod,
 } from '@/lib/dashboardPeriods';
+import {
+  dashboardRevenueFilterSummary,
+  DASHBOARD_REVENUE_OUTCOME_LABELS,
+  DEFAULT_DASHBOARD_REVENUE_FILTERS,
+  type DashboardRevenueOutcome,
+} from '@/lib/dashboardRevenueFilters';
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
@@ -29,11 +35,25 @@ export default function Dashboard() {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [appliedCustomRange, setAppliedCustomRange] = useState<DashboardCustomRange | null>(null);
+  const [revenueFilters, setRevenueFilters] = useState(DEFAULT_DASHBOARD_REVENUE_FILTERS);
   const [showCreate, setShowCreate] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const { stats, upcomingTasks, taskOwners, revenueData, isLoading, loadError, refresh } = useDashboardStats(
+  const {
+    stats,
+    upcomingTasks,
+    taskOwners,
+    revenueData,
+    revenueOwners,
+    revenueStores,
+    isLoading,
+    isRevenueLoading,
+    loadError,
+    revenueLoadError,
+    refresh,
+  } = useDashboardStats(
     appliedPeriod,
     appliedPeriod === 'custom' ? appliedCustomRange : null,
+    revenueFilters,
   );
 
   const customCandidate = { startDate: customStart, endDate: customEnd };
@@ -45,6 +65,7 @@ export default function Dashboard() {
   const appliedPeriodLabel = appliedPeriod === 'custom' && appliedCustomRange
     ? `${DASHBOARD_PERIOD_LABELS.custom}: ${appliedCustomRange.startDate} to ${appliedCustomRange.endDate}`
     : DASHBOARD_PERIOD_LABELS[appliedPeriod];
+  const revenueFilterLabel = dashboardRevenueFilterSummary(revenueFilters, revenueOwners, revenueStores);
 
   const handlePeriodChange = (nextPeriod: DashboardFilterPeriod) => {
     setSelectedPeriod(nextPeriod);
@@ -204,18 +225,75 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="dashboard-panel lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between px-6 py-4 border-b border-ink-700 bg-ink-850/70">
-            <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
-            <span className="text-xs font-medium text-ink-500 whitespace-nowrap">{appliedPeriodLabel} · Closed-Won</span>
+          <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-850/70 px-6 py-4">
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+              <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
+              <span className="text-xs font-medium text-ink-500">{appliedPeriodLabel} · {revenueFilterLabel}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Revenue Overview filters">
+              <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500">
+                Outcome
+                <select
+                  aria-label="Revenue outcome"
+                  value={revenueFilters.outcome}
+                  onChange={(event) => setRevenueFilters((current) => ({
+                    ...current,
+                    outcome: event.target.value as DashboardRevenueOutcome,
+                  }))}
+                  className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs font-medium normal-case tracking-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  {(Object.keys(DASHBOARD_REVENUE_OUTCOME_LABELS) as DashboardRevenueOutcome[]).map((outcome) => (
+                    <option key={outcome} value={outcome}>{DASHBOARD_REVENUE_OUTCOME_LABELS[outcome]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500">
+                Assigned owner
+                <select
+                  aria-label="Revenue assigned owner"
+                  value={revenueFilters.assignedTo ?? ''}
+                  onChange={(event) => setRevenueFilters((current) => ({
+                    ...current,
+                    assignedTo: event.target.value || null,
+                  }))}
+                  className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs font-medium normal-case tracking-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">All Owners</option>
+                  {revenueOwners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500">
+                Store
+                <select
+                  aria-label="Revenue store"
+                  value={revenueFilters.locationId ?? ''}
+                  onChange={(event) => setRevenueFilters((current) => ({
+                    ...current,
+                    locationId: event.target.value || null,
+                  }))}
+                  className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs font-medium normal-case tracking-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">All Stores</option>
+                  {revenueStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                </select>
+              </label>
+            </div>
           </div>
           <div className="h-72 p-5">
-            {revenueData.every((d) => d.revenue === 0) ? (
+            {isRevenueLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : revenueLoadError ? (
+              <div className="flex h-full flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 px-6 text-center">
+                <p className="text-sm font-medium text-red-300">Revenue couldn't load for these filters.</p>
+                <button onClick={refresh} className="mt-3 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/15">Retry</button>
+              </div>
+            ) : revenueData.every((d) => d.revenue === 0) ? (
               <div className="h-full flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-ink-700 bg-ink-850/50">
                 <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3">
                   <BarChart3 className="w-5 h-5" />
                 </div>
-                <p className="text-sm font-medium text-ink-400">No closed revenue {DASHBOARD_PERIOD_LABELS[appliedPeriod].toLowerCase()}</p>
-                <p className="text-xs text-ink-500 mt-1">Won deals will chart here as they close</p>
+                <p className="text-sm font-medium text-ink-400">No matching closed deals {DASHBOARD_PERIOD_LABELS[appliedPeriod].toLowerCase()}</p>
+                <p className="text-xs text-ink-500 mt-1">Closed deals will chart here when they match these filters</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

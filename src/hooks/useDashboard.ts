@@ -16,6 +16,12 @@ import {
   type TaskOwnerOption,
   type UpcomingTaskItem,
 } from '@/lib/upcomingTasks';
+import {
+  dashboardRevenueRpcParams,
+  DEFAULT_DASHBOARD_REVENUE_FILTERS,
+  type DashboardRevenueFilterOption,
+  type DashboardRevenueFilters,
+} from '@/lib/dashboardRevenueFilters';
 
 export { PERIOD_LABELS, type DashboardPeriod } from '@/lib/dashboardPeriods';
 
@@ -29,6 +35,7 @@ interface DashboardStats {
 export function useDashboardStats(
   period: DashboardFilterPeriod = 'week',
   customRange?: DashboardCustomRange | null,
+  revenueFilters: DashboardRevenueFilters = DEFAULT_DASHBOARD_REVENUE_FILTERS,
 ) {
   const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -37,9 +44,14 @@ export function useDashboardStats(
   const [upcomingTasks, setUpcomingTasks] = useState<UpcomingTaskItem[]>([]);
   const [taskOwners, setTaskOwners] = useState<TaskOwnerOption[]>([]);
   const [revenueData, setRevenueData] = useState<DashboardRevenuePoint[]>([]);
+  const [revenueOwners, setRevenueOwners] = useState<DashboardRevenueFilterOption[]>([]);
+  const [revenueStores, setRevenueStores] = useState<DashboardRevenueFilterOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRevenueLoading, setIsRevenueLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [revenueLoadError, setRevenueLoadError] = useState<string | null>(null);
   const fetchSequence = useRef(0);
+  const revenueFetchSequence = useRef(0);
 
   const fetchStats = useCallback(async () => {
     if (!profile) return;
@@ -121,17 +133,73 @@ export function useDashboardStats(
       }));
     }
 
-    // Real revenue chart from closed-won deals (server-aggregated per local day)
-    if (!summaryRes.error) {
-      setRevenueData(bucketDashboardRevenue(summary.revenue_daily ?? [], period, range));
-    }
-
     setIsLoading(false);
   }, [profile, period, customRange?.startDate, customRange?.endDate]);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  const fetchRevenue = useCallback(async () => {
+    if (!profile) return;
+    const sequence = ++revenueFetchSequence.current;
+    setIsRevenueLoading(true);
 
-  return { stats, upcomingTasks, taskOwners, revenueData, isLoading, loadError, refresh: fetchStats };
+    const range = dashboardRangeFor(period, customRange);
+    if (!range) {
+      setIsRevenueLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc(
+      'dashboard_revenue_summary',
+      dashboardRevenueRpcParams(range, revenueFilters),
+    );
+    if (sequence !== revenueFetchSequence.current) return;
+
+    if (error) {
+      console.error('Error loading dashboard revenue:', error);
+      setRevenueLoadError(error.message);
+      setIsRevenueLoading(false);
+      return;
+    }
+
+    const summary = (data ?? {}) as {
+      revenue_daily?: DashboardDailyRevenue[];
+      owner_options?: DashboardRevenueFilterOption[];
+      store_options?: DashboardRevenueFilterOption[];
+    };
+    setRevenueData(bucketDashboardRevenue(summary.revenue_daily ?? [], period, range));
+    setRevenueOwners(summary.owner_options ?? []);
+    setRevenueStores(summary.store_options ?? []);
+    setRevenueLoadError(null);
+    setIsRevenueLoading(false);
+  }, [
+    profile,
+    period,
+    customRange?.startDate,
+    customRange?.endDate,
+    revenueFilters.outcome,
+    revenueFilters.assignedTo,
+    revenueFilters.locationId,
+  ]);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([fetchStats(), fetchRevenue()]);
+  }, [fetchStats, fetchRevenue]);
+
+  return {
+    stats,
+    upcomingTasks,
+    taskOwners,
+    revenueData,
+    revenueOwners,
+    revenueStores,
+    isLoading,
+    isRevenueLoading,
+    loadError,
+    revenueLoadError,
+    refresh,
+  };
 }
 
 function formatRelativeTime(date: Date): string {

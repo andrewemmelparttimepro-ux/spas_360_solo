@@ -1,11 +1,11 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { supabase } from '@/lib/supabase';
 import { activePipelineStages, outcomeStage } from '@/lib/dealStage';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn, formatPhone } from '@/lib/utils';
 import type { Deal, DealPriority } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
@@ -31,6 +31,11 @@ import {
 } from '@/lib/dealInventory';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
+
+type CloseWonLocationState = {
+  openClosedWon?: boolean;
+  source?: 'deals-list' | 'deals-board';
+};
 
 function EditableField({ label, value, field, onSave, icon: Icon, type = 'text', options, prefix, bold, color }: { label: string; value: string | number | null; field: string; onSave: (u: Partial<Deal>) => Promise<void>; icon?: React.ElementType; type?: 'text' | 'number' | 'select' | 'date'; options?: string[]; prefix?: string; bold?: boolean; color?: string; }) {
   const [editing, setEditing] = useState(false);
@@ -59,6 +64,8 @@ function EditablePriority({ value, onSave }: { value: DealPriority; onSave: (u: 
 
 export default function DealDetail() {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { deal, isLoading, updateDeal } = useDeal(id);
   const { notes, createNote } = useNotes({ dealId: id });
   const { tasks, createTask, completeTask } = useTasks({ dealId: id });
@@ -81,6 +88,7 @@ export default function DealDetail() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [closeSaleBusy, setCloseSaleBusy] = useState(false);
   const [closeSaleError, setCloseSaleError] = useState<string | null>(null);
+  const handledCloseWonLocationKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -109,23 +117,7 @@ export default function DealDetail() {
     // No manual refetch: useDeal's realtime subscription picks up the RPC's update
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
-  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
-
-  const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
-  const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
-  const nextFollowUpState = getFollowUpState(nextFollowUp);
-  const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
-
-  const closeCloseSale = () => {
-    if (closeSaleBusy) return;
-    setCloseSaleStageId(null);
-    setFulfillmentType(null);
-    setSelectedInventoryId('');
-    setCloseSaleError(null);
-  };
-
-  const openCloseSale = async (stageId: string) => {
+  const openCloseSale = useCallback(async (stageId: string) => {
     if (!profile) return;
     setCloseSaleStageId(stageId);
     setFulfillmentType(null);
@@ -156,6 +148,35 @@ export default function DealDetail() {
     } finally {
       setInventoryLoading(false);
     }
+  }, [profile]);
+
+  useEffect(() => {
+    const navigationState = location.state as CloseWonLocationState | null;
+    if (!navigationState?.openClosedWon || !deal || !profile || stages.length === 0) return;
+    if (handledCloseWonLocationKey.current === location.key) return;
+
+    const won = outcomeStage(stages, 'won');
+    if (!won) return;
+
+    handledCloseWonLocationKey.current = location.key;
+    navigate(location.pathname, { replace: true, state: null });
+    void openCloseSale(won.id);
+  }, [deal, location.key, location.pathname, location.state, navigate, openCloseSale, profile, stages]);
+
+  if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
+
+  const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
+  const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
+  const nextFollowUpState = getFollowUpState(nextFollowUp);
+  const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
+
+  const closeCloseSale = () => {
+    if (closeSaleBusy) return;
+    setCloseSaleStageId(null);
+    setFulfillmentType(null);
+    setSelectedInventoryId('');
+    setCloseSaleError(null);
   };
 
   const completeWonSale = async () => {

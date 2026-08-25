@@ -143,7 +143,9 @@ export default function Deals() {
   const handleDealDrop = async (result: DropResult) => {
     const destinationStage = stages.find(stage => stage.id === result.destination?.droppableId);
     if (destinationStage?.is_won) {
-      navigate(`/deals/${result.draggableId}`);
+      navigate(`/deals/${result.draggableId}`, {
+        state: { openClosedWon: true, source: 'deals-board' },
+      });
       return;
     }
     await moveDeal(result);
@@ -376,7 +378,9 @@ export default function Deals() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => wonStage && navigate(`/deals/${deal.id}`)}
+                          onClick={() => wonStage && navigate(`/deals/${deal.id}`, {
+                            state: { openClosedWon: true, source: 'deals-list' },
+                          })}
                           disabled={!wonStage}
                           aria-label={`Mark ${deal.title} won`}
                           className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"

@@ -19,6 +19,21 @@ begin
       add constraint deals_sale_fulfillment_type_check
       check (sale_fulfillment_type is null or sale_fulfillment_type in ('inventory', 'special_order'));
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'deals_sale_fulfillment_inventory_check'
+      and conrelid = 'public.deals'::regclass
+  ) then
+    alter table public.deals
+      add constraint deals_sale_fulfillment_inventory_check
+      check (
+        (sale_fulfillment_type is null and inventory_item_id is null)
+        or (sale_fulfillment_type = 'inventory' and inventory_item_id is not null)
+        or (sale_fulfillment_type = 'special_order' and inventory_item_id is null)
+      );
+  end if;
 end
 $$;
 
@@ -37,12 +52,15 @@ security invoker
 set search_path = ''
 as $$
 begin
-  if new.stage_id is distinct from old.stage_id
-     and exists (
-       select 1
-       from public.pipeline_stages s
-       where s.id = new.stage_id and s.org_id = new.org_id and s.is_won
-     ) then
+  -- This trigger is limited to the three fulfillment-defining columns, so a
+  -- legacy won row whose two new columns are both null can still receive an
+  -- ordinary unrelated update. Whenever one of these columns is touched, the
+  -- resulting won row must be internally complete.
+  if exists (
+    select 1
+    from public.pipeline_stages s
+    where s.id = new.stage_id and s.org_id = new.org_id and s.is_won
+  ) then
     if new.sale_fulfillment_type is null then
       raise exception 'Choose the purchased inventory unit or Special order from Deal detail';
     end if;
@@ -62,8 +80,15 @@ begin
       raise exception 'The purchased inventory unit is not linked to this customer';
     end if;
 
-    if new.sale_fulfillment_type = 'special_order' and new.inventory_item_id is not null then
-      raise exception 'Special order cannot consume a current inventory unit';
+    if new.sale_fulfillment_type = 'special_order' and (
+      new.inventory_item_id is not null
+      or exists (
+        select 1
+        from public.inventory_items i
+        where i.deal_id = new.id
+      )
+    ) then
+      raise exception 'Special order cannot have a current inventory unit linked';
     end if;
   end if;
 
@@ -73,7 +98,7 @@ $$;
 
 drop trigger if exists require_deal_won_fulfillment on public.deals;
 create trigger require_deal_won_fulfillment
-  before update of stage_id on public.deals
+  before update of stage_id, sale_fulfillment_type, inventory_item_id on public.deals
   for each row execute function private.require_deal_won_fulfillment();
 
 create or replace function private.close_deal_sale(

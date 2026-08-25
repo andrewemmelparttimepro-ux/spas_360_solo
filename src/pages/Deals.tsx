@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { usePipeline, type PipelineDeal } from '@/hooks/usePipeline';
-import { formatFollowUpDue, getFollowUpState, type DealFollowUp, type FollowUpState } from '@/lib/followUp';
+import { filterDealsByFollowUp, formatFollowUpDue, getFollowUpState, type DealFollowUp, type FollowUpFilter, type FollowUpState } from '@/lib/followUp';
 import { useCustomerDrag, type DragCustomer } from '@/contexts/CustomerDragContext';
 import SalesBoard from '@/components/SalesBoard';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
@@ -29,6 +29,7 @@ export default function Deals() {
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [dealSearch, setDealSearch] = useState('');
+  const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('all');
   const [movingDealId, setMovingDealId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -124,9 +125,11 @@ export default function Deals() {
       if (aDue !== bDue) return aDue - bDue;
       return Number(b.amount ?? 0) - Number(a.amount ?? 0);
     });
-  const missingFollowUps = activeDeals.filter(deal => !followUpsByDeal.has(deal.id)).length;
-  const overdueFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'overdue').length;
-  const dueToday = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id)) === 'today').length;
+  const followUpNow = new Date();
+  const missingFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id), followUpNow) === 'missing').length;
+  const overdueFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id), followUpNow) === 'overdue').length;
+  const dueToday = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id), followUpNow) === 'today').length;
+  const filteredActiveDeals = filterDealsByFollowUp(activeDeals, followUpsByDeal, followUpFilter, followUpNow);
 
   const changeDealStage = async (deal: PipelineDeal, stageId: string) => {
     if (movingDealId || deal.stage_id === stageId) return;
@@ -246,12 +249,13 @@ export default function Deals() {
           </div>
         </div>
         <div className="grid grid-cols-2 divide-x divide-ink-800 border-b border-ink-800 bg-ink-950/40 sm:grid-cols-4">
-          <FollowUpStat label="Active leads" value={activeDeals.length} tone="neutral" />
-          <FollowUpStat label="No next activity" value={missingFollowUps} tone={missingFollowUps ? 'danger' : 'good'} />
-          <FollowUpStat label="Overdue" value={overdueFollowUps} tone={overdueFollowUps ? 'danger' : 'good'} />
-          <FollowUpStat label="Due today" value={dueToday} tone={dueToday ? 'warning' : 'neutral'} />
+          <FollowUpStat label="Active leads" value={activeDeals.length} tone="neutral" filter="all" selected={followUpFilter === 'all'} onSelect={setFollowUpFilter} />
+          <FollowUpStat label="No next activity" value={missingFollowUps} tone={missingFollowUps ? 'danger' : 'good'} filter="missing" selected={followUpFilter === 'missing'} onSelect={setFollowUpFilter} />
+          <FollowUpStat label="Overdue" value={overdueFollowUps} tone={overdueFollowUps ? 'danger' : 'good'} filter="overdue" selected={followUpFilter === 'overdue'} onSelect={setFollowUpFilter} />
+          <FollowUpStat label="Due today" value={dueToday} tone={dueToday ? 'warning' : 'neutral'} filter="today" selected={followUpFilter === 'today'} onSelect={setFollowUpFilter} />
         </div>
         <div
+          id="active-deals-table"
           className="max-h-[60vh] overflow-auto"
           role="region"
           aria-label="Active deals table"
@@ -273,7 +277,7 @@ export default function Deals() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800/80">
-              {activeDeals.map((deal) => {
+              {filteredActiveDeals.map((deal) => {
                 const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : 'Unassigned';
                 const ownerName = deal.assigned ? `${deal.assigned.first_name} ${deal.assigned.last_name}` : 'Unassigned';
                 const followUp = followUpsByDeal.get(deal.id);
@@ -337,10 +341,10 @@ export default function Deals() {
                   </tr>
                 );
               })}
-              {activeDeals.length === 0 && (
+              {filteredActiveDeals.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-5 py-10 text-center text-sm text-ink-500">
-                    No active deals match this salesperson and search.
+                    No active deals match the selected follow-up, salesperson, and search filters.
                   </td>
                 </tr>
               )}
@@ -419,7 +423,21 @@ const followUpTone: Record<FollowUpState, string> = {
   scheduled: 'border-brand-500/30 bg-brand-500/10 text-brand-300',
 };
 
-function FollowUpStat({ label, value, tone }: { label: string; value: number; tone: 'neutral' | 'danger' | 'warning' | 'good' }) {
+function FollowUpStat({
+  label,
+  value,
+  tone,
+  filter,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  value: number;
+  tone: 'neutral' | 'danger' | 'warning' | 'good';
+  filter: FollowUpFilter;
+  selected: boolean;
+  onSelect: (filter: FollowUpFilter) => void;
+}) {
   const tones = {
     neutral: 'text-ink-100',
     danger: 'text-red-300',
@@ -428,10 +446,19 @@ function FollowUpStat({ label, value, tone }: { label: string; value: number; to
   };
 
   return (
-    <div className="px-4 py-3">
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-controls="active-deals-table"
+      onClick={() => onSelect(filter)}
+      className={cn(
+        'w-full px-4 py-3 text-left outline-none transition hover:bg-brand-500/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400',
+        selected && 'bg-brand-500/15 ring-1 ring-inset ring-brand-500/50',
+      )}
+    >
       <p className={cn('font-mono text-xl font-bold', tones[tone])}>{value}</p>
-      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">{label}</p>
-    </div>
+      <p className={cn('mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]', selected ? 'text-brand-300' : 'text-ink-500')}>{label}</p>
+    </button>
   );
 }
 

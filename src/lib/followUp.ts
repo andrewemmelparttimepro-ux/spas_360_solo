@@ -1,4 +1,5 @@
 export type FollowUpState = 'missing' | 'overdue' | 'today' | 'scheduled';
+export type FollowUpFilter = 'all' | 'missing' | 'overdue' | 'today';
 
 export interface FollowUpTaskLike {
   id: string;
@@ -67,6 +68,23 @@ export function getFollowUpState(followUp: DealFollowUp | null | undefined, now 
     && dueAt.getDate() === now.getDate();
 
   return sameDay ? 'today' : 'scheduled';
+}
+
+export function matchesFollowUpFilter(
+  followUp: DealFollowUp | null | undefined,
+  filter: FollowUpFilter,
+  now = new Date(),
+) {
+  return filter === 'all' || getFollowUpState(followUp, now) === filter;
+}
+
+export function filterDealsByFollowUp<T extends { id: string }>(
+  deals: T[],
+  followUpsByDeal: ReadonlyMap<string, DealFollowUp>,
+  filter: FollowUpFilter,
+  now = new Date(),
+) {
+  return deals.filter((deal) => matchesFollowUpFilter(followUpsByDeal.get(deal.id), filter, now));
 }
 
 export function formatFollowUpDue(followUp: DealFollowUp | null | undefined, now = new Date()) {

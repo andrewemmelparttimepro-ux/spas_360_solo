@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   defaultFollowUpInputValue,
+  filterDealsByFollowUp,
   formatFollowUpDue,
   getFollowUpState,
+  matchesFollowUpFilter,
   summarizeDealFollowUps,
   type FollowUpTaskLike,
 } from '../src/lib/followUp.ts';
@@ -44,6 +47,49 @@ test('classifies missing, overdue, today, and scheduled follow-ups', () => {
   assert.equal(getFollowUpState(base, now), 'today');
   assert.equal(getFollowUpState({ ...base!, dueAt: local(2026, 7, 23, 8).toISOString() }, now), 'overdue');
   assert.equal(getFollowUpState({ ...base!, dueAt: local(2026, 7, 24, 16).toISOString() }, now), 'scheduled');
+});
+
+test('matches each selectable active-deal cohort using follow-up state semantics', () => {
+  const now = local(2026, 7, 23, 10);
+  const today = summarizeDealFollowUps([task({ due_at: local(2026, 7, 23, 16).toISOString() })]).get('deal-1')!;
+  const overdue = { ...today, dueAt: local(2026, 7, 22, 16).toISOString() };
+  const scheduled = { ...today, dueAt: local(2026, 7, 24, 16).toISOString() };
+
+  assert.equal(matchesFollowUpFilter(undefined, 'all', now), true);
+  assert.equal(matchesFollowUpFilter(undefined, 'missing', now), true);
+  assert.equal(matchesFollowUpFilter(today, 'today', now), true);
+  assert.equal(matchesFollowUpFilter(overdue, 'overdue', now), true);
+  assert.equal(matchesFollowUpFilter(scheduled, 'today', now), false);
+  assert.equal(matchesFollowUpFilter(today, 'missing', now), false);
+
+  const alreadyOwnerAndSearchFiltered = [
+    { id: 'scheduled', label: 'first' },
+    { id: 'missing', label: 'second' },
+    { id: 'overdue', label: 'third' },
+    { id: 'today', label: 'fourth' },
+  ];
+  const followUps = new Map([
+    ['scheduled', { ...scheduled, dealId: 'scheduled' }],
+    ['overdue', { ...overdue, dealId: 'overdue' }],
+    ['today', { ...today, dealId: 'today' }],
+  ]);
+
+  assert.deepEqual(filterDealsByFollowUp(alreadyOwnerAndSearchFiltered, followUps, 'all', now), alreadyOwnerAndSearchFiltered);
+  assert.deepEqual(filterDealsByFollowUp(alreadyOwnerAndSearchFiltered, followUps, 'missing', now).map(deal => deal.id), ['missing']);
+  assert.deepEqual(filterDealsByFollowUp(alreadyOwnerAndSearchFiltered, followUps, 'overdue', now).map(deal => deal.id), ['overdue']);
+  assert.deepEqual(filterDealsByFollowUp(alreadyOwnerAndSearchFiltered, followUps, 'today', now).map(deal => deal.id), ['today']);
+});
+
+test('wires all four summary metrics as accessible table filters', async () => {
+  const dealsPage = await readFile(new URL('../src/pages/Deals.tsx', import.meta.url), 'utf8');
+
+  assert.match(dealsPage, /label="Active leads"[^>]*filter="all"/);
+  assert.match(dealsPage, /label="No next activity"[^>]*filter="missing"/);
+  assert.match(dealsPage, /label="Overdue"[^>]*filter="overdue"/);
+  assert.match(dealsPage, /label="Due today"[^>]*filter="today"/);
+  assert.match(dealsPage, /aria-pressed=\{selected\}/);
+  assert.match(dealsPage, /aria-controls="active-deals-table"/);
+  assert.match(dealsPage, /filteredActiveDeals\.map/);
 });
 
 test('a task the DB already flagged Overdue is overdue even with a future due date', () => {

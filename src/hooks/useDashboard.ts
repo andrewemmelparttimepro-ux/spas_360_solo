@@ -11,7 +11,9 @@ import {
   type DashboardRevenuePoint,
 } from '@/lib/dashboardPeriods';
 import {
+  filterTaskOwnerOptions,
   taskOwnerName,
+  THRAWN_PROFILE_ID,
   upcomingTaskLink,
   type TaskOwnerOption,
   type UpcomingTaskItem,
@@ -82,6 +84,7 @@ export function useDashboardStats(
         .select('id, first_name, last_name')
         .eq('org_id', profile.org_id)
         .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .neq('id', THRAWN_PROFILE_ID)
         .order('first_name', { ascending: true })
         .order('last_name', { ascending: true }),
     ]);
@@ -109,7 +112,7 @@ export function useDashboardStats(
     }
 
     if (!ownersRes.error) {
-      setTaskOwners((ownersRes.data ?? []) as TaskOwnerOption[]);
+      setTaskOwners(filterTaskOwnerOptions((ownersRes.data ?? []) as TaskOwnerOption[]));
     }
 
     if (!tasksRes.error) {
@@ -124,6 +127,8 @@ export function useDashboardStats(
           time: row.due_at ? formatRelativeTime(new Date(row.due_at as string)) : '',
           assignedTo,
           assignedName: assigned ? taskOwnerName(assigned) : 'Unassigned owner',
+          dueAt: (row.due_at as string | null) ?? null,
+          status: row.status as UpcomingTaskItem['status'],
           link: upcomingTaskLink({
             deal_id: (row.deal_id as string | null) ?? null,
             contact_id: (row.contact_id as string | null) ?? null,

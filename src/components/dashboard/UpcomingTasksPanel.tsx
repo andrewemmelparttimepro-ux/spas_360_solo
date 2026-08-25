@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ALL_TASK_OWNERS,
+  PAST_DUE_TASKS,
   filterUpcomingTasks,
   taskOwnerName,
   type TaskOwnerFilter,
@@ -16,9 +17,18 @@ interface UpcomingTasksPanelProps {
 
 export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanelProps) {
   const [ownerFilter, setOwnerFilter] = useState<TaskOwnerFilter>(ALL_TASK_OWNERS);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (ownerFilter !== PAST_DUE_TASKS) return;
+    setNow(new Date());
+    const interval = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(interval);
+  }, [ownerFilter]);
+
   const filteredTasks = useMemo(
-    () => filterUpcomingTasks(tasks, ownerFilter),
-    [tasks, ownerFilter],
+    () => filterUpcomingTasks(tasks, ownerFilter, now),
+    [tasks, ownerFilter, now],
   );
   const selectedOwner = owners.find(owner => owner.id === ownerFilter);
 
@@ -33,6 +43,7 @@ export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanel
           className="min-w-0 max-w-44 rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-1.5 text-xs font-medium text-ink-200 outline-none focus:ring-2 focus:ring-brand-500"
         >
           <option value={ALL_TASK_OWNERS}>All Tasks</option>
+          <option value={PAST_DUE_TASKS}>Past Due Tasks</option>
           {owners.map(owner => (
             <option key={owner.id} value={owner.id}>{taskOwnerName(owner)}</option>
           ))}
@@ -41,7 +52,9 @@ export default function UpcomingTasksPanel({ tasks, owners }: UpcomingTasksPanel
       <div className="max-h-[28rem] space-y-3 overflow-y-auto p-4">
         {filteredTasks.length === 0 ? (
           <p className="text-sm text-ink-500 text-center py-6">
-            {selectedOwner
+            {ownerFilter === PAST_DUE_TASKS
+              ? 'No past due tasks.'
+              : selectedOwner
               ? `No upcoming tasks assigned to ${taskOwnerName(selectedOwner)}.`
               : 'No upcoming tasks.'}
           </p>

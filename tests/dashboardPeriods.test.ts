@@ -112,4 +112,18 @@ describe('dashboard date periods', () => {
     assert.match(reports, /Object\.keys\(PERIOD_LABELS\)/);
     assert.doesNotMatch(reports, /DASHBOARD_PERIOD_LABELS/);
   });
+
+  it('keeps the date range and custom controls inside Revenue Overview instead of beside New', async () => {
+    const dashboard = await read('src/pages/Dashboard.tsx');
+    const managerHeader = dashboard.slice(
+      dashboard.indexOf('<h1'),
+      dashboard.indexOf('{showCreate &&'),
+    );
+    const revenueOverview = dashboard.slice(dashboard.indexOf('Revenue Overview'));
+
+    assert.doesNotMatch(managerHeader, /aria-label="Dashboard date range"/);
+    assert.match(revenueOverview, /Revenue Overview[\s\S]*Date range[\s\S]*aria-label="Dashboard date range"/);
+    assert.match(revenueOverview, /aria-label="Revenue store"/);
+    assert.match(revenueOverview, /aria-label="Dashboard date range"[\s\S]*selectedPeriod === 'custom'[\s\S]*aria-label="Custom range start date"[\s\S]*aria-label="Custom range end date"/);
+  });
 });

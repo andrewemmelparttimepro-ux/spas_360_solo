@@ -126,16 +126,6 @@ export default function Dashboard() {
             <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
-            <select
-              aria-label="Dashboard date range"
-              value={selectedPeriod}
-              onChange={(e) => handlePeriodChange(e.target.value as DashboardFilterPeriod)}
-              className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              {(Object.keys(DASHBOARD_PERIOD_LABELS) as DashboardFilterPeriod[]).map((p) => (
-                <option key={p} value={p}>{DASHBOARD_PERIOD_LABELS[p]}</option>
-              ))}
-            </select>
             <button
               onClick={() => setShowCreate(true)}
               className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
@@ -145,48 +135,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {selectedPeriod === 'custom' && (
-          <form
-            className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900 p-3 sm:flex-row sm:items-end"
-            onSubmit={(event) => {
-              event.preventDefault();
-              applyCustomDates();
-            }}
-          >
-            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
-              Start date
-              <input
-                aria-label="Custom range start date"
-                type="date"
-                value={customStart}
-                max={customEnd || undefined}
-                onChange={(event) => setCustomStart(event.target.value)}
-                className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
-              End date
-              <input
-                aria-label="Custom range end date"
-                type="date"
-                value={customEnd}
-                min={customStart || undefined}
-                onChange={(event) => setCustomEnd(event.target.value)}
-                className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={!validCustomRange}
-              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Apply dates
-            </button>
-            <p className={`text-xs sm:max-w-52 ${customDateError ? 'text-red-400' : 'text-ink-500'}`} aria-live="polite">
-              {customDateError ?? (customDatesComplete ? 'Dates are inclusive.' : 'Choose both dates to apply an inclusive range.')}
-            </p>
-          </form>
-        )}
       </div>
 
       {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
@@ -228,10 +176,21 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="dashboard-panel lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-850/70 px-6 py-4">
-            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
-              {/* The selects below already announce outcome/owner/store — only the period needs saying */}
-              <span className="text-xs font-medium text-ink-500">{appliedPeriodLabel}</span>
+              <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500 sm:w-44">
+                Date range
+                <select
+                  aria-label="Dashboard date range"
+                  value={selectedPeriod}
+                  onChange={(event) => handlePeriodChange(event.target.value as DashboardFilterPeriod)}
+                  className="rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-xs font-medium normal-case tracking-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  {(Object.keys(DASHBOARD_PERIOD_LABELS) as DashboardFilterPeriod[]).map((period) => (
+                    <option key={period} value={period}>{DASHBOARD_PERIOD_LABELS[period]}</option>
+                  ))}
+                </select>
+              </label>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Revenue Overview filters">
               <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-ink-500">
@@ -281,6 +240,52 @@ export default function Dashboard() {
                 </select>
               </label>
             </div>
+            {selectedPeriod === 'custom' && (
+              <form
+                className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900 p-3 sm:flex-row sm:items-end"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  applyCustomDates();
+                }}
+              >
+                <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
+                  Start date
+                  <input
+                    aria-label="Custom range start date"
+                    type="date"
+                    value={customStart}
+                    max={customEnd || undefined}
+                    onChange={(event) => setCustomStart(event.target.value)}
+                    className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </label>
+                <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
+                  End date
+                  <input
+                    aria-label="Custom range end date"
+                    type="date"
+                    value={customEnd}
+                    min={customStart || undefined}
+                    onChange={(event) => setCustomEnd(event.target.value)}
+                    className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={!validCustomRange}
+                  className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Apply dates
+                </button>
+                <p className={`text-xs sm:max-w-52 ${customDateError ? 'text-red-400' : 'text-ink-500'}`} aria-live="polite">
+                  {customDateError ?? (customDatesComplete
+                    ? (appliedPeriod === 'custom' && appliedCustomRange
+                      ? `${appliedPeriodLabel}. Dates are inclusive.`
+                      : 'Dates are inclusive. Apply to update the chart.')
+                    : 'Choose both dates to apply an inclusive range.')}
+                </p>
+              </form>
+            )}
           </div>
           <div className="h-72 p-5">
             {isRevenueLoading ? (

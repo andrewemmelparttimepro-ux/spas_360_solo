@@ -94,14 +94,15 @@ describe('dashboard date periods', () => {
     assert.deepEqual(bucketDashboardRevenue(daily, 'custom', custom), [{ name: 'Feb 14', revenue: 250 }]);
   });
 
-  it('wires a week-default Dashboard with validated custom controls without widening Reports', async () => {
+  it('wires a month-default Dashboard with validated custom controls without widening Reports', async () => {
     const [dashboard, dashboardHook, reports] = await Promise.all([
       read('src/pages/Dashboard.tsx'),
       read('src/hooks/useDashboard.ts'),
       read('src/pages/Reports.tsx'),
     ]);
 
-    assert.match(dashboard, /useState<DashboardFilterPeriod>\('week'\)/);
+    assert.match(dashboard, /const \[selectedPeriod, setSelectedPeriod\] = useState<DashboardFilterPeriod>\('month'\)/);
+    assert.match(dashboard, /const \[appliedPeriod, setAppliedPeriod\] = useState<DashboardFilterPeriod>\('month'\)/);
     assert.match(dashboard, /Object\.keys\(DASHBOARD_PERIOD_LABELS\)/);
     assert.match(dashboard, /aria-label="Custom range start date"[\s\S]*type="date"/);
     assert.match(dashboard, /aria-label="Custom range end date"[\s\S]*type="date"/);

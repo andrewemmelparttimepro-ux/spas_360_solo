@@ -28,8 +28,8 @@ const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inve
 
 export default function Dashboard() {
   const { profile } = useAuth();
-  const [selectedPeriod, setSelectedPeriod] = useState<DashboardFilterPeriod>('week');
-  const [appliedPeriod, setAppliedPeriod] = useState<DashboardFilterPeriod>('week');
+  const [selectedPeriod, setSelectedPeriod] = useState<DashboardFilterPeriod>('month');
+  const [appliedPeriod, setAppliedPeriod] = useState<DashboardFilterPeriod>('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [appliedCustomRange, setAppliedCustomRange] = useState<DashboardCustomRange | null>(null);

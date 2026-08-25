@@ -3,6 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Contact, ContactType } from '@/types/database';
+import { serialNumberForDisplay, splitSerialAndFlooring } from '@/lib/inventoryFields';
+
+export interface CustomerMajorUnit {
+  id: string;
+  make: string;
+  model: string;
+  serialNumber: string;
+}
 
 // One aggregated read model per customer — the card is the whole story:
 // who they are, what's in the pipeline, what they've bought, what's in service.
@@ -15,6 +23,7 @@ export interface CustomerCard extends Contact {
   serviceAmount: number; // sum of amount_to_collect across active jobs (invoice $ in play)
   serviceLevel: 1 | 2 | 3 | null; // max level across active UNPRICED jobs — how expensive, when $ unknown
   equipmentCount: number; // inventory units tied to this customer
+  majorUnits: CustomerMajorUnit[]; // purchased inventory units tied to this customer
   hasFollowUp: boolean; // any open task on them or their open deals
   lastActivity: string; // ISO — max(last_activity_at, updated_at)
 }
@@ -26,7 +35,7 @@ export function useCustomerCards() {
   const [contacts, setContacts] = useState<(Contact & { assigned?: { first_name: string; last_name: string } | null })[]>([]);
   const [dealAgg, setDealAgg] = useState<Map<string, { open: number; openValue: number; won: number }>>(new Map());
   const [jobAgg, setJobAgg] = useState<Map<string, { count: number; amount: number; level: 1 | 2 | 3 | null }>>(new Map());
-  const [equipAgg, setEquipAgg] = useState<Map<string, number>>(new Map());
+  const [equipAgg, setEquipAgg] = useState<Map<string, CustomerMajorUnit[]>>(new Map());
   const [followUps, setFollowUps] = useState<Set<string>>(new Set()); // contact ids with an open task
   const [isLoading, setIsLoading] = useState(true);
   const fetchSeq = useRef(0);
@@ -60,7 +69,7 @@ export function useCustomerCards() {
       supabase.from('pipeline_stages').select('id, name, is_won, is_lost').eq('org_id', profile.org_id),
       supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id),
       supabase.from('jobs').select('contact_id, status, amount_to_collect, service_level').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),
-      supabase.from('inventory_items').select('customer_id').eq('org_id', profile.org_id).not('customer_id', 'is', null),
+      supabase.from('inventory_items').select('id, customer_id, brand, model, product, sku').eq('org_id', profile.org_id).not('customer_id', 'is', null),
       supabase.from('tasks').select('contact_id, deal_id').eq('org_id', profile.org_id).in('status', ['Pending', 'In Progress']),
     ]);
 
@@ -105,10 +114,18 @@ export function useCustomerCards() {
     }
     setJobAgg(jobs);
 
-    const equip = new Map<string, number>();
+    const equip = new Map<string, CustomerMajorUnit[]>();
     for (const i of equipRes.data ?? []) {
       const cid = i.customer_id as string;
-      equip.set(cid, (equip.get(cid) ?? 0) + 1);
+      const serial = serialNumberForDisplay(splitSerialAndFlooring(i.sku as string | null).serial);
+      const units = equip.get(cid) ?? [];
+      units.push({
+        id: i.id as string,
+        make: (i.brand as string | null)?.trim() || 'Make not provided',
+        model: (i.model as string | null)?.trim() || (i.product as string | null)?.trim() || 'Model not provided',
+        serialNumber: serial || 'Serial not provided',
+      });
+      equip.set(cid, units);
     }
     setEquipAgg(equip);
 
@@ -152,7 +169,8 @@ export function useCustomerCards() {
       openJobCount: jobAgg.get(c.id)?.count ?? 0,
       serviceAmount: jobAgg.get(c.id)?.amount ?? 0,
       serviceLevel: jobAgg.get(c.id)?.level ?? null,
-      equipmentCount: equipAgg.get(c.id) ?? 0,
+      equipmentCount: equipAgg.get(c.id)?.length ?? 0,
+      majorUnits: equipAgg.get(c.id) ?? [],
       hasFollowUp: followUps.has(c.id),
       lastActivity: last,
     };

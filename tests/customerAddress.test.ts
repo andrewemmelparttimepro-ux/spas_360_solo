@@ -33,7 +33,7 @@ describe('Customers table address', () => {
     assert.match(table, />Customer<[\s\S]*>Address<[\s\S]*>Phone</);
     assert.doesNotMatch(table, />Status</);
     assert.match(row, /formatCustomerAddress\(c\.mailing_address\)/);
-    assert.match(table, /min-w-\[1040px\]/);
+    assert.match(table, /min-w-\[1320px\]/);
     assert.match(cardView, /<Phone[\s\S]*\{c\.phone\}/);
     assert.match(cardView, /formatDistanceToNow\(new Date\(c\.lastActivity\)/);
   });

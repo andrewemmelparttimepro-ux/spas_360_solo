@@ -195,14 +195,15 @@ export default function Customers() {
           key={`list:${normalizedSearch}`}
           className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}
         >
-          <table className="w-full text-left border-collapse min-w-[1040px]">
+          <table className="w-full text-left border-collapse min-w-[1320px]">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Customer</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Address</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">In Play</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">Lifetime</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">Lifetime Spend</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Major Units Purchased</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Owner</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -282,6 +283,20 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
         )}
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-emerald-300">${c.wonValue.toLocaleString()}</td>
+      <td className="px-4 py-3 min-w-[260px] max-w-[360px]">
+        {c.majorUnits.length > 0 ? (
+          <ul className="space-y-1.5">
+            {c.majorUnits.map(unit => (
+              <li key={unit.id} className="text-xs leading-snug">
+                <span className="block font-medium text-ink-200">{unit.make} · {unit.model}</span>
+                <span className="block text-ink-500">Serial: {unit.serialNumber}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="text-sm text-ink-600" aria-label="No major units purchased">—</span>
+        )}
+      </td>
       <td className="px-4 py-3 text-sm text-ink-400 truncate max-w-[140px]">{assignedName ?? 'Unassigned'}</td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">

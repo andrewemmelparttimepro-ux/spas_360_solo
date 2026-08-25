@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Users, Wrench, AlertCircle, Plus, BarChart3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useDashboardStats, PERIOD_LABELS, type DashboardPeriod } from '@/hooks/useDashboard';
+import { useDashboardStats } from '@/hooks/useDashboard';
+import {
+  DASHBOARD_PERIOD_LABELS,
+  dashboardRangeFor,
+  type DashboardCustomRange,
+  type DashboardFilterPeriod,
+} from '@/lib/dashboardPeriods';
 import QuickCreate from '@/components/QuickCreate';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,10 +28,38 @@ const actionLinks: Record<ActionType, string> = { task: '/service', part: '/inve
 
 export default function Dashboard() {
   const { profile } = useAuth();
-  const [period, setPeriod] = useState<DashboardPeriod>('week');
+  const [selectedPeriod, setSelectedPeriod] = useState<DashboardFilterPeriod>('week');
+  const [appliedPeriod, setAppliedPeriod] = useState<DashboardFilterPeriod>('week');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [appliedCustomRange, setAppliedCustomRange] = useState<DashboardCustomRange | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const { stats, actions, revenueData, isLoading, loadError, refresh } = useDashboardStats(period);
+  const { stats, actions, revenueData, isLoading, loadError, refresh } = useDashboardStats(
+    appliedPeriod,
+    appliedPeriod === 'custom' ? appliedCustomRange : null,
+  );
+
+  const customCandidate = { startDate: customStart, endDate: customEnd };
+  const validCustomRange = dashboardRangeFor('custom', customCandidate);
+  const customDatesComplete = Boolean(customStart && customEnd);
+  const customDateError = customDatesComplete && !validCustomRange
+    ? (customStart > customEnd ? 'End date must be on or after start date.' : 'Enter a valid start and end date.')
+    : null;
+  const appliedPeriodLabel = appliedPeriod === 'custom' && appliedCustomRange
+    ? `${DASHBOARD_PERIOD_LABELS.custom}: ${appliedCustomRange.startDate} to ${appliedCustomRange.endDate}`
+    : DASHBOARD_PERIOD_LABELS[appliedPeriod];
+
+  const handlePeriodChange = (nextPeriod: DashboardFilterPeriod) => {
+    setSelectedPeriod(nextPeriod);
+    if (nextPeriod !== 'custom') setAppliedPeriod(nextPeriod);
+  };
+
+  const applyCustomDates = () => {
+    if (!validCustomRange) return;
+    setAppliedCustomRange(customCandidate);
+    setAppliedPeriod('custom');
+  };
 
   const loadLogo = useCallback(async () => {
     if (!profile) return;
@@ -68,28 +102,74 @@ export default function Dashboard() {
           <button onClick={refresh} className="shrink-0 rounded-lg border border-red-500/40 px-3 py-1 text-xs font-semibold hover:bg-red-500/15 transition-colors">Retry</button>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">Overview</p>
-          <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">Overview</p>
+            <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Manager Dashboard</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              aria-label="Dashboard date range"
+              value={selectedPeriod}
+              onChange={(e) => handlePeriodChange(e.target.value as DashboardFilterPeriod)}
+              className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {(Object.keys(DASHBOARD_PERIOD_LABELS) as DashboardFilterPeriod[]).map((p) => (
+                <option key={p} value={p}>{DASHBOARD_PERIOD_LABELS[p]}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />New
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
-            className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
+
+        {selectedPeriod === 'custom' && (
+          <form
+            className="flex flex-col gap-2 rounded-xl border border-ink-700 bg-ink-900 p-3 sm:flex-row sm:items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyCustomDates();
+            }}
           >
-            {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
-              <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" />New
-          </button>
-        </div>
+            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
+              Start date
+              <input
+                aria-label="Custom range start date"
+                type="date"
+                value={customStart}
+                max={customEnd || undefined}
+                onChange={(event) => setCustomStart(event.target.value)}
+                className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-400">
+              End date
+              <input
+                aria-label="Custom range end date"
+                type="date"
+                value={customEnd}
+                min={customStart || undefined}
+                onChange={(event) => setCustomEnd(event.target.value)}
+                className="rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm font-normal text-ink-100 outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={!validCustomRange}
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Apply dates
+            </button>
+            <p className={`text-xs sm:max-w-52 ${customDateError ? 'text-red-400' : 'text-ink-500'}`} aria-live="polite">
+              {customDateError ?? (customDatesComplete ? 'Dates are inclusive.' : 'Choose both dates to apply an inclusive range.')}
+            </p>
+          </form>
+        )}
       </div>
 
       {showCreate && <QuickCreate onClose={() => setShowCreate(false)} />}
@@ -130,7 +210,7 @@ export default function Dashboard() {
         <div className="dashboard-panel lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
           <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between px-6 py-4 border-b border-ink-700 bg-ink-850/70">
             <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
-            <span className="text-xs font-medium text-ink-500 whitespace-nowrap">{PERIOD_LABELS[period]} · Closed-Won</span>
+            <span className="text-xs font-medium text-ink-500 whitespace-nowrap">{appliedPeriodLabel} · Closed-Won</span>
           </div>
           <div className="h-72 p-5">
             {revenueData.every((d) => d.revenue === 0) ? (
@@ -138,7 +218,7 @@ export default function Dashboard() {
                 <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-3">
                   <BarChart3 className="w-5 h-5" />
                 </div>
-                <p className="text-sm font-medium text-ink-400">No closed revenue {PERIOD_LABELS[period].toLowerCase()}</p>
+                <p className="text-sm font-medium text-ink-400">No closed revenue {DASHBOARD_PERIOD_LABELS[appliedPeriod].toLowerCase()}</p>
                 <p className="text-xs text-ink-500 mt-1">Won deals will chart here as they close</p>
               </div>
             ) : (

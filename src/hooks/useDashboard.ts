@@ -1,18 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths,
-  eachDayOfInterval, eachWeekOfInterval, format, isWithinInterval,
-} from 'date-fns';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  bucketDashboardRevenue,
+  dashboardRangeFor,
+  type DashboardCustomRange,
+  type DashboardDailyRevenue,
+  type DashboardFilterPeriod,
+  type DashboardRevenuePoint,
+} from '@/lib/dashboardPeriods';
 
-export type DashboardPeriod = 'week' | 'month' | 'lastMonth';
-
-export const PERIOD_LABELS: Record<DashboardPeriod, string> = {
-  week: 'This Week',
-  month: 'This Month',
-  lastMonth: 'Last Month',
-};
+export { PERIOD_LABELS, type DashboardPeriod } from '@/lib/dashboardPeriods';
 
 interface DashboardStats {
   totalRevenue: number;
@@ -30,69 +29,30 @@ interface ActionItem {
   link?: string;
 }
 
-interface RevenuePoint {
-  name: string;
-  revenue: number;
-}
-
-function rangeFor(period: DashboardPeriod): { start: Date; end: Date } {
-  const now = new Date();
-  switch (period) {
-    case 'week':
-      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
-    case 'month':
-      return { start: startOfMonth(now), end: endOfMonth(now) };
-    case 'lastMonth': {
-      const lm = subMonths(now, 1);
-      return { start: startOfMonth(lm), end: endOfMonth(lm) };
-    }
-  }
-}
-
-// The DB aggregates revenue per dealership-local day ({d: 'YYYY-MM-DD', v: dollars});
-// this only maps those days into the chart's display buckets.
-type DailyRevenue = { d: string; v: number };
-
-/**
- * Week → one bucket per weekday; month/lastMonth → one bucket per calendar week.
- * Revenue realizes on deals.closed_at, aggregated server-side (no row caps).
- */
-function bucketRevenue(daily: DailyRevenue[], period: DashboardPeriod, range: { start: Date; end: Date }): RevenuePoint[] {
-  const byDay = new Map(daily.map((r) => [r.d, Number(r.v) || 0]));
-  if (period === 'week') {
-    const days = eachDayOfInterval({ start: range.start, end: range.end });
-    return days.map((day) => ({
-      name: format(day, 'EEE'),
-      revenue: byDay.get(format(day, 'yyyy-MM-dd')) ?? 0,
-    }));
-  }
-
-  const weeks = eachWeekOfInterval({ start: range.start, end: range.end }, { weekStartsOn: 1 });
-  return weeks.map((weekStart, i) => {
-    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-    const revenue = daily.reduce((sum, r) => {
-      const day = new Date(`${r.d}T00:00:00`); // local midnight — matches the DB's local-day grouping
-      return isWithinInterval(day, { start: weekStart, end: weekEnd }) ? sum + (Number(r.v) || 0) : sum;
-    }, 0);
-    return { name: `Wk ${i + 1}`, revenue };
-  });
-}
-
-export function useDashboardStats(period: DashboardPeriod = 'week') {
+export function useDashboardStats(
+  period: DashboardFilterPeriod = 'week',
+  customRange?: DashboardCustomRange | null,
+) {
   const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0, activeDeals: 0, unscheduledJobs: 0, overduePartsCount: 0,
   });
   const [actions, setActions] = useState<ActionItem[]>([]);
-  const [revenueData, setRevenueData] = useState<RevenuePoint[]>([]);
+  const [revenueData, setRevenueData] = useState<DashboardRevenuePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const fetchSequence = useRef(0);
 
   const fetchStats = useCallback(async () => {
     if (!profile) return;
+    const sequence = ++fetchSequence.current;
     setIsLoading(true);
 
-    const range = rangeFor(period);
+    const range = dashboardRangeFor(period, customRange);
+    if (!range) {
+      setIsLoading(false);
+      return;
+    }
 
     // Money and counts aggregate in SQL (no 1,000-row cap can understate them);
     // the two list queries below only feed the Requires Attention feed.
@@ -104,6 +64,7 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
       supabase.from('parts').select('id, status, expected_arrival, order_date, part_number, description, job_id').in('status', ['Ordered', 'Backordered']).limit(200),
       supabase.from('tasks').select('id, title, status, due_at, deal_id').eq('assigned_to', profile.id).in('status', ['Pending', 'Overdue']).order('due_at').limit(10),
     ]);
+    if (sequence !== fetchSequence.current) return;
 
     // Zeros on the money tiles must mean "zero", never "the query failed"
     const firstError = summaryRes.error ?? partsRes.error ?? tasksRes.error;
@@ -112,7 +73,7 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
 
     const summary = (summaryRes.data ?? {}) as {
       total_revenue?: number;
-      revenue_daily?: DailyRevenue[];
+      revenue_daily?: DashboardDailyRevenue[];
       active_deals?: number;
       unscheduled_jobs?: number;
       overdue_parts?: number;
@@ -166,11 +127,11 @@ export function useDashboardStats(period: DashboardPeriod = 'week') {
 
     // Real revenue chart from closed-won deals (server-aggregated per local day)
     if (!summaryRes.error) {
-      setRevenueData(bucketRevenue(summary.revenue_daily ?? [], period, range));
+      setRevenueData(bucketDashboardRevenue(summary.revenue_daily ?? [], period, range));
     }
 
     setIsLoading(false);
-  }, [profile, period]);
+  }, [profile, period, customRange?.startDate, customRange?.endDate]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 

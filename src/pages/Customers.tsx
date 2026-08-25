@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { formatCustomerAddress } from '@/lib/customerAddress';
 import { filterCustomersByNamePrefix, normalizeCustomerNameQuery } from '@/lib/customerSearch';
 import { useCustomerCards, type CustomerCard, type CustomerSort } from '@/hooks/useCustomerCards';
 import { useCustomerDrag } from '@/contexts/CustomerDragContext';
@@ -194,15 +195,15 @@ export default function Customers() {
           key={`list:${normalizedSearch}`}
           className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}
         >
-          <table className="w-full text-left border-collapse min-w-[860px]">
+          <table className="w-full text-left border-collapse min-w-[1040px]">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Address</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">In Play</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">Lifetime</th>
                 <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Owner</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -233,7 +234,7 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
   const { armDrag } = useCustomerDrag();
   const navigate = useNavigate();
   const assignedName = c.assigned ? `${c.assigned.first_name} ${c.assigned.last_name}` : null;
-  const { idleDays, needsFollowUp, goingCold } = healthOf(c);
+  const address = formatCustomerAddress(c.mailing_address);
 
   return (
     <tr
@@ -260,6 +261,11 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
           </span>
         </div>
       </td>
+      <td className="px-4 py-3 text-sm text-ink-400 min-w-[220px] max-w-[320px]">
+        <span className="block whitespace-normal break-words leading-snug" title={address === 'Not provided' ? undefined : address}>
+          {address}
+        </span>
+      </td>
       <td className="px-4 py-3">
         <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300">{c.phone}</a>
       </td>
@@ -277,15 +283,6 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
       </td>
       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-emerald-300">${c.wonValue.toLocaleString()}</td>
       <td className="px-4 py-3 text-sm text-ink-400 truncate max-w-[140px]">{assignedName ?? 'Unassigned'}</td>
-      <td className="px-4 py-3 text-[11px] whitespace-nowrap">
-        {needsFollowUp ? (
-          <span className="flex items-center gap-1 text-red-400 font-semibold"><AlertTriangle className="w-3 h-3" />No follow-up</span>
-        ) : goingCold ? (
-          <span className="flex items-center gap-1 text-amber-400 font-semibold"><Snowflake className="w-3 h-3" />{idleDays}d quiet</span>
-        ) : (
-          <span className="text-ink-500">{formatDistanceToNow(new Date(c.lastActivity), { addSuffix: true })}</span>
-        )}
-      </td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-1.5">
           {c.openJobCount > 0 && (

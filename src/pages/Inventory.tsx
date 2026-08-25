@@ -400,7 +400,7 @@ export default function Inventory() {
   }
 
   return (
-    <div className="h-full flex flex-col max-w-[1600px] mx-auto">
+    <div className="max-w-[1600px] mx-auto">
       {/* Compact chrome: this page IS the table — everything above it stays one line tall. */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
         <div>
@@ -427,7 +427,7 @@ export default function Inventory() {
         />
       )}
 
-      <div className="flex-1 bg-ink-900 rounded-xl border border-ink-700 shadow-sm flex flex-col overflow-hidden">
+      <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-ink-700 flex flex-wrap items-center gap-3 bg-ink-950">
           <StoreSwitcher />
           <div className="relative flex-1 min-w-[220px] max-w-96">
@@ -447,7 +447,8 @@ export default function Inventory() {
             </select>
           </label>
         </div>
-        <div className="flex-1 overflow-auto">
+        {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">

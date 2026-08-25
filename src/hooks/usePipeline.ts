@@ -196,7 +196,7 @@ export function useDeal(id: string | undefined) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('deals')
-      .select('*, contacts:contact_id(first_name, last_name, phone)')
+      .select('*, contact:contact_id(first_name, last_name, phone)')
       .eq('id', id)
       .single();
     if (error) console.error('Error fetching deal:', error);

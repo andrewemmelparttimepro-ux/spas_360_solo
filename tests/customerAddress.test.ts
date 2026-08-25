@@ -2,10 +2,18 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import { formatCustomerAddress } from '../src/lib/customerAddress.ts';
+import { formatPhone } from '../src/lib/utils.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 describe('Customers table address', () => {
+  it('uses one readable phone format without rewriting extensions or short values', () => {
+    assert.equal(formatPhone('7016410155'), '(701) 641-0155');
+    assert.equal(formatPhone('+1 (701) 641-0155'), '(701) 641-0155');
+    assert.equal(formatPhone('701-641-0155 x22'), '701-641-0155 x22');
+    assert.equal(formatPhone(null), '');
+  });
+
   it('shows an explicit absence only when no stored address content exists', () => {
     assert.equal(formatCustomerAddress(null), 'Not provided');
     assert.equal(formatCustomerAddress(undefined), 'Not provided');

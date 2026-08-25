@@ -87,11 +87,10 @@ export function filterDealsByFollowUp<T extends { id: string }>(
   return deals.filter((deal) => matchesFollowUpFilter(followUpsByDeal.get(deal.id), filter, now));
 }
 
-// Imported/auto-created tasks carry a placeholder timestamp that lands between
-// midnight and 6 AM local — nobody schedules a 4:00 AM follow-up, so a small-hours
-// time is noise and the date alone is the honest display.
+// The legacy import encoded date-only follow-ups as exactly 4:00 AM local.
+// Hide only that known placeholder. A real early-morning appointment must stay visible.
 function hasMeaningfulTime(dueAt: Date) {
-  return dueAt.getHours() >= 6;
+  return dueAt.getHours() !== 4 || dueAt.getMinutes() !== 0;
 }
 
 export function formatFollowUpDue(followUp: DealFollowUp | null | undefined, now = new Date()) {

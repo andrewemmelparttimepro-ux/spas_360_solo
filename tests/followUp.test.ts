@@ -126,6 +126,17 @@ test('formats due labels for every state', () => {
   assert.match(formatFollowUpDue({ ...base, dueAt: local(2026, 7, 28, 9).toISOString() }, now), /Jul 28/);
 });
 
+test('hides only the known 4:00 AM import placeholder', () => {
+  const now = local(2026, 7, 23, 3);
+  const base = summarizeDealFollowUps([task({ due_at: local(2026, 7, 23, 4).toISOString() })]).get('deal-1')!;
+
+  assert.equal(formatFollowUpDue(base, now), 'Today');
+  assert.match(
+    formatFollowUpDue({ ...base, dueAt: local(2026, 7, 23, 5).toISOString() }, now),
+    /^Today, /,
+  );
+});
+
 test('defaults a new follow-up to 9:00 AM on the next local day', () => {
   assert.equal(
     defaultFollowUpInputValue(new Date(2026, 6, 23, 16, 45)),

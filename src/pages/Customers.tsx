@@ -282,8 +282,10 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
           </span>
         )}
       </td>
-      {/* A book full of green $0s reads as noise — only real spend earns the color */}
-      <td className={cn('px-4 py-3 text-right font-mono text-sm font-bold', c.wonValue > 0 ? 'text-emerald-300' : 'text-ink-600')}>${c.wonValue.toLocaleString()}</td>
+      {/* A book full of green $0s reads as noise. Reserve color and dollars for real spend. */}
+      <td className={cn('px-4 py-3 text-right font-mono text-sm font-bold', c.wonValue > 0 ? 'text-emerald-300' : 'text-ink-500')}>
+        {c.wonValue > 0 ? `$${c.wonValue.toLocaleString()}` : <span aria-label="No lifetime spend">—</span>}
+      </td>
       <td className="px-4 py-3 min-w-[260px] max-w-[360px]">
         {c.majorUnits.length > 0 ? (
           <ul className="space-y-1.5">

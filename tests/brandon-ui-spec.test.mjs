@@ -107,6 +107,8 @@ describe('Brandon composite UI contract', () => {
     assert.match(deals, />Expected close</);
     assert.match(inventory, /const brandOptions = Array\.from\(new Set\(items\.map/);
     assert.match(inventory, /const groupedItems = groupInventoryItems\(visibleItems\)/);
+    assert.match(inventory, /className="overflow-x-auto"/);
+    assert.doesNotMatch(inventory, /className="flex-1 overflow-auto"/);
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);
     assert.match(inventory, /inventoryCustomerOrStock\(item\.notes, item\.customer_id, currentCustomerName\)/);
@@ -120,23 +122,33 @@ describe('Brandon composite UI contract', () => {
     assert.match(service, /Created \{format\(new Date\(job\.created_at\), 'MMM d, yyyy'\)\}/);
     assert.match(serviceJobs, /sort\(\(a, b\) => new Date\(b\.created_at\)\.getTime\(\) - new Date\(a\.created_at\)\.getTime\(\)\)/);
     assert.match(dealDetail, />Priority</);
+    assert.match(dealDetail, /aria-label="Deal stage"/);
+    assert.match(dealDetail, />\s*Won\s*</);
+    assert.match(dealDetail, />\s*Lost\s*</);
   });
 
   it('makes a newly created customer immediately visible in the active store', async () => {
-    const [customers, customerCards, wizard] = await Promise.all([
+    const [customers, customerCards, contacts, wizard, pipeline] = await Promise.all([
       read('src/pages/Customers.tsx'),
       read('src/hooks/useCustomerCards.ts'),
+      read('src/hooks/useContacts.ts'),
       read('src/components/NewCustomerWizard.tsx'),
+      read('src/hooks/usePipeline.ts'),
     ]);
 
     assert.match(customerCards, /const fetchSeq = useRef\(0\)/);
     assert.match(customerCards, /const seq = \+\+fetchSeq\.current/);
     assert.match(customerCards, /if \(seq !== fetchSeq\.current\) return;/);
+    assert.match(customerCards, /\.order\('updated_at', \{ ascending: false \}\)[\s\S]*\.order\('id', \{ ascending: true \}\)/);
+    assert.match(customerCards, /const seen = new Set<string>\(\)/);
+    assert.match(contacts, /\.order\('updated_at', \{ ascending: false \}\)[\s\S]*\.order\('id', \{ ascending: true \}\)/);
+    assert.match(contacts, /setContacts\(allContacts\.filter/);
     assert.match(customers, /onCreated=\{\(\) => refresh\(\)\}/);
     assert.match(wizard, /const creationLocationId = activeLocationId \?\? profile\.location_id \?\? null/);
     assert.match(wizard, /p_location_id: creationLocationId/);
     assert.match(wizard, /location_id: creationLocationId/);
     assert.match(wizard, /await onCreated\?\.\(deal\.id\);[\s\S]*onClose\(\);/);
+    assert.match(pipeline, /contact:contact_id\(first_name, last_name, phone\)/);
   });
 
   it('keeps the calendar as a high-contrast dark surface inside the light canvas', async () => {

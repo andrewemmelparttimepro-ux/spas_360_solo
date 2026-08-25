@@ -5,6 +5,7 @@ import {
   MEDIA_LIBRARY_POST_ID,
   formatMediaLibrarySize,
   isSafeMediaPreview,
+  mediaLibraryDisplayName,
   mediaLibraryKind,
 } from '../src/lib/mediaLibrary.ts';
 
@@ -21,6 +22,8 @@ describe('Media library file handling', () => {
     assert.equal(isSafeMediaPreview('drawing.svg', 'image/svg+xml'), false);
     assert.equal(formatMediaLibrarySize('29142840'), '28 MB');
     assert.equal(formatMediaLibrarySize('2.7 MB'), '2.7 MB');
+    assert.equal(mediaLibraryDisplayName('03BDDF11-EF6C-4628-BDD8-8AA7442EB34C.GIF', 'image'), 'Photo · 03BDDF11');
+    assert.equal(mediaLibraryDisplayName('Brandon delivery photo.jpg', 'image'), 'Brandon delivery photo');
   });
 
   it('scopes runtime reads to the exact human-created source post and report files', async () => {

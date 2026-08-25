@@ -123,6 +123,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(serviceJobs, /sort\(\(a, b\) => new Date\(b\.created_at\)\.getTime\(\) - new Date\(a\.created_at\)\.getTime\(\)\)/);
     assert.match(dealDetail, />Priority</);
     assert.match(dealDetail, /aria-label="Deal stage"/);
+    assert.match(dealDetail, /formatPhone\(contact\.phone\)/);
     assert.match(dealDetail, />\s*Won\s*</);
     assert.match(dealDetail, />\s*Lost\s*</);
   });

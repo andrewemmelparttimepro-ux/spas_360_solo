@@ -6,7 +6,7 @@ import { activePipelineStages, outcomeStage } from '@/lib/dealStage';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useState, useRef, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import type { Deal, DealPriority } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -208,7 +208,7 @@ export default function DealDetail() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
         <Link to="/deals" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
-        <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300 mt-1 inline-block">{contact.first_name} {contact.last_name} · {contact.phone}</Link>}</div>
+        <div className="flex-1"><h1 className="text-xl sm:text-2xl font-bold text-ink-100">{deal.title}</h1>{contact && <Link to={`/customers/${deal.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300 mt-1 inline-block">{contact.first_name} {contact.last_name} · {formatPhone(contact.phone)}</Link>}</div>
         <div className="flex flex-wrap items-end gap-4">
           {stages.length > 0 && (
             <div className="flex flex-col items-start gap-1">

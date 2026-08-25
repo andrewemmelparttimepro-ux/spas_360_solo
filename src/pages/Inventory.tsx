@@ -20,6 +20,10 @@ import {
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 
+const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
+const INVENTORY_GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
+const INVENTORY_ROW_CELL_CLASS = 'px-3 py-0.5 text-xs leading-4';
+
 // --------------- Inline editable cell ---------------
 function EditableCell({
   value,
@@ -148,7 +152,7 @@ function EditableCell({
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSaveError(null); setEditing(true); } }}
       onClick={() => { setSaveError(null); setEditing(true); }}
       className={cn(
-        "cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 group inline-flex items-center gap-1",
+        "min-h-6 cursor-pointer rounded px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 group inline-flex items-center gap-1",
         className
       )}
       title="Click to edit"
@@ -282,7 +286,7 @@ function CustomerStockCell({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="group inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 -mx-1.5 text-left transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30"
+        className="group inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 -mx-1.5 text-left transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30"
         title="Choose a customer or Stock"
         aria-label={`Edit Customer or Stock for ${item.model || item.product}`}
       >
@@ -454,17 +458,17 @@ export default function Inventory() {
         </div>
         {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-left border-collapse">
+          <table data-density="compact" className="w-full min-w-[1120px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Model</th>
-                {showStore && <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Store</th>}
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Color Combination</th>
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Serial Number</th>
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Inventory Flooring Status</th>
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Customer/Stock</th>
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">Delivery Date</th>
-                <th className="px-4 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap">On Hand Y/N</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Model</th>
+                {showStore && <th className={INVENTORY_HEADER_CELL_CLASS}>Store</th>}
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Color Combination</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Serial Number</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Customer/Stock</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
@@ -473,7 +477,7 @@ export default function Inventory() {
               ) : groupedItems.map(group => (
                 <Fragment key={group.key}>
                   <tr className={cn('border-y border-ink-700', group.headerClassName)}>
-                    <th colSpan={columnCount} scope="rowgroup" className="px-4 py-2 text-left">
+                    <th colSpan={columnCount} scope="rowgroup" className={INVENTORY_GROUP_HEADER_CELL_CLASS}>
                       <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em]">
                         <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', group.dotClassName)} />
                         {group.label}
@@ -483,13 +487,13 @@ export default function Inventory() {
                   </tr>
                   {group.items.map(item => (
                     <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className={cn('transition-colors', group.tintClassName)}>
-                  <td className="px-4 py-2.5 text-sm text-ink-300 whitespace-nowrap">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 whitespace-nowrap')}>
                     <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
                       {item.model || item.product}
                     </Link>
                   </td>
                   {showStore && (
-                    <td className="px-4 py-2.5 text-sm text-ink-300">
+                    <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                       <span
                         className="inline-flex items-center whitespace-nowrap rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium"
                         title={((item as unknown as { locations?: { name?: string } }).locations?.name) ?? undefined}
@@ -498,22 +502,22 @@ export default function Inventory() {
                       </span>
                     </td>
                   )}
-                  <td className="px-4 py-2.5 text-sm text-ink-400">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-400')}>
                     <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-ink-300">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <InventoryTextCell item={item} part="serial" onSave={updateItem} />
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-ink-300">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-ink-300">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <CustomerStockCell item={item} onSave={updateItem} />
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-ink-300">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
                   </td>
-                  <td className="px-4 py-2.5 text-sm font-semibold text-ink-200">
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'font-semibold text-ink-200')}>
                     <OnHandCell item={item} onSave={updateItem} />
                   </td>
                     </tr>

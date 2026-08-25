@@ -50,6 +50,8 @@ export interface Deal {
   expected_close_date: string | null; assigned_to: string;
   product_interest: string[] | null; lead_source: LeadSource;
   lost_reason: string | null; location_id: string | null;
+  sale_fulfillment_type: 'inventory' | 'special_order' | null;
+  inventory_item_id: string | null;
   position: number; closed_at: string | null; created_at: string; updated_at: string;
 }
 

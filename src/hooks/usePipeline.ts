@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import type { DropResult } from '@hello-pangea/dnd';
 import type { Deal, PipelineStage, Profile } from '@/types/database';
+import type { DealInventoryOption } from '@/lib/dealInventory';
 import {
   summarizeDealFollowUps,
   type DealFollowUp,
@@ -188,7 +189,10 @@ export function usePipeline() {
 }
 
 export function useDeal(id: string | undefined) {
-  const [deal, setDeal] = useState<(Deal & { contact?: { first_name: string; last_name: string; phone: string } }) | null>(null);
+  const [deal, setDeal] = useState<(Deal & {
+    contact?: { first_name: string; last_name: string; phone: string };
+    inventory_item?: DealInventoryOption | null;
+  }) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDeal = useCallback(async () => {
@@ -196,7 +200,7 @@ export function useDeal(id: string | undefined) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('deals')
-      .select('*, contact:contact_id(first_name, last_name, phone)')
+      .select('*, contact:contact_id(first_name, last_name, phone), inventory_item:inventory_item_id(id,sku,product,brand,model,color_finish,location_id,locations:location_id(name))')
       .eq('id', id)
       .single();
     if (error) console.error('Error fetching deal:', error);

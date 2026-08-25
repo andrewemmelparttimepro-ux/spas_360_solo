@@ -1,4 +1,4 @@
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { Plus, MoreHorizontal, CalendarClock, AlertTriangle, User, Snowflake, Link2, X, Search, UsersRound, List, Columns3 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
@@ -139,6 +139,15 @@ export default function Deals() {
   const overdueFollowUps = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id), followUpNow) === 'overdue').length;
   const dueToday = activeDeals.filter(deal => getFollowUpState(followUpsByDeal.get(deal.id), followUpNow) === 'today').length;
   const filteredActiveDeals = filterDealsByFollowUp(activeDeals, followUpsByDeal, followUpFilter, followUpNow);
+
+  const handleDealDrop = async (result: DropResult) => {
+    const destinationStage = stages.find(stage => stage.id === result.destination?.droppableId);
+    if (destinationStage?.is_won) {
+      navigate(`/deals/${result.draggableId}`);
+      return;
+    }
+    await moveDeal(result);
+  };
 
   const changeDealStage = async (deal: PipelineDeal, stageId: string) => {
     if (movingDealId || deal.stage_id === stageId) return;
@@ -367,8 +376,8 @@ export default function Deals() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => wonStage && changeDealStage(deal, wonStage.id)}
-                          disabled={!wonStage || movingDealId !== null}
+                          onClick={() => wonStage && navigate(`/deals/${deal.id}`)}
+                          disabled={!wonStage}
                           aria-label={`Mark ${deal.title} won`}
                           className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                         >
@@ -407,7 +416,7 @@ export default function Deals() {
       <SalesBoard deals={visibleDeals} stages={stages} followUpsByDeal={followUpsByDeal} />
 
       <div className="overflow-x-auto pb-4" data-cdrop-scroll>
-        <DragDropContext onDragEnd={moveDeal}>
+        <DragDropContext onDragEnd={handleDealDrop}>
           <div className="flex space-x-4 items-start">
             {stages.map(stage => {
               const stageDeals = visibleDeals.filter(deal => deal.stage_id === stage.id);

@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { supabase } from '@/lib/supabase';
 import { activePipelineStages, outcomeStage } from '@/lib/dealStage';
@@ -23,6 +23,12 @@ import {
   getFollowUpState,
   summarizeDealFollowUps,
 } from '@/lib/followUp';
+import {
+  closeDealSaleArgs,
+  inventoryUnitLabel,
+  type DealFulfillmentType,
+  type DealInventoryOption,
+} from '@/lib/dealInventory';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
 
@@ -68,6 +74,13 @@ export default function DealDetail() {
   const taskSectionRef = useRef<HTMLDivElement>(null);
   // Stage lives here too — closing a deal shouldn't require going back to the list
   const [stages, setStages] = useState<{ id: string; name: string; is_won: boolean; is_lost: boolean }[]>([]);
+  const [closeSaleStageId, setCloseSaleStageId] = useState<string | null>(null);
+  const [fulfillmentType, setFulfillmentType] = useState<DealFulfillmentType | null>(null);
+  const [selectedInventoryId, setSelectedInventoryId] = useState('');
+  const [availableInventory, setAvailableInventory] = useState<DealInventoryOption[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [closeSaleBusy, setCloseSaleBusy] = useState(false);
+  const [closeSaleError, setCloseSaleError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -83,8 +96,8 @@ export default function DealDetail() {
 
   const saveDeal = async (updates: Partial<Deal>) => { await updateDeal(updates); toast('Deal updated'); };
 
-  // Stage changes go through the same atomic RPC as the board — it renumbers
-  // positions and the DB trigger runs the won-deal handoff either way.
+  // Ordinary stage changes use the board RPC. Closed-Won is handled separately
+  // because the purchased-unit choice must commit in the same transaction.
   const changeStage = async (stageId: string) => {
     if (!id || !stageId || stageId === deal?.stage_id) return;
     const { error } = await supabase.rpc('move_deal', { p_deal_id: id, p_stage_id: stageId, p_position: 0 });
@@ -103,6 +116,88 @@ export default function DealDetail() {
   const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
   const nextFollowUpState = getFollowUpState(nextFollowUp);
   const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
+
+  const closeCloseSale = () => {
+    if (closeSaleBusy) return;
+    setCloseSaleStageId(null);
+    setFulfillmentType(null);
+    setSelectedInventoryId('');
+    setCloseSaleError(null);
+  };
+
+  const openCloseSale = async (stageId: string) => {
+    if (!profile) return;
+    setCloseSaleStageId(stageId);
+    setFulfillmentType(null);
+    setSelectedInventoryId('');
+    setAvailableInventory([]);
+    setCloseSaleError(null);
+    setInventoryLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select('id,sku,product,brand,model,color_finish,location_id,locations:location_id(name)')
+        .eq('org_id', profile.org_id)
+        .eq('status', 'In Stock')
+        .is('customer_id', null)
+        .is('deal_id', null)
+        .order('brand', { ascending: true, nullsFirst: false })
+        .order('model', { ascending: true, nullsFirst: false })
+        .order('sku', { ascending: true });
+
+      if (error) {
+        setCloseSaleError(`Current inventory couldn't load: ${error.message}`);
+      } else {
+        setAvailableInventory((data ?? []) as unknown as DealInventoryOption[]);
+      }
+    } catch (error) {
+      setCloseSaleError(`Current inventory couldn't load: ${(error as Error).message || 'Network error'}`);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const completeWonSale = async () => {
+    if (!closeSaleStageId) return;
+    setCloseSaleError(null);
+
+    let args: ReturnType<typeof closeDealSaleArgs>;
+    try {
+      args = closeDealSaleArgs({
+        dealId: deal.id,
+        stageId: closeSaleStageId,
+        fulfillmentType,
+        inventoryItemId: selectedInventoryId,
+      });
+    } catch (error) {
+      setCloseSaleError((error as Error).message);
+      return;
+    }
+
+    setCloseSaleBusy(true);
+    try {
+      const { error } = await supabase.rpc('close_deal_sale', args);
+      if (error) throw error;
+    } catch (error) {
+      const message = `Couldn't close this sale: ${(error as Error).message || 'Network error'}`;
+      setCloseSaleError(message);
+      toast(message, 'error');
+      return;
+    } finally {
+      setCloseSaleBusy(false);
+    }
+
+    setCloseSaleStageId(null);
+    setFulfillmentType(null);
+    setSelectedInventoryId('');
+    toast(
+      fulfillmentType === 'inventory'
+        ? 'Deal won 🎉 Purchased unit linked to this customer'
+        : 'Deal won 🎉 Special order recorded',
+      'success',
+    );
+  };
 
   const openTaskComposer = () => {
     setShowTaskForm(true);
@@ -230,7 +325,7 @@ export default function DealDetail() {
                   <>
                     <button
                       type="button"
-                      onClick={() => { const won = outcomeStage(stages, 'won'); if (won) changeStage(won.id); }}
+                      onClick={() => { const won = outcomeStage(stages, 'won'); if (won) void openCloseSale(won.id); }}
                       className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
                     >
                       Won
@@ -283,6 +378,18 @@ export default function DealDetail() {
               <p className="mt-1 truncate text-xs text-ink-400">{nextFollowUp?.title ?? 'This lead needs a dated next step.'}</p>
             </div>
             <div className="flex items-center text-sm text-ink-300"><User className="w-4 h-4 mr-2 text-ink-500" />Source: {deal.lead_source}</div>
+            {deal.sale_fulfillment_type && (
+              <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400"><PackageCheck className="h-4 w-4" /> Purchased unit</p>
+                <p className="mt-1 text-sm font-medium text-ink-100">
+                  {deal.sale_fulfillment_type === 'special_order'
+                    ? 'Special order'
+                    : deal.inventory_item
+                      ? inventoryUnitLabel(deal.inventory_item)
+                      : 'Current inventory'}
+                </p>
+              </div>
+            )}
             {deal.product_interest && deal.product_interest.length > 0 && <div><p className="text-xs text-ink-500 mb-1">Products of Interest</p><div className="flex flex-wrap gap-1">{deal.product_interest.map(p => <span key={p} className="px-2 py-0.5 bg-ink-950 text-ink-300 rounded text-xs">{p}</span>)}</div></div>}
           </div>
         </div>
@@ -421,6 +528,79 @@ export default function DealDetail() {
           </div>
         </div>
       </div>
+      {closeSaleStageId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4" role="presentation">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="close-sale-title"
+            className="w-full max-w-xl rounded-2xl border border-ink-700 bg-ink-900 p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="close-sale-title" className="text-xl font-bold text-ink-100">Complete Closed-Won</h2>
+                <p className="mt-1 text-sm text-ink-400">Which unit did {contact ? `${contact.first_name} ${contact.last_name}` : 'this customer'} purchase?</p>
+              </div>
+              <button type="button" onClick={closeCloseSale} disabled={closeSaleBusy} aria-label="Cancel closing sale" className="rounded-lg p-2 text-ink-400 hover:bg-ink-800 disabled:opacity-50"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <label className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'inventory' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
+                <span className="flex items-center gap-3 text-sm font-semibold text-ink-100">
+                  <input
+                    type="radio"
+                    name="sale-fulfillment"
+                    checked={fulfillmentType === 'inventory'}
+                    onChange={() => { setFulfillmentType('inventory'); setCloseSaleError(null); }}
+                    disabled={inventoryLoading || availableInventory.length === 0 || closeSaleBusy}
+                  />
+                  Current inventory
+                </span>
+                {inventoryLoading ? (
+                  <span className="mt-3 flex items-center gap-2 text-sm text-ink-500"><Loader2 className="h-4 w-4 animate-spin" />Loading available units…</span>
+                ) : availableInventory.length === 0 ? (
+                  <span className="mt-3 block text-sm text-ink-500">No unassigned In Stock units are available.</span>
+                ) : (
+                  <select
+                    value={selectedInventoryId}
+                    onChange={event => { setSelectedInventoryId(event.target.value); setFulfillmentType('inventory'); setCloseSaleError(null); }}
+                    disabled={closeSaleBusy}
+                    aria-label="Purchased inventory unit"
+                    className="mt-3 w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500"
+                  >
+                    <option value="">Choose the exact unit and serial…</option>
+                    {availableInventory.map(item => <option key={item.id} value={item.id}>{inventoryUnitLabel(item)}</option>)}
+                  </select>
+                )}
+              </label>
+
+              <label className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'special_order' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
+                <span className="flex items-center gap-3 text-sm font-semibold text-ink-100">
+                  <input
+                    type="radio"
+                    name="sale-fulfillment"
+                    checked={fulfillmentType === 'special_order'}
+                    onChange={() => { setFulfillmentType('special_order'); setCloseSaleError(null); }}
+                    disabled={closeSaleBusy}
+                  />
+                  Special order
+                </span>
+                <span className="mt-2 block pl-6 text-xs text-ink-500">Records the sale without assigning or consuming a current stock unit.</span>
+              </label>
+            </div>
+
+            {closeSaleError && <p role="alert" className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300">{closeSaleError}</p>}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={closeCloseSale} disabled={closeSaleBusy} className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-400 hover:bg-ink-800 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={() => void completeWonSale()} disabled={closeSaleBusy || !fulfillmentType} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                {closeSaleBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Mark Closed-Won
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -104,6 +104,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(deals, /mb-5 shrink-0 overflow-hidden/);
     assert.match(deals, /className="max-h-\[68vh\] overflow-auto"/);
     assert.match(deals, /aria-label="Active deals table"/);
+    assert.match(deals, /className="group\/deal-link px-5 py-3"[\s\S]*group-hover\/deal-link:text-brand-400 focus-visible:text-brand-400/);
     assert.match(deals, />Expected close</);
     assert.match(inventory, /const brandOptions = Array\.from\(new Set\(items\.map/);
     assert.match(inventory, /const groupedItems = groupInventoryItems\(visibleItems\)/);

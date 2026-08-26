@@ -335,8 +335,13 @@ export default function Deals() {
                 const followUpState = getFollowUpState(followUp);
                 return (
                   <tr key={deal.id} className="bg-ink-900/70 hover:bg-brand-500/5">
-                    <td className="px-5 py-3">
-                      <Link to={`/deals/${deal.id}`} className="font-medium text-ink-100 hover:text-brand-400">{deal.title}</Link>
+                    <td className="group/deal-link px-5 py-3">
+                      <Link
+                        to={`/deals/${deal.id}`}
+                        className="font-medium text-ink-100 transition-colors group-hover/deal-link:text-brand-400 focus-visible:text-brand-400"
+                      >
+                        {deal.title}
+                      </Link>
                     </td>
                     <td className="px-5 py-3 text-ink-300">{contactName}</td>
                     <td className="min-w-[180px] px-5 py-3">

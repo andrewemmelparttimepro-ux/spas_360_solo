@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
-import type { Contact, DealPriority, LeadSource, PipelineStage } from '@/types/database';
+import type { Contact, DealLeadSource, DealPriority, PipelineStage } from '@/types/database';
 import { useModal } from '@/hooks/useModal';
 
 // Quick deal creation for a KNOWN customer — the fast lane next to the full
@@ -22,16 +22,16 @@ const FOLLOW_UPS = [
   { label: 'Next week', days: 7 },
 ] as const;
 const LEAD_SOURCE_OPTIONS = [
-  { label: 'Facebook', storedValue: 'Ad' },
-  { label: 'Google', storedValue: 'Ad' },
-  { label: 'Radio', storedValue: 'Ad' },
-  { label: 'Tv', storedValue: 'Ad' },
+  { label: 'Facebook', storedValue: 'Facebook' },
+  { label: 'Google', storedValue: 'Google' },
+  { label: 'Radio', storedValue: 'Radio' },
+  { label: 'Tv', storedValue: 'Tv' },
   { label: 'Website', storedValue: 'Website' },
   { label: 'Referral', storedValue: 'Referral' },
-  { label: 'Called In', storedValue: 'Phone' },
-  { label: 'Walk-In', storedValue: 'Walk-in' },
-  { label: 'Off-Site Show/Event', storedValue: 'Event' },
-] as const satisfies readonly { label: string; storedValue: LeadSource }[];
+  { label: 'Called In', storedValue: 'Called In' },
+  { label: 'Walk-In', storedValue: 'Walk-In' },
+  { label: 'Off-Site Show/Event', storedValue: 'Off-Site Show/Event' },
+] as const satisfies readonly { label: string; storedValue: DealLeadSource }[];
 type DealLeadSourceChoice = (typeof LEAD_SOURCE_OPTIONS)[number]['label'];
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {

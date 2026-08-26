@@ -5,6 +5,7 @@ export type UserRole = 'owner_manager' | 'service_manager' | 'salesperson' | 'te
 export type DealPriority = 'High' | 'Medium' | 'Low';
 export type ContactType = 'Lead' | 'Prospect' | 'Customer' | 'Past Customer';
 export type LeadSource = 'Walk-in' | 'Website' | 'Referral' | 'Ad' | 'Phone' | 'Event' | 'Other';
+export type DealLeadSource = LeadSource | 'Facebook' | 'Google' | 'Radio' | 'Tv' | 'Called In' | 'Walk-In' | 'Off-Site Show/Event';
 export type ScheduleJobType = 'Service' | 'Warranty' | 'Delivery' | 'On Order' | 'Customer Pick Up';
 export type LegacyJobType = 'Repair' | 'Installation' | 'Maintenance' | 'Pickup';
 export type JobType = ScheduleJobType | LegacyJobType;
@@ -50,7 +51,7 @@ export interface Deal {
   id: string; org_id: string; contact_id: string; stage_id: string;
   title: string; amount: number | null; priority: DealPriority;
   expected_close_date: string | null; assigned_to: string;
-  product_interest: string[] | null; lead_source: LeadSource;
+  product_interest: string[] | null; lead_source: DealLeadSource;
   lost_reason: string | null; location_id: string | null;
   sale_fulfillment_type: 'inventory' | 'special_order' | null;
   inventory_item_id: string | null;

@@ -21,15 +21,15 @@ test('customer New Deal shows the requested lead sources and stores the canonica
     .map(([, label, storedValue]) => ({ label, storedValue }));
 
   assert.deepEqual(options, [
-    { label: 'Facebook', storedValue: 'Ad' },
-    { label: 'Google', storedValue: 'Ad' },
-    { label: 'Radio', storedValue: 'Ad' },
-    { label: 'Tv', storedValue: 'Ad' },
+    { label: 'Facebook', storedValue: 'Facebook' },
+    { label: 'Google', storedValue: 'Google' },
+    { label: 'Radio', storedValue: 'Radio' },
+    { label: 'Tv', storedValue: 'Tv' },
     { label: 'Website', storedValue: 'Website' },
     { label: 'Referral', storedValue: 'Referral' },
-    { label: 'Called In', storedValue: 'Phone' },
-    { label: 'Walk-In', storedValue: 'Walk-in' },
-    { label: 'Off-Site Show/Event', storedValue: 'Event' },
+    { label: 'Called In', storedValue: 'Called In' },
+    { label: 'Walk-In', storedValue: 'Walk-In' },
+    { label: 'Off-Site Show/Event', storedValue: 'Off-Site Show/Event' },
   ]);
   assert.match(modal, /useState<DealLeadSourceChoice>\('Walk-In'\)/);
   assert.match(modal, /<label htmlFor="deal-lead-source"[^>]*>[\s\S]*Lead Source[\s\S]*<select[\s\S]*id="deal-lead-source"[\s\S]*required/);

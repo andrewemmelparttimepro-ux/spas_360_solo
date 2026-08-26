@@ -312,19 +312,19 @@ export default function Deals() {
           aria-label="Active deals table"
           tabIndex={0}
         >
-          <table className="min-w-full divide-y divide-ink-800 text-sm">
+          <table className="w-full min-w-[1120px] table-fixed divide-y divide-ink-800 text-sm">
             <thead className="sticky top-0 z-10 bg-ink-950 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-500">
               <tr>
-                <th className="px-5 py-3">Deal</th>
-                <th className="px-5 py-3">Customer</th>
-                <th className="px-5 py-3">Stage</th>
-                <th className="px-5 py-3">Deal owner</th>
-                <th className="px-5 py-3">Next activity</th>
-                <th className="px-5 py-3">Amount</th>
-                <th className="px-5 py-3">Priority</th>
-                <th className="px-5 py-3">Expected close</th>
-                <th className="px-5 py-3">Open tasks</th>
-                <th className="px-5 py-3">Outcome</th>
+                <th className="w-[12%] px-3 py-3">Deal</th>
+                <th className="w-[9%] px-3 py-3">Customer</th>
+                <th className="w-[12%] px-3 py-3">Stage</th>
+                <th className="w-[9%] px-3 py-3">Deal owner</th>
+                <th className="w-[16%] px-3 py-3">Next activity</th>
+                <th className="w-[8%] px-3 py-3">Amount</th>
+                <th className="w-[8%] px-3 py-3">Priority</th>
+                <th className="w-[9%] px-3 py-3">Expected close</th>
+                <th className="w-[5%] px-3 py-3">Open tasks</th>
+                <th className="w-[12%] px-3 py-3">Outcome</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800/80">
@@ -335,7 +335,7 @@ export default function Deals() {
                 const followUpState = getFollowUpState(followUp);
                 return (
                   <tr key={deal.id} className="bg-ink-900/70 hover:bg-brand-500/5">
-                    <td className="group/deal-link px-5 py-3">
+                    <td className="group/deal-link px-3 py-3">
                       <Link
                         to={`/deals/${deal.id}`}
                         className="font-medium text-ink-100 transition-colors group-hover/deal-link:text-brand-400 focus-visible:text-brand-400"
@@ -343,8 +343,8 @@ export default function Deals() {
                         {deal.title}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 text-ink-300">{contactName}</td>
-                    <td className="min-w-[180px] px-5 py-3">
+                    <td className="px-3 py-3 text-ink-300">{contactName}</td>
+                    <td className="px-3 py-3">
                       <select
                         value={deal.stage_id}
                         onChange={(event) => changeDealStage(deal, event.target.value)}
@@ -355,8 +355,8 @@ export default function Deals() {
                         {editableStages.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
                       </select>
                     </td>
-                    <td className="px-5 py-3 text-ink-300">{ownerName}</td>
-                    <td className="min-w-[210px] px-5 py-3">
+                    <td className="px-3 py-3 text-ink-300">{ownerName}</td>
+                    <td className="px-3 py-3">
                       {followUp ? (
                         <Link to={`/deals/${deal.id}`} className={cn('block rounded-lg border px-3 py-2 transition hover:brightness-110', followUpTone[followUpState])}>
                           <span className="block text-xs font-semibold">{formatFollowUpDue(followUp)}</span>
@@ -368,19 +368,19 @@ export default function Deals() {
                         </Link>
                       )}
                     </td>
-                    <td className="px-5 py-3 font-mono text-ink-100">${(Number(deal.amount) || 0).toLocaleString()}</td>
-                    <td className="px-5 py-3">
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-ink-100">${(Number(deal.amount) || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3">
                       <span className={cn(
-                        'rounded-full border px-2.5 py-1 text-xs font-medium',
+                        'rounded-full border px-2 py-1 text-[11px] font-medium',
                         deal.priority === 'High' ? 'border-red-500/30 bg-red-500/10 text-red-300'
                           : deal.priority === 'Medium' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                           : 'border-ink-700 bg-ink-950 text-ink-300',
                       )}>{deal.priority}</span>
                     </td>
-                    <td className="px-5 py-3 text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '—'}</td>
-                    <td className="px-5 py-3 text-center font-mono text-ink-300">{followUp?.openTaskCount ?? 0}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 py-3 text-xs text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '—'}</td>
+                    <td className="px-3 py-3 text-center font-mono text-ink-300">{followUp?.openTaskCount ?? 0}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => wonStage && navigate(`/deals/${deal.id}`, {
@@ -388,7 +388,7 @@ export default function Deals() {
                           })}
                           disabled={!wonStage}
                           aria-label={`Mark ${deal.title} won`}
-                          className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-2 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Won
                         </button>
@@ -397,7 +397,7 @@ export default function Deals() {
                           onClick={() => lostStage && changeDealStage(deal, lostStage.id)}
                           disabled={!lostStage || movingDealId !== null}
                           aria-label={`Mark ${deal.title} lost`}
-                          className="rounded-lg border border-red-500/35 bg-red-500/10 px-2.5 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg border border-red-500/35 bg-red-500/10 px-2 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Lost
                         </button>

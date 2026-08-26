@@ -104,7 +104,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(deals, /mb-5 shrink-0 overflow-hidden/);
     assert.match(deals, /className="max-h-\[68vh\] overflow-auto"/);
     assert.match(deals, /aria-label="Active deals table"/);
-    assert.match(deals, /className="group\/deal-link px-3 py-3"[\s\S]*group-hover\/deal-link:text-brand-400 focus-visible:text-brand-400/);
+    assert.match(deals, /className="group\/deal-link px-1\.5 py-2"[\s\S]*group-hover\/deal-link:text-brand-400 focus-visible:text-brand-400/);
     assert.match(deals, />Expected close</);
     assert.match(inventory, /const brandOptions = Array\.from\(new Set\(items\.map/);
     assert.match(inventory, /const groupedItems = groupInventoryItems\(visibleItems\)/);
@@ -135,12 +135,13 @@ describe('Brandon composite UI contract', () => {
     assert.match(dealDetail, />\s*Lost\s*</);
   });
 
-  it('fits every active Deals column at normal desktop widths without losing narrow-screen overflow', async () => {
+  it('fits every active Deals column in the bounded Fix-It side-by-side width', async () => {
     const deals = await read('src/pages/Deals.tsx');
 
-    assert.match(deals, /id="active-deals-table"[\s\S]*<table className="w-full min-w-\[1120px\] table-fixed/);
-    assert.match(deals, /w-\[12%\][^>]*>Deal<[\s\S]*w-\[12%\][^>]*>Outcome</);
-    assert.match(deals, /className="flex items-center gap-1"[\s\S]*Mark \$\{deal\.title\} won[\s\S]*Mark \$\{deal\.title\} lost/);
+    assert.match(deals, /id="active-deals-table"[\s\S]*<table className="w-full min-w-\[800px\] table-fixed/);
+    assert.match(deals, /w-\[12%\][^>]*>Deal<[\s\S]*w-\[10%\][^>]*>Outcome</);
+    assert.match(deals, /title=\{deal\.title\}[\s\S]*title=\{contactName\}[\s\S]*title=\{stageName\}[\s\S]*title=\{ownerName\}/);
+    assert.match(deals, /className="flex items-center gap-0\.5"[\s\S]*Mark \$\{deal\.title\} won[\s\S]*Mark \$\{deal\.title\} lost/);
     assert.doesNotMatch(deals, /min-w-\[(180|210)px\] px-5 py-3/);
   });
 

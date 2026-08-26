@@ -41,8 +41,17 @@ describe('Customers table address', () => {
     assert.match(table, />Customer<[\s\S]*>Address<[\s\S]*>Phone</);
     assert.doesNotMatch(table, />Status</);
     assert.match(row, /formatCustomerAddress\(c\.mailing_address\)/);
-    assert.match(table, /min-w-\[1320px\]/);
+    assert.match(table, /min-w-\[800px\][^"\n]*table-fixed/);
     assert.match(cardView, /<Phone[\s\S]*\{formatPhone\(c\.phone\)\}/);
     assert.match(cardView, /formatDistanceToNow\(new Date\(c\.lastActivity\)/);
+  });
+
+  it('fits every requested list column beside the Fix-It panel with accessible truncation', async () => {
+    const customers = await read('src/pages/Customers.tsx');
+
+    assert.match(customers, /w-\[14%\][^>]*>Customer<[\s\S]*w-\[9%\][^>]*>Owner<[\s\S]*w-\[8%\]/);
+    assert.match(customers, /title=\{address === 'Not provided'[\s\S]*title=\{formatPhone\(c\.phone\)\}/);
+    assert.match(customers, /title=\{`\$\{unit\.make\}[\s\S]*Serial: \$\{unit\.serialNumber\}`\}/);
+    assert.doesNotMatch(customers, /min-w-\[(1320|220|260)px\]/);
   });
 });

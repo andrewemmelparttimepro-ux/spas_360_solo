@@ -195,17 +195,17 @@ export default function Customers() {
           key={`list:${normalizedSearch}`}
           className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}
         >
-          <table className="w-full text-left border-collapse min-w-[1320px]">
+          <table className="w-full min-w-[800px] table-fixed border-collapse text-left text-[10px]">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Customer</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Address</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Phone</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">In Play</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider text-right">Lifetime Spend</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Major Units Purchased</th>
-                <th className="px-4 py-3 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Owner</th>
-                <th className="px-4 py-3" />
+                <th className="w-[14%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Customer</th>
+                <th className="w-[17%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Address</th>
+                <th className="w-[13%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Phone</th>
+                <th className="w-[12%] px-1.5 py-2 text-right text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">In Play</th>
+                <th className="w-[10%] px-1.5 py-2 text-right text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Lifetime Spend</th>
+                <th className="w-[17%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Major Units Purchased</th>
+                <th className="w-[9%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Owner</th>
+                <th className="w-[8%] px-1.5 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
@@ -249,33 +249,33 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
       }}
       className="hover:bg-ink-800 transition-colors cursor-grab"
     >
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-7 h-7 rounded-full bg-violet-500/15 text-violet-300 flex items-center justify-center text-[10px] font-bold shrink-0">
+      <td className="px-1.5 py-2">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[8px] font-bold text-violet-300">
             {`${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()}
           </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-medium text-ink-100 truncate">{c.first_name} {c.last_name}</span>
-            <span className={cn('inline-block px-1.5 py-px rounded-full text-[9px] font-semibold', TYPE_BADGE[c.customer_type] ?? 'bg-ink-950 text-ink-300')}>
+          <span className="min-w-0" title={`${c.first_name} ${c.last_name} · ${c.customer_type}`}>
+            <span className="block truncate text-[10px] font-medium text-ink-100">{c.first_name} {c.last_name}</span>
+            <span className={cn('inline-block rounded-full px-1 py-px text-[8px] font-semibold', TYPE_BADGE[c.customer_type] ?? 'bg-ink-950 text-ink-300')}>
               {c.customer_type}
             </span>
           </span>
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-ink-400 min-w-[220px] max-w-[320px]">
-        <span className="block whitespace-normal break-words leading-snug" title={address === 'Not provided' ? undefined : address}>
+      <td className="px-1.5 py-2 text-ink-400">
+        <span className="block truncate" title={address === 'Not provided' ? undefined : address}>
           {address}
         </span>
       </td>
-      <td className="px-4 py-3">
-        <a href={`tel:${c.phone}`} className="text-sm text-ink-300 hover:text-brand-300 whitespace-nowrap">{formatPhone(c.phone)}</a>
+      <td className="px-1.5 py-2">
+        <a href={`tel:${c.phone}`} title={formatPhone(c.phone)} className="block truncate whitespace-nowrap text-[10px] text-ink-300 hover:text-brand-300">{formatPhone(c.phone)}</a>
       </td>
-      <td className="px-4 py-3 text-right font-mono text-sm font-bold text-ink-100">
+      <td className="px-1.5 py-2 text-right font-mono text-[10px] font-bold text-ink-100">
         ${(c.openDealValue + c.serviceAmount).toLocaleString()}
         {c.openDealCount > 0 && <span className="text-[10px] font-medium text-ink-500 ml-1">({c.openDealCount})</span>}
         {c.serviceLevel != null && (
           <span
-            className="ml-1.5 px-1.5 py-px rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold align-middle whitespace-nowrap"
+            className="mt-0.5 block whitespace-nowrap rounded bg-amber-500/10 px-1 py-px text-[8px] font-bold text-amber-300"
             title={`Active service job, invoice not yet estimated — level ${c.serviceLevel} of 3 expected cost`}
           >
             In service
@@ -283,16 +283,16 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
         )}
       </td>
       {/* A book full of green $0s reads as noise. Reserve color and dollars for real spend. */}
-      <td className={cn('px-4 py-3 text-right font-mono text-sm font-bold', c.wonValue > 0 ? 'text-emerald-300' : 'text-ink-500')}>
+      <td className={cn('px-1.5 py-2 text-right font-mono text-[10px] font-bold', c.wonValue > 0 ? 'text-emerald-300' : 'text-ink-500')}>
         {c.wonValue > 0 ? `$${c.wonValue.toLocaleString()}` : <span aria-label="No lifetime spend">—</span>}
       </td>
-      <td className="px-4 py-3 min-w-[260px] max-w-[360px]">
+      <td className="px-1.5 py-2">
         {c.majorUnits.length > 0 ? (
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {c.majorUnits.map(unit => (
-              <li key={unit.id} className="text-xs leading-snug">
-                <span className="block font-medium text-ink-200">{unit.make} · {unit.model}</span>
-                <span className="block text-ink-500">Serial: {unit.serialNumber}</span>
+              <li key={unit.id} className="min-w-0 leading-tight" title={`${unit.make} · ${unit.model} · Serial: ${unit.serialNumber}`}>
+                <span className="block truncate text-[9px] font-medium text-ink-200">{unit.make} · {unit.model}</span>
+                <span className="block truncate text-[8px] text-ink-500">Serial: {unit.serialNumber}</span>
               </li>
             ))}
           </ul>
@@ -300,9 +300,9 @@ function CustomerRow({ customer: c, onNewDeal }: { customer: CustomerCard; onNew
           <span className="text-sm text-ink-600" aria-label="No major units purchased">—</span>
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-ink-400 truncate max-w-[140px]">{assignedName ?? 'Unassigned'}</td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-1.5">
+      <td className="truncate px-1.5 py-2 text-ink-400" title={assignedName ?? 'Unassigned'}>{assignedName ?? 'Unassigned'}</td>
+      <td className="px-1.5 py-2 text-right">
+        <div className="flex flex-wrap items-center justify-end gap-0.5">
           {c.openJobCount > 0 && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 text-[10px] font-semibold" title={`${c.openJobCount} open service job(s)`}>
               <Wrench className="w-3 h-3" />{c.openJobCount}

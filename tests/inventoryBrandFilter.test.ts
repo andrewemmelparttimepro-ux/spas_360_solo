@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '../src/lib/inventoryBrandFilter.ts';
+import { ALL_INVENTORY_BRANDS, INVENTORY_GROUP_FILTERS, inventoryBrandOptions, inventoryMatchesBrand } from '../src/lib/inventoryBrandFilter.ts';
 
 describe('Inventory brand filter', () => {
   const items = [
@@ -27,6 +27,7 @@ describe('Inventory brand filter', () => {
       'Platinum Spas',
       'Sundance Spas',
       'Visscher',
+      ...INVENTORY_GROUP_FILTERS,
     ]);
   });
 
@@ -34,5 +35,23 @@ describe('Inventory brand filter', () => {
     assert.equal(inventoryMatchesBrand({ brand: ' Covana ' }, 'Covana'), true);
     assert.equal(inventoryMatchesBrand({ brand: 'Master Spas' }, 'Covana'), false);
     assert.equal(inventoryMatchesBrand({ brand: null }, ALL_INVENTORY_BRANDS), true);
+  });
+
+  it('adds the exact requested inventory groups and applies their production meanings', () => {
+    const groupedItems = [
+      { brand: null, category: 'Saunas', status: 'In Stock' },
+      { brand: null, category: 'Outdoor Living', status: 'In Stock' },
+      { brand: null, category: 'Covers', status: 'In Stock' },
+      { brand: 'Master Spas', category: 'Hot Tubs', status: 'On Order' },
+      { brand: null, category: 'Used Spas', status: 'In Stock' },
+      { brand: null, category: 'Hot Tubs', status: 'In Stock' },
+    ];
+
+    assert.equal(inventoryMatchesBrand(groupedItems[0], 'Saunas'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[1], 'Outdoor Living'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[2], 'Covers'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[3], 'Need To Order'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[4], 'Used Inventory'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[5], 'All Other'), true);
   });
 });

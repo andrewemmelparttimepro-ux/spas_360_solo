@@ -449,7 +449,7 @@ export default function Inventory() {
               value={brandFilter}
               onChange={event => setBrandFilter(event.target.value)}
               className="bg-ink-900 border border-ink-700 text-ink-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              aria-label="Filter inventory by brand"
+              aria-label="Filter inventory"
             >
               <option>{ALL_INVENTORY_BRANDS}</option>
               {brandOptions.map(brand => <option key={brand}>{brand}</option>)}

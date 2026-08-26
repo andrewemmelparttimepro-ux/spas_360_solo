@@ -19,6 +19,7 @@ import {
   type InventoryCustomerStockSelection,
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
+import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
 const INVENTORY_GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
@@ -384,7 +385,7 @@ export default function Inventory() {
   const { locations, activeLocationId } = useAuth();
   // With every store on screen, each row must say which floor it's on
   const showStore = !activeLocationId;
-  const [brandFilter, setBrandFilter] = useState('All Brands');
+  const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
   // Editor drawer: null = closed, 'new' = create, item = edit
   const [editorTarget, setEditorTarget] = useState<'new' | InventoryItem | null>(null);
 
@@ -399,9 +400,8 @@ export default function Inventory() {
     { label: 'On Order', value: onOrder },
     { label: 'Low Stock', value: lowStockAlerts },
   ];
-  const brandOptions = Array.from(new Set(items.map(item => item.brand?.trim()).filter((brand): brand is string => Boolean(brand))))
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
-  const visibleItems = brandFilter === 'All Brands' ? items : items.filter(item => item.brand === brandFilter);
+  const brandOptions = inventoryBrandOptions(items);
+  const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
   const groupedItems = groupInventoryItems(visibleItems);
   const columnCount = showStore ? 8 : 7;
   if (isLoading) {
@@ -451,7 +451,7 @@ export default function Inventory() {
               className="bg-ink-900 border border-ink-700 text-ink-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               aria-label="Filter inventory by brand"
             >
-              <option>All Brands</option>
+              <option>{ALL_INVENTORY_BRANDS}</option>
               {brandOptions.map(brand => <option key={brand}>{brand}</option>)}
             </select>
           </label>

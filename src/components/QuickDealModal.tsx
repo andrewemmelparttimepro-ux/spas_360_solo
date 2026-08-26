@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
-import type { Contact, DealPriority, PipelineStage } from '@/types/database';
+import type { Contact, DealPriority, LeadSource, PipelineStage } from '@/types/database';
 import { useModal } from '@/hooks/useModal';
 
 // Quick deal creation for a KNOWN customer — the fast lane next to the full
@@ -21,6 +21,18 @@ const FOLLOW_UPS = [
   { label: 'In 3 days', days: 3 },
   { label: 'Next week', days: 7 },
 ] as const;
+const LEAD_SOURCE_OPTIONS = [
+  { label: 'Facebook', storedValue: 'Ad' },
+  { label: 'Google', storedValue: 'Ad' },
+  { label: 'Radio', storedValue: 'Ad' },
+  { label: 'Tv', storedValue: 'Ad' },
+  { label: 'Website', storedValue: 'Website' },
+  { label: 'Referral', storedValue: 'Referral' },
+  { label: 'Called In', storedValue: 'Phone' },
+  { label: 'Walk-In', storedValue: 'Walk-in' },
+  { label: 'Off-Site Show/Event', storedValue: 'Event' },
+] as const satisfies readonly { label: string; storedValue: LeadSource }[];
+type DealLeadSourceChoice = (typeof LEAD_SOURCE_OPTIONS)[number]['label'];
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -50,6 +62,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [stage, setStage] = useState<string>(stageId ?? '');
   const [interest, setInterest] = useState('');
+  const [leadSource, setLeadSource] = useState<DealLeadSourceChoice>('Walk-In');
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [amount, setAmount] = useState('');
@@ -90,6 +103,9 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
     if (!profile || !user || !contact || !canCreate || saving) return;
     setSaving(true);
     try {
+      const storedLeadSource = LEAD_SOURCE_OPTIONS.find(option => option.label === leadSource)?.storedValue;
+      if (!storedLeadSource) throw new Error('Choose a lead source');
+
       // Commission integrity: credit the customer's salesperson, log the enterer
       const creditTo = contact.assigned_to ?? user.id;
       const enteredByOther = creditTo !== user.id;
@@ -101,7 +117,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         title: title.trim(),
         amount: amount ? parseFloat(amount) : null,
         priority,
-        lead_source: contact.lead_source,
+        lead_source: storedLeadSource,
         product_interest: interest.trim() ? [interest.trim()] : null,
         expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
@@ -183,6 +199,23 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
                 placeholder="e.g. Sundance Aspen or a replacement cover"
                 className={inputClass}
               />
+            </div>
+
+            <div>
+              <label htmlFor="deal-lead-source" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+                Lead Source
+              </label>
+              <select
+                id="deal-lead-source"
+                value={leadSource}
+                onChange={e => setLeadSource(e.target.value as DealLeadSourceChoice)}
+                className={inputClass}
+                required
+              >
+                {LEAD_SOURCE_OPTIONS.map(option => (
+                  <option key={option.label} value={option.label}>{option.label}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

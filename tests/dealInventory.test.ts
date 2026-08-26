@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { closeDealSaleArgs, inventoryUnitLabel } from '../src/lib/dealInventory.ts';
+import { closeDealSaleArgs, dealInventoryForDisplay, inventoryUnitLabel } from '../src/lib/dealInventory.ts';
+
+const assignedUnit = {
+  id: 'unit-1',
+  sku: '101049590',
+  product: 'Hot tub',
+  brand: 'Nova',
+  model: 'Nova 7',
+  color_finish: null,
+  location_id: 'store-1',
+  locations: null,
+};
 
 describe('deal inventory close flow', () => {
   it('labels a stocked unit with its exact serial and store', () => {
@@ -24,6 +35,42 @@ describe('deal inventory close flow', () => {
       fulfillmentType: 'inventory',
       inventoryItemId: '',
     }), /Choose the purchased inventory unit/);
+  });
+
+  it('shows customer-assigned inventory when a deal has no explicit fulfillment link', () => {
+    assert.deepEqual(dealInventoryForDisplay({
+      fulfillmentType: null,
+      linkedInventory: null,
+      customerInventory: [assignedUnit],
+    }), { kind: 'inventory', source: 'customer', items: [assignedUnit] });
+  });
+
+  it('keeps explicit deal inventory ahead of customer-assigned fallback units', () => {
+    const explicitlyLinked = { ...assignedUnit, id: 'explicit-unit', sku: 'EXPLICIT-1' };
+    assert.deepEqual(dealInventoryForDisplay({
+      fulfillmentType: 'inventory',
+      linkedInventory: explicitlyLinked,
+      customerInventory: [assignedUnit],
+    }), { kind: 'inventory', source: 'deal', items: [explicitlyLinked] });
+  });
+
+  it('keeps special orders ahead of unrelated customer-assigned inventory', () => {
+    assert.deepEqual(dealInventoryForDisplay({
+      fulfillmentType: 'special_order',
+      linkedInventory: null,
+      customerInventory: [assignedUnit],
+    }), { kind: 'special_order', items: [] });
+  });
+
+  it('reads unlinked inventory assigned to the deal contact without mutating either row', async () => {
+    const [dealHook, dealDetail] = await Promise.all([
+      readFile(new URL('../src/hooks/usePipeline.ts', import.meta.url), 'utf8'),
+      readFile(new URL('../src/pages/DealDetail.tsx', import.meta.url), 'utf8'),
+    ]);
+
+    assert.match(dealHook, /\.eq\('customer_id', data\.contact_id\)[\s\S]*\.is\('deal_id', null\)/);
+    assert.doesNotMatch(dealHook, /inventory_items'[\s\S]{0,200}\.update\(/);
+    assert.match(dealDetail, /source === 'customer' \? 'Assigned inventory' : 'Purchased unit'/);
   });
 
   it('never sends an inventory id for a special order', () => {

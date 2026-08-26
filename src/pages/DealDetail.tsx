@@ -25,6 +25,7 @@ import {
 } from '@/lib/followUp';
 import {
   closeDealSaleArgs,
+  dealInventoryForDisplay,
   inventoryUnitLabel,
   type DealFulfillmentType,
   type DealInventoryOption,
@@ -165,6 +166,12 @@ export default function DealDetail() {
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
+
+  const purchasedUnit = dealInventoryForDisplay({
+    fulfillmentType: deal.sale_fulfillment_type,
+    linkedInventory: deal.inventory_item ?? null,
+    customerInventory: deal.customer_inventory,
+  });
 
   const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
   const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
@@ -399,16 +406,23 @@ export default function DealDetail() {
               <p className="mt-1 truncate text-xs text-ink-400">{nextFollowUp?.title ?? 'This lead needs a dated next step.'}</p>
             </div>
             <div className="flex items-center text-sm text-ink-300"><User className="w-4 h-4 mr-2 text-ink-500" />Source: {deal.lead_source}</div>
-            {deal.sale_fulfillment_type && (
+            {purchasedUnit && (
               <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400"><PackageCheck className="h-4 w-4" /> Purchased unit</p>
-                <p className="mt-1 text-sm font-medium text-ink-100">
-                  {deal.sale_fulfillment_type === 'special_order'
-                    ? 'Special order'
-                    : deal.inventory_item
-                      ? inventoryUnitLabel(deal.inventory_item)
-                      : 'Current inventory'}
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                  <PackageCheck className="h-4 w-4" />
+                  {purchasedUnit.kind === 'inventory' && purchasedUnit.source === 'customer' ? 'Assigned inventory' : 'Purchased unit'}
                 </p>
+                {purchasedUnit.kind === 'special_order' ? (
+                  <p className="mt-1 text-sm font-medium text-ink-100">Special order</p>
+                ) : purchasedUnit.items.length > 0 ? (
+                  <div className="mt-1 space-y-1">
+                    {purchasedUnit.items.map(item => (
+                      <p key={item.id} className="text-sm font-medium text-ink-100">{inventoryUnitLabel(item)}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-ink-100">Current inventory</p>
+                )}
               </div>
             )}
             {deal.product_interest && deal.product_interest.length > 0 && <div><p className="text-xs text-ink-500 mb-1">Products of Interest</p><div className="flex flex-wrap gap-1">{deal.product_interest.map(p => <span key={p} className="px-2 py-0.5 bg-ink-950 text-ink-300 rounded text-xs">{p}</span>)}</div></div>}

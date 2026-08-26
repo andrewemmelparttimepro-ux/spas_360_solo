@@ -9,6 +9,25 @@ export type DealInventoryOption = Pick<
   locations?: { name: string } | null;
 };
 
+export type DealInventoryDisplay =
+  | { kind: 'special_order'; items: [] }
+  | { kind: 'inventory'; source: 'deal' | 'customer'; items: DealInventoryOption[] };
+
+export function dealInventoryForDisplay({
+  fulfillmentType,
+  linkedInventory,
+  customerInventory,
+}: {
+  fulfillmentType: DealFulfillmentType | null;
+  linkedInventory: DealInventoryOption | null;
+  customerInventory: DealInventoryOption[];
+}): DealInventoryDisplay | null {
+  if (fulfillmentType === 'special_order') return { kind: 'special_order', items: [] };
+  if (linkedInventory) return { kind: 'inventory', source: 'deal', items: [linkedInventory] };
+  if (customerInventory.length > 0) return { kind: 'inventory', source: 'customer', items: customerInventory };
+  return fulfillmentType === 'inventory' ? { kind: 'inventory', source: 'deal', items: [] } : null;
+}
+
 export function inventoryUnitLabel(item: DealInventoryOption): string {
   const product = [item.brand, item.model || item.product, item.color_finish]
     .filter(Boolean)

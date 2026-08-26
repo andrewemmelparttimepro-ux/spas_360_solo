@@ -24,6 +24,12 @@ export type PipelineDeal = Deal & {
 
 export type SalespersonOption = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'role'>;
 
+type DealDetailRecord = Deal & {
+  contact?: { first_name: string; last_name: string; phone: string };
+  inventory_item?: DealInventoryOption | null;
+  customer_inventory: DealInventoryOption[];
+};
+
 export function usePipeline() {
   const { profile, activeLocationId } = useAuth();
   const { toast } = useToast();
@@ -189,10 +195,7 @@ export function usePipeline() {
 }
 
 export function useDeal(id: string | undefined) {
-  const [deal, setDeal] = useState<(Deal & {
-    contact?: { first_name: string; last_name: string; phone: string };
-    inventory_item?: DealInventoryOption | null;
-  }) | null>(null);
+  const [deal, setDeal] = useState<DealDetailRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDeal = useCallback(async () => {
@@ -203,8 +206,32 @@ export function useDeal(id: string | undefined) {
       .select('*, contact:contact_id(first_name, last_name, phone), inventory_item:inventory_item_id(id,sku,product,brand,model,color_finish,location_id,locations:location_id(name))')
       .eq('id', id)
       .single();
-    if (error) console.error('Error fetching deal:', error);
-    setDeal(data as typeof deal);
+    if (error || !data) {
+      if (error) console.error('Error fetching deal:', error);
+      setDeal(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let customerInventory: DealInventoryOption[] = [];
+    if (!data.inventory_item && data.sale_fulfillment_type !== 'special_order' && data.contact_id) {
+      const { data: assignedUnits, error: assignedUnitsError } = await supabase
+        .from('inventory_items')
+        .select('id,sku,product,brand,model,color_finish,location_id,locations:location_id(name)')
+        .eq('org_id', data.org_id)
+        .eq('customer_id', data.contact_id)
+        .is('deal_id', null)
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: true });
+
+      if (assignedUnitsError) {
+        console.error('Error fetching customer-assigned inventory:', assignedUnitsError);
+      } else {
+        customerInventory = (assignedUnits ?? []) as unknown as DealInventoryOption[];
+      }
+    }
+
+    setDeal({ ...data, customer_inventory: customerInventory } as DealDetailRecord);
     setIsLoading(false);
   }, [id]);
 

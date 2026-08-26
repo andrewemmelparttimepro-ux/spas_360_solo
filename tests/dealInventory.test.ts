@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { closeDealSaleArgs, dealInventoryForDisplay, inventoryUnitLabel } from '../src/lib/dealInventory.ts';
+import { availableDealInventory, closeDealSaleArgs, dealInventoryForDisplay, inventoryUnitLabel } from '../src/lib/dealInventory.ts';
 
 const assignedUnit = {
   id: 'unit-1',
@@ -37,6 +37,21 @@ describe('deal inventory close flow', () => {
     }), /Choose the purchased inventory unit/);
   });
 
+  it('keeps the current deal selection while hiding units reserved by another deal', () => {
+    const otherUnit = { ...assignedUnit, id: 'unit-2', sku: 'OTHER-2' };
+    const openUnit = { ...assignedUnit, id: 'unit-3', sku: 'OPEN-3' };
+
+    assert.deepEqual(availableDealInventory(
+      [assignedUnit, otherUnit, openUnit],
+      [
+        { id: 'deal-1', inventory_item_id: assignedUnit.id },
+        { id: 'deal-2', inventory_item_id: otherUnit.id },
+      ],
+      'deal-1',
+      assignedUnit.id,
+    ), [assignedUnit, openUnit]);
+  });
+
   it('shows customer-assigned inventory when a deal has no explicit fulfillment link', () => {
     assert.deepEqual(dealInventoryForDisplay({
       fulfillmentType: null,
@@ -70,7 +85,7 @@ describe('deal inventory close flow', () => {
 
     assert.match(dealHook, /\.eq\('customer_id', data\.contact_id\)[\s\S]*\.is\('deal_id', null\)/);
     assert.doesNotMatch(dealHook, /inventory_items'[\s\S]{0,200}\.update\(/);
-    assert.match(dealDetail, /source === 'customer' \? 'Assigned inventory' : 'Purchased unit'/);
+    assert.match(dealDetail, /source === 'customer'[\s\S]*\? 'Assigned inventory'/);
   });
 
   it('never sends an inventory id for a special order', () => {
@@ -118,5 +133,29 @@ describe('deal inventory close flow', () => {
     assert.match(sql, /revoke all on function private\.close_deal_sale\(uuid, uuid, text, uuid\) from public, anon/);
     assert.match(sql, /grant execute on function private\.close_deal_sale\(uuid, uuid, text, uuid\) to authenticated, service_role/);
     assert.match(sql, /language sql[\s\S]*security invoker[\s\S]*select private\.close_deal_sale/);
+  });
+
+  it('attaches inventory from the left Deal Information column before Won', async () => {
+    const [dealDetail, sql] = await Promise.all([
+      readFile(new URL('../src/pages/DealDetail.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../supabase/migrations/20260826213000_preselect_deal_inventory.sql', import.meta.url), 'utf8'),
+    ]);
+
+    const leftColumn = dealDetail.slice(
+      dealDetail.indexOf('Deal Information'),
+      dealDetail.indexOf('lg:col-span-2'),
+    );
+
+    assert.match(leftColumn, /htmlFor="deal-inventory-item"[^>]*>Inventory item/);
+    assert.match(leftColumn, /id="deal-inventory-item"[\s\S]*Choose inventory before Won/);
+    assert.match(dealDetail, /attachInventoryToDeal[\s\S]*sale_fulfillment_type: inventoryItemId \? 'inventory' : null[\s\S]*inventory_item_id: inventoryItemId \|\| null/);
+    assert.match(dealDetail, /setFulfillmentType\(deal\.sale_fulfillment_type\)[\s\S]*setSelectedInventoryId\(deal\.inventory_item_id \?\? ''\)/);
+    assert.match(dealDetail, /isClosedDeal[\s\S]*'Attached inventory'/);
+
+    assert.match(sql, /v_current_stage_is_won and v_existing_type is not null/);
+    assert.match(sql, /i\.status = 'In Stock' and i\.customer_id is null and i\.deal_id is null/);
+    assert.match(sql, /i\.status = 'Sold' and i\.customer_id = new\.contact_id and i\.deal_id = new\.id/);
+    assert.match(sql, /status = 'Sold',[\s\S]*customer_id = v_contact_id,[\s\S]*deal_id = p_deal_id/);
+    assert.match(sql, /perform private\.move_deal\(p_deal_id, p_stage_id, 0\)/);
   });
 });

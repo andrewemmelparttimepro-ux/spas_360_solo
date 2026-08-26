@@ -255,8 +255,9 @@ export function useDeal(id: string | undefined) {
   const updateDeal = async (updates: Partial<Deal>) => {
     if (!id) return;
     const { error } = await supabase.from('deals').update(updates).eq('id', id);
-    if (error) { console.error('Error updating deal:', error); return; }
+    if (error) { console.error('Error updating deal:', error); return error; }
     await fetchDeal();
+    return null;
   };
 
   return { deal, isLoading, updateDeal };

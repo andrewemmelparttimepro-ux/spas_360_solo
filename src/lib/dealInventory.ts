@@ -13,6 +13,26 @@ export type DealInventoryDisplay =
   | { kind: 'special_order'; items: [] }
   | { kind: 'inventory'; source: 'deal' | 'customer'; items: DealInventoryOption[] };
 
+export type DealInventoryReservation = {
+  id: string;
+  inventory_item_id: string | null;
+};
+
+export function availableDealInventory(
+  items: DealInventoryOption[],
+  reservations: DealInventoryReservation[],
+  currentDealId: string,
+  currentInventoryItemId: string | null,
+): DealInventoryOption[] {
+  const reservedByAnotherDeal = new Set(
+    reservations
+      .filter(reservation => reservation.id !== currentDealId && reservation.inventory_item_id)
+      .map(reservation => reservation.inventory_item_id as string),
+  );
+
+  return items.filter(item => item.id === currentInventoryItemId || !reservedByAnotherDeal.has(item.id));
+}
+
 export function dealInventoryForDisplay({
   fulfillmentType,
   linkedInventory,

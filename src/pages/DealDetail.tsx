@@ -24,6 +24,7 @@ import {
   summarizeDealFollowUps,
 } from '@/lib/followUp';
 import {
+  availableDealInventory,
   closeDealSaleArgs,
   dealInventoryForDisplay,
   inventoryUnitLabel,
@@ -118,38 +119,61 @@ export default function DealDetail() {
     // No manual refetch: useDeal's realtime subscription picks up the RPC's update
   };
 
-  const openCloseSale = useCallback(async (stageId: string) => {
-    if (!profile) return;
-    setCloseSaleStageId(stageId);
-    setFulfillmentType(null);
-    setSelectedInventoryId('');
-    setAvailableInventory([]);
+  const loadAvailableInventory = useCallback(async () => {
+    if (!profile || !deal) return;
     setCloseSaleError(null);
     setInventoryLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .from('inventory_items')
-        .select('id,sku,product,brand,model,color_finish,location_id,locations:location_id(name)')
-        .eq('org_id', profile.org_id)
-        .eq('status', 'In Stock')
-        .is('customer_id', null)
-        .is('deal_id', null)
-        .order('brand', { ascending: true, nullsFirst: false })
-        .order('model', { ascending: true, nullsFirst: false })
-        .order('sku', { ascending: true });
+      const [inventoryResult, reservationsResult] = await Promise.all([
+        supabase
+          .from('inventory_items')
+          .select('id,sku,product,brand,model,color_finish,location_id,locations:location_id(name)')
+          .eq('org_id', profile.org_id)
+          .eq('status', 'In Stock')
+          .is('customer_id', null)
+          .is('deal_id', null)
+          .order('brand', { ascending: true, nullsFirst: false })
+          .order('model', { ascending: true, nullsFirst: false })
+          .order('sku', { ascending: true }),
+        supabase
+          .from('deals')
+          .select('id,inventory_item_id')
+          .eq('org_id', profile.org_id)
+          .not('inventory_item_id', 'is', null),
+      ]);
 
-      if (error) {
-        setCloseSaleError(`Current inventory couldn't load: ${error.message}`);
+      if (inventoryResult.error) {
+        setCloseSaleError(`Current inventory couldn't load: ${inventoryResult.error.message}`);
+      } else if (reservationsResult.error) {
+        setCloseSaleError(`Current deal assignments couldn't load: ${reservationsResult.error.message}`);
       } else {
-        setAvailableInventory((data ?? []) as unknown as DealInventoryOption[]);
+        setAvailableInventory(availableDealInventory(
+          (inventoryResult.data ?? []) as unknown as DealInventoryOption[],
+          reservationsResult.data ?? [],
+          deal.id,
+          deal.inventory_item_id,
+        ));
       }
     } catch (error) {
       setCloseSaleError(`Current inventory couldn't load: ${(error as Error).message || 'Network error'}`);
     } finally {
       setInventoryLoading(false);
     }
-  }, [profile]);
+  }, [deal, profile]);
+
+  useEffect(() => {
+    void loadAvailableInventory();
+  }, [loadAvailableInventory]);
+
+  const openCloseSale = useCallback(async (stageId: string) => {
+    if (!profile || !deal) return;
+    setCloseSaleStageId(stageId);
+    setFulfillmentType(deal.sale_fulfillment_type);
+    setSelectedInventoryId(deal.inventory_item_id ?? '');
+    setCloseSaleError(null);
+    await loadAvailableInventory();
+  }, [deal, loadAvailableInventory, profile]);
 
   useEffect(() => {
     const navigationState = location.state as CloseWonLocationState | null;
@@ -174,6 +198,8 @@ export default function DealDetail() {
   });
 
   const contact = deal.contact as { first_name: string; last_name: string; phone: string } | undefined;
+  const currentStage = stages.find(stage => stage.id === deal.stage_id);
+  const isClosedDeal = Boolean(currentStage?.is_won || currentStage?.is_lost);
   const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
   const nextFollowUpState = getFollowUpState(nextFollowUp);
   const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
@@ -184,6 +210,29 @@ export default function DealDetail() {
     setFulfillmentType(null);
     setSelectedInventoryId('');
     setCloseSaleError(null);
+  };
+
+  const attachInventoryToDeal = async (inventoryItemId: string) => {
+    setCloseSaleError(null);
+    setCloseSaleBusy(true);
+
+    try {
+      const error = await updateDeal({
+        sale_fulfillment_type: inventoryItemId ? 'inventory' : null,
+        inventory_item_id: inventoryItemId || null,
+      });
+      if (error) throw error;
+
+      setFulfillmentType(inventoryItemId ? 'inventory' : null);
+      setSelectedInventoryId(inventoryItemId);
+      toast(inventoryItemId ? 'Inventory unit attached to this deal' : 'Inventory unit removed from this deal', 'success');
+    } catch (error) {
+      const message = `Couldn't attach this inventory unit: ${(error as Error).message || 'Unknown error'}`;
+      setCloseSaleError(message);
+      toast(message, 'error');
+    } finally {
+      setCloseSaleBusy(false);
+    }
   };
 
   const completeWonSale = async () => {
@@ -406,11 +455,32 @@ export default function DealDetail() {
               <p className="mt-1 truncate text-xs text-ink-400">{nextFollowUp?.title ?? 'This lead needs a dated next step.'}</p>
             </div>
             <div className="flex items-center text-sm text-ink-300"><User className="w-4 h-4 mr-2 text-ink-500" />Source: {deal.lead_source}</div>
+            {!isClosedDeal && (
+              <div>
+                <label htmlFor="deal-inventory-item" className="mb-1 block text-xs font-semibold text-ink-500">Inventory item</label>
+                <select
+                  id="deal-inventory-item"
+                  value={deal.inventory_item_id ?? ''}
+                  onChange={event => void attachInventoryToDeal(event.target.value)}
+                  disabled={inventoryLoading || closeSaleBusy}
+                  className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">Choose inventory before Won…</option>
+                  {availableInventory.map(item => <option key={item.id} value={item.id}>{inventoryUnitLabel(item)}</option>)}
+                </select>
+                {inventoryLoading && <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading available units…</p>}
+                {closeSaleError && <p role="alert" className="mt-1 text-xs font-medium text-red-300">{closeSaleError}</p>}
+              </div>
+            )}
             {purchasedUnit && (
               <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
                   <PackageCheck className="h-4 w-4" />
-                  {purchasedUnit.kind === 'inventory' && purchasedUnit.source === 'customer' ? 'Assigned inventory' : 'Purchased unit'}
+                  {purchasedUnit.kind === 'inventory' && purchasedUnit.source === 'customer'
+                    ? 'Assigned inventory'
+                    : isClosedDeal
+                      ? 'Purchased unit'
+                      : 'Attached inventory'}
                 </p>
                 {purchasedUnit.kind === 'special_order' ? (
                   <p className="mt-1 text-sm font-medium text-ink-100">Special order</p>

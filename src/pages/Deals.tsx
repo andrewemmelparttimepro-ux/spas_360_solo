@@ -319,12 +319,12 @@ export default function Deals() {
                 <th className="w-[10%] px-1.5 py-2">Customer</th>
                 <th className="w-[11%] px-1.5 py-2">Stage</th>
                 <th className="w-[9%] px-1.5 py-2">Deal owner</th>
-                <th className="w-[16%] px-1.5 py-2">Next activity</th>
+                <th className="w-[14%] px-1.5 py-2">Next activity</th>
                 <th className="w-[9%] px-1.5 py-2">Amount</th>
                 <th className="w-[8%] px-1.5 py-2">Priority</th>
                 <th className="w-[10%] px-1.5 py-2">Expected close</th>
                 <th className="w-[5%] px-1.5 py-2">Open tasks</th>
-                <th className="w-[10%] px-1.5 py-2">Outcome</th>
+                <th className="w-[12%] px-1 py-2">Outcome</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800/80">
@@ -386,7 +386,7 @@ export default function Deals() {
                     </td>
                     <td className="whitespace-nowrap px-1.5 py-2 text-[10px] text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '—'}</td>
                     <td className="px-1.5 py-2 text-center font-mono text-[10px] text-ink-300">{followUp?.openTaskCount ?? 0}</td>
-                    <td className="px-1.5 py-2">
+                    <td className="px-1 py-2">
                       <div className="flex items-center gap-0.5">
                         <button
                           type="button"
@@ -395,7 +395,7 @@ export default function Deals() {
                           })}
                           disabled={!wonStage}
                           aria-label={`Mark ${deal.title} won`}
-                          className="rounded-md border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-1.5 text-[10px] font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-md border border-emerald-500/35 bg-emerald-500/10 px-1 py-1.5 text-[10px] font-bold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Won
                         </button>
@@ -404,7 +404,7 @@ export default function Deals() {
                           onClick={() => lostStage && changeDealStage(deal, lostStage.id)}
                           disabled={!lostStage || movingDealId !== null}
                           aria-label={`Mark ${deal.title} lost`}
-                          className="rounded-md border border-red-500/35 bg-red-500/10 px-1.5 py-1.5 text-[10px] font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-md border border-red-500/35 bg-red-500/10 px-1 py-1.5 text-[10px] font-bold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Lost
                         </button>

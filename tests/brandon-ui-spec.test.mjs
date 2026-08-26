@@ -139,7 +139,7 @@ describe('Brandon composite UI contract', () => {
     const deals = await read('src/pages/Deals.tsx');
 
     assert.match(deals, /id="active-deals-table"[\s\S]*<table className="w-full min-w-\[800px\] table-fixed/);
-    assert.match(deals, /w-\[12%\][^>]*>Deal<[\s\S]*w-\[10%\][^>]*>Outcome</);
+    assert.match(deals, /w-\[12%\][^>]*>Deal<[\s\S]*w-\[12%\][^>]*>Outcome</);
     assert.match(deals, /title=\{deal\.title\}[\s\S]*title=\{contactName\}[\s\S]*title=\{stageName\}[\s\S]*title=\{ownerName\}/);
     assert.match(deals, /className="flex items-center gap-0\.5"[\s\S]*Mark \$\{deal\.title\} won[\s\S]*Mark \$\{deal\.title\} lost/);
     assert.doesNotMatch(deals, /min-w-\[(180|210)px\] px-5 py-3/);

@@ -11,7 +11,6 @@ import { useModal } from '@/hooks/useModal';
 // NewCustomerWizard. Same doctrine: commission stays with the customer's
 // assigned salesperson, and every deal leaves with a follow-up task. No exceptions.
 
-const INTERESTS = ['Hot Tub', 'Swim Spa', 'Sauna', 'Cold Plunge', 'Game Room', 'Parts & Chemicals'] as const;
 const PRIORITIES: { value: DealPriority; label: string }[] = [
   { value: 'High', label: 'High — close in a week' },
   { value: 'Medium', label: 'Medium — 2–4 weeks' },
@@ -50,7 +49,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [contact, setContact] = useState<(Contact & { assigned?: { first_name: string; last_name: string } | null }) | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [stage, setStage] = useState<string>(stageId ?? '');
-  const [interests, setInterests] = useState<string[]>([]);
+  const [interest, setInterest] = useState('');
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [amount, setAmount] = useState('');
@@ -78,11 +77,9 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   // Auto-title mirrors the wizard's "{Last} – {interest}" ritual; backs off once hand-edited
   useEffect(() => {
     if (titleTouched || !contact) return;
-    setTitle(interests.length > 0 ? `${contact.last_name} – ${interests[0]}` : '');
-  }, [interests, contact, titleTouched]);
-
-  const toggleInterest = (i: string) =>
-    setInterests(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
+    const trimmedInterest = interest.trim();
+    setTitle(trimmedInterest ? `${contact.last_name} – ${trimmedInterest}` : '');
+  }, [interest, contact, titleTouched]);
 
   const canCreate = useMemo(
     () => !!contact && !!stage && title.trim().length > 0 && expectedCloseDate.length > 0,
@@ -105,7 +102,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         amount: amount ? parseFloat(amount) : null,
         priority,
         lead_source: contact.lead_source,
-        product_interest: interests.length > 0 ? interests : null,
+        product_interest: interest.trim() ? [interest.trim()] : null,
         expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
         location_id: contact.location_id ?? profile.location_id ?? null,
@@ -176,10 +173,16 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         ) : (
           <div className="px-6 py-5 space-y-5 overflow-y-auto">
             <div>
-              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">What are they shopping for?</p>
-              <div className="flex flex-wrap gap-2">
-                {INTERESTS.map(i => <Chip key={i} active={interests.includes(i)} onClick={() => toggleInterest(i)}>{i}</Chip>)}
-              </div>
+              <label htmlFor="deal-interest" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+                What are they shopping for?
+              </label>
+              <input
+                id="deal-interest"
+                value={interest}
+                onChange={e => setInterest(e.target.value)}
+                placeholder="e.g. Sundance Aspen or a replacement cover"
+                className={inputClass}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

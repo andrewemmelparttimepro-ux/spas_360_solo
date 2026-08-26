@@ -9,7 +9,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType } from '@/types/database';
-import { availableInventoryForJob, customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
+import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -86,7 +86,7 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
         )}
       </div>
       <Link to={`/service/${job.id}`} className="block mt-1">
-        <h3 className="font-semibold text-sm leading-snug hover:underline underline-offset-2">{job.title}</h3>
+        <h3 className={cn('font-semibold text-sm leading-snug hover:underline underline-offset-2', calendarJobTitleClass(job.status))}>{job.title}</h3>
         <p className="text-xs opacity-70 mt-0.5">
           {job.job_type}{contact ? ` · ${contact.first_name} ${contact.last_name}` : ''}{city ? ` · ${city}` : ''}
         </p>
@@ -506,7 +506,7 @@ export default function Service() {
                                           )}
                                         >
                                           {jobTime(job) && <span className="font-bold mr-1">{jobTime(job)}</span>}
-                                          {job.title}
+                                          <span className={calendarJobTitleClass(job.status)}>{job.title}</span>
                                         </Link>
                                       </div>
                                     )}

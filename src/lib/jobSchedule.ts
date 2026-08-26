@@ -1,4 +1,4 @@
-import type { InventoryItem, JobType, ScheduleJobType } from '@/types/database';
+import type { InventoryItem, JobStatus, JobType, ScheduleJobType } from '@/types/database';
 
 export const JOB_TYPE_OPTIONS: ScheduleJobType[] = [
   'Service',
@@ -12,6 +12,10 @@ export function scheduleJobType(jobType: JobType): ScheduleJobType {
   if (jobType === 'Repair' || jobType === 'Installation' || jobType === 'Maintenance') return 'Service';
   if (jobType === 'Pickup') return 'Customer Pick Up';
   return jobType;
+}
+
+export function calendarJobTitleClass(status: JobStatus): string | undefined {
+  return status === 'Completed' ? 'line-through decoration-solid decoration-2' : undefined;
 }
 
 export function availableInventoryForJob<T extends Pick<

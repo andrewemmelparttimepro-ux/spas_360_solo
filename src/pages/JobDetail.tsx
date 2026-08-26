@@ -313,7 +313,7 @@ export default function JobDetail() {
             <span className="text-[10px] text-ink-500">Click any value to edit</span>
           </div>
           <div className="space-y-4">
-            <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS} />
+            <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS.some(option => option === job.job_type) ? JOB_TYPE_OPTIONS : [job.job_type, ...JOB_TYPE_OPTIONS]} />
             {location && <div className="flex items-center text-sm"><MapPin className="w-4 h-4 mr-2 text-ink-500" />{location.name}</div>}
             {property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
             <EditableField label="Scheduled" value={job.scheduled_at ? toLocalInputValue(job.scheduled_at) : null} field="scheduled_at" onSave={saveJob} icon={Clock} type="datetime-local" />

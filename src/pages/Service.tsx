@@ -4,18 +4,18 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useServiceJobs, statusColors, statusChipColors, statusDotColors, JOB_STATUS_OPTIONS } from '@/hooks/useServiceJobs';
+import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Job, JobStatus, JobType } from '@/types/database';
+import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
+import { customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
 
 type ViewMode = 'day' | 'week' | 'month';
-type ServiceJob = Job & { contacts?: { first_name: string; last_name: string } | null };
+type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; mailing_address: string | null } | null };
 
-// Statuses shown in the legend/filter (Cancelled is hidden from boards anyway)
-const LEGEND_STATUSES: JobStatus[] = ['Delivery', 'Warranty', 'Parts on Order'];
+const LEGEND_JOB_TYPES: ScheduleJobType[] = JOB_TYPE_OPTIONS;
 
 const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
 
@@ -74,8 +74,9 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
 // --------------- Day/week job card ---------------
 function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
   const contact = job.contacts;
+  const city = customerCityFromAddress(contact?.mailing_address);
   return (
-    <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', statusColors[job.status as JobStatus] ?? 'bg-ink-950')}>
+    <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', jobTypeCardColors[scheduleJobType(job.job_type)] ?? 'bg-ink-950')}>
       <div className="flex items-center justify-between gap-2">
         <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
         {job.scheduled_at && (
@@ -85,7 +86,7 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
       <Link to={`/service/${job.id}`} className="block mt-1">
         <h3 className="font-semibold text-sm leading-snug hover:underline underline-offset-2">{job.title}</h3>
         <p className="text-xs opacity-70 mt-0.5">
-          {job.job_type}{contact ? ` · ${contact.first_name} ${contact.last_name}` : ''}
+          {job.job_type}{contact ? ` · ${contact.first_name} ${contact.last_name}` : ''}{city ? ` · ${city}` : ''}
         </p>
       </Link>
     </div>
@@ -102,7 +103,7 @@ export default function Service() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [statusFilter, setStatusFilter] = useState<Set<JobStatus>>(new Set());
+  const [jobTypeFilter, setJobTypeFilter] = useState<Set<ScheduleJobType>>(new Set());
 
   const saveJobStatus = async (id: string, u: { status: JobStatus }) => {
     const ok = await updateJob(id, u);
@@ -110,10 +111,10 @@ export default function Service() {
     return ok;
   };
 
-  const toggleFilter = (s: JobStatus) =>
-    setStatusFilter(prev => {
+  const toggleFilter = (jobType: ScheduleJobType) =>
+    setJobTypeFilter(prev => {
       const next = new Set(prev);
-      if (next.has(s)) next.delete(s); else next.add(s);
+      if (next.has(jobType)) next.delete(jobType); else next.add(jobType);
       return next;
     });
 
@@ -172,14 +173,17 @@ export default function Service() {
   const filteredJobs = useMemo(() => {
     return (scheduledJobs as ServiceJob[]).filter(j => {
       if (!j.scheduled_at) return false;
-      if (statusFilter.size > 0 && !statusFilter.has(j.status as JobStatus)) return false;
+      if (jobTypeFilter.size > 0 && !jobTypeFilter.has(scheduleJobType(j.job_type))) return false;
       return isWithinInterval(new Date(j.scheduled_at), { start: rangeStart, end: rangeEnd });
     });
-  }, [scheduledJobs, rangeStart, rangeEnd, statusFilter]);
+  }, [scheduledJobs, rangeStart, rangeEnd, jobTypeFilter]);
 
   const legendCounts = useMemo(() => {
-    const c = {} as Record<JobStatus, number>;
-    for (const j of jobs) c[j.status as JobStatus] = (c[j.status as JobStatus] ?? 0) + 1;
+    const c = {} as Record<ScheduleJobType, number>;
+    for (const j of jobs) {
+      const jobType = scheduleJobType(j.job_type);
+      c[jobType] = (c[jobType] ?? 0) + 1;
+    }
     return c;
   }, [jobs]);
 
@@ -225,7 +229,7 @@ export default function Service() {
   }, [contacts]);
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
-    job_type: 'Repair' as JobType, status: 'In Progress' as JobStatus,
+    job_type: 'Service' as JobType, status: 'In Progress' as JobStatus,
     description: '', scheduled_at: '', priority: 'Medium' as 'High' | 'Medium' | 'Low', amount_to_collect: '',
   });
   const handleCreate = async () => {
@@ -238,7 +242,7 @@ export default function Service() {
       amount_to_collect: newJob.amount_to_collect ? parseFloat(newJob.amount_to_collect) : null,
     });
     setShowCreate(false);
-    setNewJob({ title: '', contact_id: '', location_id: '', job_type: 'Repair', status: 'In Progress', description: '', scheduled_at: '', priority: 'Medium', amount_to_collect: '' });
+    setNewJob({ title: '', contact_id: '', location_id: '', job_type: 'Service', status: 'In Progress', description: '', scheduled_at: '', priority: 'Medium', amount_to_collect: '' });
   };
 
   if (isLoading) {
@@ -267,12 +271,12 @@ export default function Service() {
 
       {/* Color legend = working filter (Brandon's color language) */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4 shrink-0">
-        {LEGEND_STATUSES.map(s => {
-          const active = statusFilter.has(s);
+        {LEGEND_JOB_TYPES.map(jobType => {
+          const active = jobTypeFilter.has(jobType);
           return (
             <button
-              key={s}
-              onClick={() => toggleFilter(s)}
+              key={jobType}
+              onClick={() => toggleFilter(jobType)}
               className={cn(
                 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all',
                 active
@@ -280,14 +284,14 @@ export default function Service() {
                   : 'bg-ink-900 border-ink-700 text-ink-400 hover:text-ink-200 hover:border-ink-600'
               )}
             >
-              <span className={cn('w-2 h-2 rounded-full shrink-0', statusDotColors[s])} />
-              {s === 'Parts on Order' ? 'Parts On Order' : s}
-              <span className="font-mono text-[10px] opacity-70">{legendCounts[s] ?? 0}</span>
+              <span className={cn('w-2 h-2 rounded-full shrink-0', jobTypeDotColors[jobType])} />
+              {jobType}
+              <span className="font-mono text-[10px] opacity-70">{legendCounts[jobType] ?? 0}</span>
             </button>
           );
         })}
-        {statusFilter.size > 0 && (
-          <button onClick={() => setStatusFilter(new Set())} className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 px-2">
+        {jobTypeFilter.size > 0 && (
+          <button onClick={() => setJobTypeFilter(new Set())} className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 px-2">
             Clear filter
           </button>
         )}
@@ -310,7 +314,7 @@ export default function Service() {
               </select>
               <div className="grid grid-cols-2 gap-3">
                 <select value={newJob.job_type} onChange={e => { setNewJob({...newJob, job_type: e.target.value as JobType}); applyAutoTitle(newJob.contact_id, e.target.value); }} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  <option>Delivery</option><option>Repair</option><option>Installation</option><option>Warranty</option><option>Maintenance</option><option>Pickup</option>
+                  {JOB_TYPE_OPTIONS.map(jobType => <option key={jobType}>{jobType}</option>)}
                 </select>
                 <select value={newJob.status} onChange={e => setNewJob({...newJob, status: e.target.value as JobStatus})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option>In Progress</option><option>Delivery</option><option>Parts on Order</option><option>Warranty</option><option>Ready for Pickup</option>
@@ -475,7 +479,7 @@ export default function Service() {
                                           title={`${job.title}${job.scheduled_at ? ` — ${format(new Date(job.scheduled_at), 'h:mm a')}` : ''}`}
                                           className={cn(
                                             'block text-[10px] leading-[15px] px-1.5 py-[3px] rounded-[4px] truncate font-semibold shadow-sm',
-                                            statusChipColors[job.status as JobStatus] ?? 'bg-ink-800 text-ink-300',
+                                            jobTypeChipColors[scheduleJobType(job.job_type)] ?? 'bg-ink-800 text-ink-300',
                                             snap.isDragging && 'ring-2 ring-brand-400'
                                           )}
                                         >
@@ -520,7 +524,7 @@ export default function Service() {
                           ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
                           className={cn(
                             'rounded-md px-2.5 py-2 shadow-sm cursor-grab active:cursor-grabbing',
-                            statusChipColors[job.status as JobStatus] ?? 'bg-ink-800 text-ink-300',
+                            jobTypeChipColors[scheduleJobType(job.job_type)] ?? 'bg-ink-800 text-ink-300',
                             snap.isDragging && 'ring-2 ring-brand-400 rotate-1'
                           )}
                         >
@@ -530,6 +534,12 @@ export default function Service() {
                           <Link to={`/service/${job.id}`} onClick={e => e.stopPropagation()} className="block text-xs font-semibold leading-snug mt-0.5 hover:underline underline-offset-2">
                             {job.title}
                           </Link>
+                          {job.contacts && (
+                            <p className="mt-1 text-[10px] font-semibold opacity-90">
+                              {job.contacts.first_name} {job.contacts.last_name}
+                              {customerCityFromAddress(job.contacts.mailing_address) ? ` · ${customerCityFromAddress(job.contacts.mailing_address)}` : ''}
+                            </p>
+                          )}
                           <p className="mt-1 text-[10px] font-medium opacity-80">
                             Created {format(new Date(job.created_at), 'MMM d, yyyy')}
                           </p>

@@ -163,8 +163,8 @@ CREATE TABLE jobs (
   property_id UUID REFERENCES properties(id),
   location_id UUID NOT NULL REFERENCES locations(id),
   title TEXT NOT NULL,
-  job_type TEXT NOT NULL DEFAULT 'Repair'
-    CHECK (job_type IN ('Delivery', 'Repair', 'Installation', 'Warranty', 'Maintenance', 'Pickup')),
+  job_type TEXT NOT NULL DEFAULT 'Service'
+    CHECK (job_type IN ('Service', 'Warranty', 'Delivery', 'On Order', 'Customer Pick Up', 'Repair', 'Installation', 'Maintenance', 'Pickup')),
   status TEXT NOT NULL DEFAULT 'In Progress'
     CHECK (status IN ('Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'In Progress', 'Completed', 'Cancelled')),
   description TEXT,

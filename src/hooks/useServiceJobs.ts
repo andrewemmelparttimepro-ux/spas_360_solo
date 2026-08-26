@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Job, JobStatus } from '@/types/database';
+import type { Job, JobStatus, ScheduleJobType } from '@/types/database';
+import { JOB_TYPE_OPTIONS } from '@/lib/jobSchedule';
 
 // Brandon's color language from the Jobber board:
 // red = delivery, orange = warranty, black = parts not received,
@@ -42,8 +43,34 @@ export const statusDotColors: Record<JobStatus, string> = {
   'Cancelled': 'bg-ink-600',
 };
 
+// Schedule colors follow the job's business type, not its mutable workflow
+// status. That keeps the same visual language when a job is scheduled.
+export const jobTypeCardColors: Record<ScheduleJobType, string> = {
+  'Service': 'border-l-brand-500 bg-brand-500/10 text-brand-200',
+  'Warranty': 'border-l-orange-500 bg-orange-500/10 text-orange-200',
+  'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
+  'On Order': 'border-l-ink-600 bg-black text-white',
+  'Customer Pick Up': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
+};
+
+export const jobTypeChipColors: Record<ScheduleJobType, string> = {
+  'Service': 'bg-brand-500 text-white',
+  'Warranty': 'bg-orange-600 text-white',
+  'Delivery': 'bg-red-600 text-white',
+  'On Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
+  'Customer Pick Up': 'bg-emerald-600 text-white',
+};
+
+export const jobTypeDotColors: Record<ScheduleJobType, string> = {
+  'Service': 'bg-brand-400',
+  'Warranty': 'bg-orange-500',
+  'Delivery': 'bg-red-500',
+  'On Order': 'bg-black ring-1 ring-ink-500',
+  'Customer Pick Up': 'bg-emerald-500',
+};
+
 export const JOB_STATUS_OPTIONS: JobStatus[] = ['Pending Confirm', 'In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
-export const JOB_TYPE_OPTIONS = ['Delivery', 'Repair', 'Installation', 'Warranty', 'Maintenance', 'Pickup'];
+export { JOB_TYPE_OPTIONS };
 
 export function useServiceJobs() {
   const { profile, activeLocationId } = useAuth();
@@ -56,7 +83,7 @@ export function useServiceJobs() {
 
     let query = supabase
       .from('jobs')
-      .select('*, contacts:contact_id(first_name, last_name), job_assignments(user_id, profiles:user_id(first_name, last_name))')
+      .select('*, contacts:contact_id(first_name, last_name, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
       .eq('org_id', profile.org_id)
       .order('scheduled_at', { ascending: true, nullsFirst: true });
 

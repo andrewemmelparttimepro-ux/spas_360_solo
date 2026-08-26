@@ -20,6 +20,7 @@ import {
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
+import { inventoryAgeLabel } from '@/lib/inventoryAge';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
 const INVENTORY_GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
@@ -403,7 +404,7 @@ export default function Inventory() {
   const brandOptions = inventoryBrandOptions(items);
   const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
   const groupedItems = groupInventoryItems(visibleItems);
-  const columnCount = showStore ? 8 : 7;
+  const columnCount = showStore ? 9 : 8;
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -458,7 +459,7 @@ export default function Inventory() {
         </div>
         {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
         <div className="overflow-x-auto">
-          <table data-density="compact" className="w-full min-w-[1120px] text-left border-collapse">
+          <table data-density="compact" className="w-full min-w-[1220px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Model</th>
@@ -466,6 +467,7 @@ export default function Inventory() {
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Color Combination</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Serial Number</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Age</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Customer/Stock</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>
@@ -510,6 +512,9 @@ export default function Inventory() {
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
+                  </td>
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
+                    {inventoryAgeLabel(item.created_at)}
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <CustomerStockCell item={item} onSave={updateItem} />

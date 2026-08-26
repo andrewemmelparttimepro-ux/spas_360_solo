@@ -117,7 +117,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   }, []);
 
   return (
-    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-1.5 sm:gap-4 shrink-0 z-40">
+    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-1.5 sm:gap-4 lg:gap-2 2xl:gap-4 shrink-0 z-40">
       {/* Menu — on desktop it holds Inbox, Citadel, Reports, Settings */}
       <button
         onClick={onMenuClick}
@@ -137,7 +137,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </NavLink>
 
       {/* Nav (desktop) — the floor-operations destinations only. */}
-      <nav className="hidden lg:flex items-center gap-1">
+      <nav className="hidden min-w-0 flex-1 items-center justify-evenly lg:flex">
         {PRIMARY_NAV_SECTIONS.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
@@ -158,7 +158,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     {...(isDropNav ? { 'data-cdrop': 'nav', 'data-cdrop-nav': item.path } : {})}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-1 px-1.5 py-[7px] rounded-lg text-[11px] font-semibold transition-all 2xl:gap-1.5 2xl:px-2.5 2xl:text-[12px]',
+                        'flex items-center gap-1 px-1.5 py-[7px] rounded-lg text-[12px] font-semibold transition-all 2xl:gap-1.5 2xl:px-2.5 2xl:text-[13px]',
                         isActive ? tone.active : tone.idle,
                         // A customer card is in flight — light up the landing zones
                         dragging && isDropNav && 'ring-2 ring-violet-400/50',
@@ -176,7 +176,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         })}
       </nav>
 
-      <div className="flex-1" />
+      <div className="flex-1 lg:hidden" />
 
       {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. */}
       <button

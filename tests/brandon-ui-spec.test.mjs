@@ -34,8 +34,10 @@ describe('Brandon composite UI contract', () => {
     assert.match(header, /name: 'Media', path: '\/media', icon: Images/);
     assert.match(header, /name: 'Documents', path: '\/documents', icon: Files/);
     assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown/);
-    assert.match(header, /<nav className="hidden lg:flex items-center gap-1">/);
-    assert.match(header, /px-1\.5[^"]*text-\[11px\][^"]*2xl:px-2\.5[^"]*2xl:text-\[12px\]/);
+    assert.match(header, /<nav className="hidden min-w-0 flex-1 items-center justify-evenly lg:flex">/);
+    assert.match(header, /gap-1\.5 sm:gap-4 lg:gap-2 2xl:gap-4/);
+    assert.match(header, /px-1\.5[^"]*text-\[12px\][^"]*2xl:px-2\.5[^"]*2xl:text-\[13px\]/);
+    assert.match(header, /<div className="flex-1 lg:hidden" \/>/);
     // Every destination now wears the same icon rule — no per-tab exemptions
     assert.match(header, /<item\.icon className="h-\[15px\] w-\[15px\] shrink-0 hidden 2xl:block" \/>/);
     const secondaryBlock = header.slice(header.indexOf('SECONDARY_NAV_ITEMS'));

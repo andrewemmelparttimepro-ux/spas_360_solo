@@ -350,7 +350,10 @@ export default function Service() {
                   <option value="High">High Priority</option><option value="Medium">Medium Priority</option><option value="Low">Low Priority</option>
                 </select>
               </div>
-              <input type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+              <div>
+                <label htmlFor="new-job-scheduled-at" className="mb-1.5 block text-xs font-semibold text-ink-300">Select Dates</label>
+                <input id="new-job-scheduled-at" type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+              </div>
               <input placeholder="Amount to Collect ($)" type="number" value={newJob.amount_to_collect} onChange={e => setNewJob({...newJob, amount_to_collect: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <textarea placeholder="Description / Notes" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} rows={3} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-none" />
               {createJobError && <p role="alert" className="text-xs font-medium text-red-300">{createJobError}</p>}

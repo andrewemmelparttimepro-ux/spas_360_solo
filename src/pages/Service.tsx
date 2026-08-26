@@ -6,9 +6,11 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addW
 import { cn } from '@/lib/utils';
 import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, statusDotColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
+import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType } from '@/types/database';
-import { customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
+import { availableInventoryForJob, customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
+import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
 
@@ -96,6 +98,7 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
 export default function Service() {
   const { jobs, unscheduledJobs, scheduledJobs, isLoading, createJob, updateJob } = useServiceJobs();
   const { contacts } = useContacts();
+  const { items: inventoryItems, refresh: refreshInventory } = useInventory();
   const { locations, profile, activeLocationId } = useAuth();
   const { toast } = useToast();
 
@@ -186,6 +189,8 @@ export default function Service() {
 
   // ─── Create job modal ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
+  const [creatingJob, setCreatingJob] = useState(false);
+  const [createJobError, setCreateJobError] = useState<string | null>(null);
 
   // Arriving via the dashboard's "+ New" → open the modal immediately, smart defaults applied.
   // A customer card dropped on the Schedule pill arrives with contactId pre-picked.
@@ -199,6 +204,7 @@ export default function Service() {
         location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '',
       }));
       if (st.contactId) pendingContactRef.current = st.contactId;
+      setCreateJobError(null);
       setShowCreate(true);
       navigate(location.pathname, { replace: true, state: null }); // consume the flag
     }
@@ -226,20 +232,38 @@ export default function Service() {
   }, [contacts]);
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
-    job_type: 'Service' as JobType, status: 'In Progress' as JobStatus,
+    inventory_item_id: '', job_type: 'Service' as JobType,
     description: '', scheduled_at: '', priority: 'Medium' as 'High' | 'Medium' | 'Low', amount_to_collect: '',
   });
+  const availableInventory = useMemo(
+    () => availableInventoryForJob(inventoryItems, newJob.location_id),
+    [inventoryItems, newJob.location_id],
+  );
+
   const handleCreate = async () => {
-    await createJob({
+    if (creatingJob) return;
+    setCreatingJob(true);
+    setCreateJobError(null);
+    const result = await createJob({
       title: newJob.title, contact_id: newJob.contact_id,
       location_id: newJob.location_id || (locations[0]?.id ?? ''),
-      job_type: newJob.job_type, status: newJob.status,
+      job_type: newJob.job_type, status: 'In Progress',
       description: newJob.description || null, scheduled_at: newJob.scheduled_at || null,
       priority: newJob.priority,
       amount_to_collect: newJob.amount_to_collect ? parseFloat(newJob.amount_to_collect) : null,
-    });
+    }, newJob.inventory_item_id || null);
+    if (!result.id) {
+      const message = result.error || 'The job could not be created.';
+      setCreateJobError(message);
+      toast(message, 'error');
+      setCreatingJob(false);
+      return;
+    }
+    await refreshInventory();
+    toast('Job created', 'success');
     setShowCreate(false);
-    setNewJob({ title: '', contact_id: '', location_id: '', job_type: 'Service', status: 'In Progress', description: '', scheduled_at: '', priority: 'Medium', amount_to_collect: '' });
+    setNewJob({ title: '', contact_id: '', location_id: '', inventory_item_id: '', job_type: 'Service', description: '', scheduled_at: '', priority: 'Medium', amount_to_collect: '' });
+    setCreatingJob(false);
   };
 
   if (isLoading) {
@@ -258,6 +282,7 @@ export default function Service() {
           onClick={() => {
             // Smart default: pre-pick the store you're already working in
             setNewJob(j => ({ ...j, location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '' }));
+            setCreateJobError(null);
             setShowCreate(true);
           }}
           className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
@@ -298,10 +323,10 @@ export default function Service() {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div role="dialog" aria-modal="true" aria-label="New job" className="bg-ink-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto">
-            <DialogKeys onClose={() => setShowCreate(false)} />
+            <DialogKeys onClose={() => { if (!creatingJob) setShowCreate(false); }} />
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-ink-100">New Job</h2>
-              <button onClick={() => setShowCreate(false)} className="text-ink-500 hover:text-ink-300"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowCreate(false)} disabled={creatingJob} className="text-ink-500 hover:text-ink-300 disabled:opacity-50"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
               <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
@@ -309,16 +334,15 @@ export default function Service() {
                 <option value="">Select Customer *</option>
                 {contacts.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name} — {c.phone}</option>)}
               </select>
+              <select value={newJob.job_type} onChange={e => { setNewJob({...newJob, job_type: e.target.value as JobType}); applyAutoTitle(newJob.contact_id, e.target.value); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+                {JOB_TYPE_OPTIONS.map(jobType => <option key={jobType}>{jobType}</option>)}
+              </select>
+              <select value={newJob.inventory_item_id} onChange={e => setNewJob({...newJob, inventory_item_id: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+                <option value="">Current Inventory (optional)</option>
+                {availableInventory.map(item => <option key={item.id} value={item.id}>{inventoryUnitLabel(item)}</option>)}
+              </select>
               <div className="grid grid-cols-2 gap-3">
-                <select value={newJob.job_type} onChange={e => { setNewJob({...newJob, job_type: e.target.value as JobType}); applyAutoTitle(newJob.contact_id, e.target.value); }} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  {JOB_TYPE_OPTIONS.map(jobType => <option key={jobType}>{jobType}</option>)}
-                </select>
-                <select value={newJob.status} onChange={e => setNewJob({...newJob, status: e.target.value as JobStatus})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
-                  <option>In Progress</option><option>Delivery</option><option>Parts on Order</option><option>Warranty</option><option>Ready for Pickup</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <select value={newJob.location_id} onChange={e => setNewJob({...newJob, location_id: e.target.value})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+                <select value={newJob.location_id} onChange={e => setNewJob({...newJob, location_id: e.target.value, inventory_item_id: ''})} className="px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                   <option value="">Location *</option>
                   {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
@@ -329,10 +353,11 @@ export default function Service() {
               <input type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <input placeholder="Amount to Collect ($)" type="number" value={newJob.amount_to_collect} onChange={e => setNewJob({...newJob, amount_to_collect: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <textarea placeholder="Description / Notes" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} rows={3} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-none" />
+              {createJobError && <p role="alert" className="text-xs font-medium text-red-300">{createJobError}</p>}
             </div>
             <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} disabled={!newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">Create Job</button>
+              <button onClick={() => setShowCreate(false)} disabled={creatingJob} className="px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 rounded-lg disabled:opacity-50">Cancel</button>
+              <button onClick={handleCreate} disabled={creatingJob || !newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">{creatingJob ? 'Creating…' : 'Create Job'}</button>
             </div>
           </div>
         </div>

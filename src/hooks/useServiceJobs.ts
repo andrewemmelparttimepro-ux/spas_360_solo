@@ -116,20 +116,30 @@ export function useServiceJobs() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const scheduledJobs = jobs.filter(j => j.scheduled_at && j.status !== 'Cancelled');
 
-  const createJob = useCallback(async (job: Partial<Job>) => {
-    if (!profile) return null;
-    const { data, error } = await supabase
-      .from('jobs')
-      .insert({
-        ...job,
-        org_id: profile.org_id,
-        created_by: profile.id,
-      } as Job)
-      .select()
-      .single();
-    if (error) { console.error('Error creating job:', error); return null; }
-    await fetchJobs();
-    return data;
+  const createJob = useCallback(async (job: Partial<Job>, inventoryItemId: string | null = null) => {
+    if (!profile) return { id: null, error: 'Your session is not ready.' };
+    try {
+      const { data, error } = await supabase.rpc('create_job_with_inventory', {
+        p_title: job.title ?? '',
+        p_contact_id: job.contact_id,
+        p_location_id: job.location_id,
+        p_job_type: job.job_type,
+        p_description: job.description ?? null,
+        p_scheduled_at: job.scheduled_at ?? null,
+        p_priority: job.priority ?? 'Medium',
+        p_amount_to_collect: job.amount_to_collect ?? null,
+        p_inventory_item_id: inventoryItemId || null,
+      });
+      if (error) {
+        console.error('Error creating job:', error);
+        return { id: null, error: error.message || 'The job could not be created.' };
+      }
+      await fetchJobs();
+      return { id: data as string, error: null };
+    } catch (error) {
+      console.error('Error creating job:', error);
+      return { id: null, error: (error as Error).message || 'The job could not be created.' };
+    }
   }, [profile, fetchJobs]);
 
   const updateJob = useCallback(async (id: string, updates: Partial<Job>) => {

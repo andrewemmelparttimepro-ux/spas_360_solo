@@ -6,6 +6,7 @@ import type { Contact, InventoryItem } from '@/types/database';
 
 export type InventoryListItem = InventoryItem & {
   customer: Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone' | 'customer_type'> | null;
+  locations?: { name: string } | null;
 };
 
 export function useInventory() {

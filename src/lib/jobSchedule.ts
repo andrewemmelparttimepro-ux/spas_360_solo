@@ -1,4 +1,4 @@
-import type { JobType, ScheduleJobType } from '@/types/database';
+import type { InventoryItem, JobType, ScheduleJobType } from '@/types/database';
 
 export const JOB_TYPE_OPTIONS: ScheduleJobType[] = [
   'Service',
@@ -12,6 +12,19 @@ export function scheduleJobType(jobType: JobType): ScheduleJobType {
   if (jobType === 'Repair' || jobType === 'Installation' || jobType === 'Maintenance') return 'Service';
   if (jobType === 'Pickup') return 'Customer Pick Up';
   return jobType;
+}
+
+export function availableInventoryForJob<T extends Pick<
+  InventoryItem,
+  'status' | 'customer_id' | 'deal_id' | 'job_id' | 'location_id'
+>>(items: T[], locationId: string): T[] {
+  return items.filter(item => (
+    item.status === 'In Stock'
+    && item.customer_id === null
+    && item.deal_id === null
+    && item.job_id === null
+    && (!locationId || item.location_id === locationId)
+  ));
 }
 
 /**

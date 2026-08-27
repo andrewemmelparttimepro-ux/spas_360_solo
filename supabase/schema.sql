@@ -143,7 +143,11 @@ CREATE TABLE deals (
   assigned_to UUID NOT NULL REFERENCES profiles(id),
   product_interest TEXT[] DEFAULT '{}',
   lead_source TEXT NOT NULL DEFAULT 'Walk-in'
-    CHECK (lead_source IN ('Walk-in', 'Website', 'Referral', 'Ad', 'Phone', 'Event', 'Other')),
+    CHECK (lead_source IN (
+      'Walk-in', 'Website', 'Referral', 'Ad', 'Phone', 'Event', 'Other',
+      'Facebook', 'Google', 'Radio', 'Tv', 'Called In', 'Walk-In',
+      'Off-Site Show/Event'
+    )),
   lost_reason TEXT,
   location_id UUID REFERENCES locations(id),
   position INT NOT NULL DEFAULT 0,

@@ -15,7 +15,10 @@ test('customer New Deal uses one free-text interest field and preserves the deal
 });
 
 test('customer New Deal shows the requested lead sources and stores the canonical deal value', async () => {
-  const modal = await read('src/components/QuickDealModal.tsx');
+  const [modal, schema] = await Promise.all([
+    read('src/components/QuickDealModal.tsx'),
+    read('supabase/schema.sql'),
+  ]);
 
   const options = [...modal.matchAll(/\{ label: '([^']+)', storedValue: '([^']+)' \}/g)]
     .map(([, label, storedValue]) => ({ label, storedValue }));
@@ -37,4 +40,7 @@ test('customer New Deal shows the requested lead sources and stores the canonica
   assert.doesNotMatch(modal, /<option value=""/);
   assert.match(modal, /lead_source:\s*storedLeadSource/);
   assert.doesNotMatch(modal, /lead_source:\s*contact\.lead_source/);
+  for (const value of options.map(option => option.storedValue)) {
+    assert.match(schema, new RegExp(`'${value.replace('/', '\\/')}'`));
+  }
 });

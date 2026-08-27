@@ -53,13 +53,13 @@ describe('Schedule job language and colors', () => {
       hook.indexOf('// Legend dots'),
     );
     assert.match(queueColors, /'Delivery': 'bg-red-600 text-white'/);
-    assert.match(queueColors, /'Warranty': 'bg-orange-600 text-white'/);
+    assert.match(queueColors, /'Warranty': 'bg-purple-600 text-white'/);
     assert.match(queueColors, /'Parts on Order': 'bg-black text-white/);
     assert.match(queueColors, /'In Progress': 'bg-brand-500 text-white'/);
     assert.match(queueColors, /'Ready for Pickup': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'Service': 'bg-brand-500 text-white'/);
     assert.match(hook, /'Delivery': 'bg-red-600 text-white'/);
-    assert.match(hook, /'Warranty': 'bg-orange-600 text-white'/);
+    assert.match(hook, /'Warranty': 'bg-purple-600 text-white'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'On Order': 'bg-black text-white/);
     assert.match(service, /jobTypeChipColors\[scheduleJobType\(job\.job_type\)\]/);
@@ -80,9 +80,22 @@ describe('Schedule job language and colors', () => {
     assert.doesNotMatch(service, /legendCounts/);
     assert.match(hook, /'Service': 'bg-brand-400'/);
     assert.match(hook, /'Delivery': 'bg-red-500'/);
-    assert.match(hook, /'Warranty': 'bg-orange-500'/);
+    assert.match(hook, /'Warranty': 'bg-purple-500'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-500'/);
     assert.match(hook, /'On Order': 'bg-black ring-1 ring-ink-500'/);
+  });
+
+  it('uses purple for every Warranty treatment without recoloring other job types', async () => {
+    const hook = await read('src/hooks/useServiceJobs.ts');
+    const css = await read('src/index.css');
+
+    assert.equal((hook.match(/'Warranty': '[^']*purple[^']*'/g) ?? []).length, 6);
+    assert.doesNotMatch(hook, /'Warranty': '[^']*orange[^']*'/);
+    assert.match(hook, /'Service': 'bg-brand-500 text-white'/);
+    assert.match(hook, /'Delivery': 'bg-red-600 text-white'/);
+    assert.match(hook, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
+    assert.match(hook, /'On Order': 'bg-black text-white/);
+    assert.match(css, /\.app-main \.schedule-calendar \.text-purple-200\s*\{\s*color:\s*var\(--color-purple-200\) !important;/i);
   });
 
   it('preserves legacy rows and labels won deliveries with customer and city', async () => {

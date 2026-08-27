@@ -124,7 +124,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(inventoryEditor, />Model \*</);
     assert.match(service, /const LEGEND_JOB_TYPES: ScheduleJobType\[\] = \['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order'\]/);
     assert.match(serviceJobs, /'Service': 'bg-brand-500 text-white'/);
-    assert.match(serviceJobs, /'Warranty': 'bg-orange-600 text-white'/);
+    assert.match(serviceJobs, /'Warranty': 'bg-purple-600 text-white'/);
     assert.match(serviceJobs, /'Delivery': 'bg-red-600 text-white'/);
     assert.match(serviceJobs, /'On Order': 'bg-black text-white/);
     assert.match(serviceJobs, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
@@ -180,7 +180,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(service, /className="schedule-calendar[^\"]*bg-ink-900/);
     assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-900:\s*#0D1726/i);
     assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-100:\s*#F7F9FC/i);
-    assert.match(css, /\.app-main \.schedule-calendar \.text-orange-200\s*\{\s*color:\s*var\(--color-orange-200\) !important;/i);
+    assert.match(css, /\.app-main \.schedule-calendar \.text-purple-200\s*\{\s*color:\s*var\(--color-purple-200\) !important;/i);
   });
 
   it('keeps the personalized dashboard welcome and approved-logo lookup', async () => {

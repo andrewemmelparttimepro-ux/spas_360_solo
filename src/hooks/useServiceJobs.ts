@@ -6,13 +6,13 @@ import type { Job, JobStatus, ScheduleJobType } from '@/types/database';
 import { JOB_TYPE_OPTIONS } from '@/lib/jobSchedule';
 
 // Brandon's color language from the Jobber board:
-// red = delivery, orange = warranty, black = parts not received,
+// red = delivery, purple = warranty, black = parts not received,
 // blue = service, green = ready, strikethrough = done.
 export const statusColors: Record<JobStatus, string> = {
   'Pending Confirm': 'border-l-amber-500 bg-amber-500/10 text-amber-200',
   'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
   'Parts on Order': 'border-l-ink-600 bg-black text-ink-300',
-  'Warranty': 'border-l-orange-500 bg-orange-500/10 text-orange-200',
+  'Warranty': 'border-l-purple-500 bg-purple-500/10 text-purple-200',
   'Ready for Pickup': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
   'In Progress': 'border-l-brand-400 bg-brand-500/10 text-brand-300',
   'Completed': 'border-l-ink-600 bg-ink-950 text-ink-500 line-through',
@@ -24,7 +24,7 @@ export const statusChipColors: Record<JobStatus, string> = {
   'Pending Confirm': 'bg-amber-500 text-black',
   'Delivery': 'bg-red-600 text-white',
   'Parts on Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
-  'Warranty': 'bg-orange-600 text-white',
+  'Warranty': 'bg-purple-600 text-white',
   'Ready for Pickup': 'bg-emerald-600 text-white',
   'In Progress': 'bg-brand-500 text-white',
   'Completed': 'bg-ink-800 text-ink-400 line-through',
@@ -36,7 +36,7 @@ export const statusDotColors: Record<JobStatus, string> = {
   'Pending Confirm': 'bg-amber-500',
   'Delivery': 'bg-red-500',
   'Parts on Order': 'bg-black ring-1 ring-ink-500',
-  'Warranty': 'bg-orange-500',
+  'Warranty': 'bg-purple-500',
   'Ready for Pickup': 'bg-emerald-500',
   'In Progress': 'bg-brand-400',
   'Completed': 'bg-ink-500',
@@ -47,7 +47,7 @@ export const statusDotColors: Record<JobStatus, string> = {
 // status. That keeps the same visual language when a job is scheduled.
 export const jobTypeCardColors: Record<ScheduleJobType, string> = {
   'Service': 'border-l-brand-500 bg-brand-500/10 text-brand-200',
-  'Warranty': 'border-l-orange-500 bg-orange-500/10 text-orange-200',
+  'Warranty': 'border-l-purple-500 bg-purple-500/10 text-purple-200',
   'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
   'On Order': 'border-l-ink-600 bg-black text-white',
   'Customer Pick Up': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
@@ -55,7 +55,7 @@ export const jobTypeCardColors: Record<ScheduleJobType, string> = {
 
 export const jobTypeChipColors: Record<ScheduleJobType, string> = {
   'Service': 'bg-brand-500 text-white',
-  'Warranty': 'bg-orange-600 text-white',
+  'Warranty': 'bg-purple-600 text-white',
   'Delivery': 'bg-red-600 text-white',
   'On Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
   'Customer Pick Up': 'bg-emerald-600 text-white',
@@ -63,7 +63,7 @@ export const jobTypeChipColors: Record<ScheduleJobType, string> = {
 
 export const jobTypeDotColors: Record<ScheduleJobType, string> = {
   'Service': 'bg-brand-400',
-  'Warranty': 'bg-orange-500',
+  'Warranty': 'bg-purple-500',
   'Delivery': 'bg-red-500',
   'On Order': 'bg-black ring-1 ring-ink-500',
   'Customer Pick Up': 'bg-emerald-500',

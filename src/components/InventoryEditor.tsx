@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { X, Trash2, BadgeDollarSign, Package, ImagePlus, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Trash2, Package, ImagePlus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/hooks/useContacts';
@@ -16,9 +16,25 @@ import { useModal } from '@/hooks/useModal';
  * (managers only — mirrors the RLS policy).
  */
 
-const CATEGORIES = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Game Room', 'Covers', 'Chemicals', 'Parts', 'Accessories'];
-const BRANDS = ['Sundance', 'Master Spas', 'Finnleo', 'Hot Spring', 'Eco Spa', 'Covana', 'Visscher'];
+const BRANDS = [
+  'Ashley Furniture',
+  'Eco Spas',
+  'Finnleo Saunas',
+  'FinnSaunas',
+  'GDI Saunas',
+  'Lux Craft',
+  'Master Spas',
+  'Other',
+  'Platinum Spas',
+  'Sundance',
+  'Visscher',
+] as const;
 const STATUSES = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'] as const;
+
+function locationLabel(name: string) {
+  if (/^Minot(?:\s*\(MCHL\))?$/i.test(name.trim())) return 'Minot - MCHL';
+  return name;
+}
 
 const statusChip: Record<string, string> = {
   'In Stock': 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300',
@@ -114,14 +130,6 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
     toast('Approved product photo attached', 'success');
   };
 
-  // Live margin — the number Brandon actually cares about
-  const margin = useMemo(() => {
-    const cost = parseFloat(v.cost), sale = parseFloat(v.sale_price);
-    if (isNaN(cost) || isNaN(sale) || sale === 0) return null;
-    const dollars = sale - cost;
-    return { dollars, pct: Math.round((dollars / sale) * 100) };
-  }, [v.cost, v.sale_price]);
-
   const markSold = () => set({ status: 'Sold', date_sold: v.date_sold || today });
 
   const handleSave = async () => {
@@ -186,10 +194,7 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Identity */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelClass}>Serial Number *</label><input value={v.sku} onChange={e => set({ sku: e.target.value })} className={inputClass} placeholder="101039194" /></div>
-            <div><label className={labelClass}>Model</label><input value={v.model} onChange={e => set({ model: e.target.value })} className={inputClass} /></div>
-          </div>
+          <div><label className={labelClass}>Serial Number *</label><input value={v.sku} onChange={e => set({ sku: e.target.value })} className={inputClass} placeholder="101039194" /></div>
           <div><label className={labelClass}>Model *</label><input value={v.product} onChange={e => set({ product: e.target.value })} className={inputClass} placeholder="Nova 7L" /></div>
           <div><label className={labelClass}>Color / Finish</label><input value={v.color_finish} onChange={e => set({ color_finish: e.target.value })} className={inputClass} placeholder="Grey/Platinum" /></div>
 
@@ -216,28 +221,19 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
             </label>
           </div>
 
-          {/* Brand chips + free text */}
+          {/* Brand choices */}
           <div>
             <label className={labelClass}>Brand</label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {BRANDS.map(b => <Chip key={b} active={v.brand === b} onClick={() => set({ brand: v.brand === b ? '' : b })}>{b}</Chip>)}
-            </div>
-            <input value={BRANDS.includes(v.brand) ? '' : v.brand} onChange={e => set({ brand: e.target.value })} className={cn(inputClass, 'max-w-[220px]')} placeholder="Other brand…" />
-          </div>
-
-          {/* Category chips */}
-          <div>
-            <label className={labelClass}>Category</label>
             <div className="flex flex-wrap gap-1.5">
-              {CATEGORIES.map(c => <Chip key={c} active={v.category === c} onClick={() => set({ category: c })}>{c}</Chip>)}
+              {BRANDS.map(b => <Chip key={b} active={v.brand === b} onClick={() => set({ brand: b })}>{b}</Chip>)}
             </div>
           </div>
 
-          {/* Store */}
+          {/* Location */}
           <div>
-            <label className={labelClass}>Store</label>
+            <label className={labelClass}>Location</label>
             <div className="flex gap-1.5">
-              {locations.map(l => <Chip key={l.id} active={v.location_id === l.id} onClick={() => set({ location_id: l.id })}>{l.name}</Chip>)}
+              {locations.map(l => <Chip key={l.id} active={v.location_id === l.id} onClick={() => set({ location_id: l.id })}>{locationLabel(l.name)}</Chip>)}
             </div>
           </div>
 
@@ -263,27 +259,7 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
             </div>
           )}
 
-          {/* Pricing + live margin */}
-          <div>
-            <label className={labelClass}>Pricing</label>
-            <div className="grid grid-cols-3 gap-2.5">
-              <div><input type="number" value={v.cost} onChange={e => set({ cost: e.target.value })} className={inputClass} placeholder="Cost $" /></div>
-              <div><input type="number" value={v.msrp} onChange={e => set({ msrp: e.target.value })} className={inputClass} placeholder="MSRP $" /></div>
-              <div><input type="number" value={v.sale_price} onChange={e => set({ sale_price: e.target.value })} className={inputClass} placeholder="Sale $" /></div>
-            </div>
-            {margin && (
-              <p className={cn('flex items-center gap-1.5 text-xs font-semibold mt-2', margin.dollars >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                <BadgeDollarSign className="w-3.5 h-3.5" />
-                Margin {margin.dollars < 0 ? '−' : ''}${Math.abs(margin.dollars).toLocaleString()} · {margin.pct}%
-              </p>
-            )}
-          </div>
-
-          {/* Dates + warranty */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={labelClass}>Date received</label><input type="date" value={v.date_received} onChange={e => set({ date_received: e.target.value })} className={inputClass} /></div>
-            <div><label className={labelClass}>Warranty</label><input value={v.warranty_info} onChange={e => set({ warranty_info: e.target.value })} className={inputClass} placeholder="5yr shell / 2yr parts" /></div>
-          </div>
+          <div><label className={labelClass}>Date received</label><input type="date" value={v.date_received} onChange={e => set({ date_received: e.target.value })} className={inputClass} /></div>
 
           <div><label className={labelClass}>Notes</label><textarea value={v.notes} onChange={e => set({ notes: e.target.value })} rows={3} className={cn(inputClass, 'resize-none')} placeholder="Size, cover, order refs…" /></div>
 

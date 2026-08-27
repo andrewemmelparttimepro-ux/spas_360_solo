@@ -103,6 +103,13 @@ describe('Brandon composite UI contract', () => {
     assert.match(salesBoard, /label: 'Overdue Sales Tasks'/);
     assert.match(deals, /value=\{activeDeals\.length\}/);
     assert.match(deals, /\{filteredActiveDeals\.map\(\(deal\) =>/);
+    assert.match(deals, /const \[priorityFilter, setPriorityFilter\] = useState<DealPriority \| 'all'>\('all'\)/);
+    assert.match(deals, /priorityFilter !== 'all' && deal\.priority !== priorityFilter/);
+    assert.match(deals, /aria-label="Filter by salesperson"/);
+    assert.match(deals, /aria-label="Filter by priority"/);
+    assert.match(deals, /<option value="High">Priority High<\/option>[\s\S]*<option value="Medium">Priority Medium<\/option>[\s\S]*<option value="Low">Priority Low<\/option>/);
+    assert.match(deals, /aria-label="Deal filters"[\s\S]*\{filterControls\}[\s\S]*\{quickDeal &&/);
+    assert.equal((deals.match(/\{filterControls\}/g) ?? []).length, 1);
     assert.match(deals, /mb-5 shrink-0 overflow-hidden/);
     assert.match(deals, /className="max-h-\[68vh\] overflow-auto"/);
     assert.match(deals, /aria-label="Active deals table"/);

@@ -156,19 +156,19 @@ body {
   --color-brand-200: #BAE6FD;
 }
 
-/* The Schedule calendar remains a dark operational surface against the gray app canvas. */
+/* The Schedule calendar uses a dark-gray operational surface against the gray app canvas. */
 .schedule-calendar {
-  --color-ink-950: #08111F;
-  --color-ink-900: #0D1726;
-  --color-ink-850: #142033;
-  --color-ink-800: #1B2A3F;
-  --color-ink-700: #2A3A50;
-  --color-ink-600: #3C4E65;
-  --color-ink-500: #7F8EA3;
-  --color-ink-400: #A9B5C5;
-  --color-ink-300: #D2DAE5;
-  --color-ink-200: #E3E8EF;
-  --color-ink-100: #F7F9FC;
+  --color-ink-950: #25282E;
+  --color-ink-900: #30343B;
+  --color-ink-850: #353A42;
+  --color-ink-800: #3D434C;
+  --color-ink-700: #515862;
+  --color-ink-600: #69717C;
+  --color-ink-500: #8D96A2;
+  --color-ink-400: #B2BAC4;
+  --color-ink-300: #D6DCE3;
+  --color-ink-200: #E7EBF0;
+  --color-ink-100: #F8FAFC;
   --color-brand-200: #BAE6FD;
   --color-brand-300: #7CC4F4;
   --color-brand-400: #45ACF2;

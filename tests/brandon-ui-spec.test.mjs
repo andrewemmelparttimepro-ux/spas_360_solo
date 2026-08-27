@@ -173,15 +173,16 @@ describe('Brandon composite UI contract', () => {
     assert.match(pipeline, /contact:contact_id\(first_name, last_name, phone\)/);
   });
 
-  it('keeps the calendar as a high-contrast dark surface inside the light canvas', async () => {
+  it('keeps the full calendar on a high-contrast dark-gray surface inside the light canvas', async () => {
     const [css, service] = await Promise.all([
       read('src/index.css'),
       read('src/pages/Service.tsx'),
     ]);
 
     assert.match(service, /className="schedule-calendar[^\"]*bg-ink-900/);
-    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-900:\s*#0D1726/i);
-    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-100:\s*#F7F9FC/i);
+    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-950:\s*#25282E/i);
+    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-900:\s*#30343B/i);
+    assert.match(css, /\.schedule-calendar\s*\{[\s\S]*?--color-ink-100:\s*#F8FAFC/i);
     assert.match(css, /\.app-main \.schedule-calendar \.text-purple-200\s*\{\s*color:\s*var\(--color-purple-200\) !important;/i);
   });
 

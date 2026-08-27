@@ -51,6 +51,19 @@ export function availableInventoryForJob<T extends Pick<
   ));
 }
 
+export function inventoryChoicesForJob<T extends Pick<
+  InventoryItem,
+  'id' | 'status' | 'customer_id' | 'deal_id' | 'job_id' | 'location_id' | 'notes'
+> & {
+  dealAssignment: InventoryDealAssignment | null;
+}>(items: T[], jobId: string, locationId: string): T[] {
+  const availableIds = new Set(
+    availableInventoryForJob(items, locationId).map(item => item.id),
+  );
+
+  return items.filter(item => item.job_id === jobId || availableIds.has(item.id));
+}
+
 /**
  * Contacts store mailing addresses as a single free-form field. Prefer the
  * comma-delimited city immediately before a state/ZIP component, while also

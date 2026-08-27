@@ -526,6 +526,7 @@ export default function Service() {
 
       {showCreate && showInventorySelector && (
         <DealInventorySelector
+          multiple={false}
           items={availableInventory}
           initialSelection={newJob.inventory_item_id}
           loading={inventoryLoading}

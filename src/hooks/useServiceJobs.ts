@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, ScheduleJobType } from '@/types/database';
-import { JOB_TYPE_OPTIONS } from '@/lib/jobSchedule';
+import { inventoryChoicesForJob, JOB_TYPE_OPTIONS } from '@/lib/jobSchedule';
+import {
+  mergeInventoryDealAssignments,
+  type InventoryDealAssignmentRow,
+  type InventoryWithDealAssignment,
+} from '@/lib/inventoryDealAssignment';
 
 // Brandon's color language from the Jobber board:
 // red = delivery, purple = warranty, black = parts not received,
@@ -217,4 +222,91 @@ export function useJob(id: string | undefined) {
   }, [id]);
 
   return { job, isLoading, updateJob, deleteJob };
+}
+
+export function useJobInventory(jobId: string | undefined, locationId: string | undefined) {
+  const { profile } = useAuth();
+  const [items, setItems] = useState<InventoryWithDealAssignment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchInventory = useCallback(async () => {
+    if (!profile || !jobId || !locationId) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const [inventoryResult, assignmentResult] = await Promise.all([
+      supabase
+        .from('inventory_items')
+        .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)')
+        .eq('org_id', profile.org_id)
+        .eq('location_id', locationId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('deals')
+        .select('id, inventory_item_id, contact:contact_id(id, first_name, last_name, phone, customer_type)')
+        .eq('org_id', profile.org_id)
+        .not('inventory_item_id', 'is', null),
+    ]);
+
+    if (inventoryResult.error || assignmentResult.error) {
+      console.error('Error fetching job inventory:', inventoryResult.error ?? assignmentResult.error);
+      setIsLoading(false);
+      return;
+    }
+
+    setItems(mergeInventoryDealAssignments(
+      (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
+      (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
+    ));
+    setIsLoading(false);
+  }, [jobId, locationId, profile]);
+
+  useEffect(() => { void fetchInventory(); }, [fetchInventory]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const refetch = debounceRefetch(fetchInventory);
+    const channel = supabase
+      .channel(`job-inventory-${jobId ?? 'unknown'}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_items',
+        filter: `org_id=eq.${profile.org_id}`,
+      }, refetch)
+      .subscribe();
+    return () => { refetch.cancel(); supabase.removeChannel(channel); };
+  }, [fetchInventory, jobId, profile]);
+
+  const selectedItems = useMemo(
+    () => items.filter(item => item.job_id === jobId),
+    [items, jobId],
+  );
+  const choices = useMemo(
+    () => jobId && locationId ? inventoryChoicesForJob(items, jobId, locationId) : [],
+    [items, jobId, locationId],
+  );
+
+  const replaceInventory = useCallback(async (inventoryItemIds: string[]) => {
+    if (!jobId) return { ok: false, error: 'Job not found.' };
+    setIsSaving(true);
+    const { error } = await supabase.rpc('replace_job_inventory', {
+      p_job_id: jobId,
+      p_inventory_item_ids: inventoryItemIds,
+    });
+    if (error) {
+      console.error('Error replacing job inventory:', error);
+      setIsSaving(false);
+      return { ok: false, error: error.message || 'The inventory could not be saved.' };
+    }
+    await fetchInventory();
+    setIsSaving(false);
+    return { ok: true, error: null };
+  }, [fetchInventory, jobId]);
+
+  return { items, choices, selectedItems, isLoading, isSaving, replaceInventory, refresh: fetchInventory };
 }

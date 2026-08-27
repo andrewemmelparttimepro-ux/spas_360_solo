@@ -11,17 +11,33 @@ const HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppe
 const GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
 const ROW_CELL_CLASS = 'px-3 py-0.5 text-xs leading-4';
 
-type DealInventorySelectorProps = {
+type DealInventorySelectorCommonProps = {
   items: DealInventoryOption[];
-  initialSelection: string;
   loading: boolean;
   busy?: boolean;
   showStore: boolean;
   title: string;
   actionLabel: string;
   onCancel: () => void;
+};
+
+type SingleInventorySelectorProps = DealInventorySelectorCommonProps & {
+  multiple: false;
+  initialSelection: string;
   onConfirm: (inventoryItemId: string) => void | Promise<void>;
 };
+
+type MultiInventorySelectorProps = DealInventorySelectorCommonProps & {
+  multiple: true;
+  initialSelection: string[];
+  onConfirm: (inventoryItemIds: string[]) => void | Promise<void>;
+};
+
+type DealInventorySelectorProps = SingleInventorySelectorProps | MultiInventorySelectorProps;
+
+function isMultiSelector(props: DealInventorySelectorProps): props is MultiInventorySelectorProps {
+  return props.multiple;
+}
 
 function searchableInventoryText(item: DealInventoryOption): string {
   return [item.model, item.product, item.brand, item.color_finish, item.sku, item.locations?.name]
@@ -30,18 +46,21 @@ function searchableInventoryText(item: DealInventoryOption): string {
     .toLocaleLowerCase();
 }
 
-export default function DealInventorySelector({
-  items,
-  initialSelection,
-  loading,
-  busy = false,
-  showStore,
-  title,
-  actionLabel,
-  onCancel,
-  onConfirm,
-}: DealInventorySelectorProps) {
-  const [selectedInventoryId, setSelectedInventoryId] = useState(initialSelection);
+export default function DealInventorySelector(props: DealInventorySelectorProps) {
+  const {
+    items,
+    loading,
+    showStore,
+    title,
+    actionLabel,
+    onCancel,
+  } = props;
+  const busy = props.busy ?? false;
+  const [selectedInventoryIds, setSelectedInventoryIds] = useState<string[]>(
+    isMultiSelector(props)
+      ? props.initialSelection
+      : (props.initialSelection ? [props.initialSelection] : []),
+  );
   const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -72,6 +91,20 @@ export default function DealInventorySelector({
   const groupedItems = useMemo(() => groupInventoryItems(visibleItems), [visibleItems]);
   const columnCount = showStore ? 9 : 8;
 
+  const toggleSelection = (inventoryItemId: string) => {
+    setSelectedInventoryIds(current => {
+      if (!props.multiple) return [inventoryItemId];
+      return current.includes(inventoryItemId)
+        ? current.filter(id => id !== inventoryItemId)
+        : [...current, inventoryItemId];
+    });
+  };
+
+  const confirmSelection = () => {
+    if (isMultiSelector(props)) return props.onConfirm(selectedInventoryIds);
+    return props.onConfirm(selectedInventoryIds[0] ?? '');
+  };
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-6"
@@ -88,7 +121,11 @@ export default function DealInventorySelector({
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-500">Inventory</p>
             <h2 id="deal-inventory-selector-title" className="mt-1 text-xl font-bold text-ink-100">{title}</h2>
-            <p className="mt-1 text-sm text-ink-400">Choose one available In Stock unit. The rows and color groups match Inventory.</p>
+            <p className="mt-1 text-sm text-ink-400">
+              {props.multiple
+                ? 'Choose one or more inventory units. Clear every selection to detach inventory from this job.'
+                : 'Choose one available In Stock unit. The rows and color groups match Inventory.'}
+            </p>
           </div>
           <button type="button" onClick={onCancel} disabled={busy} aria-label="Close inventory window" className="rounded-lg p-2 text-ink-400 hover:bg-ink-800 disabled:opacity-50">
             <X className="h-5 w-5" />
@@ -159,7 +196,7 @@ export default function DealInventorySelector({
                     </th>
                   </tr>
                   {group.items.map(item => {
-                    const selected = selectedInventoryId === item.id;
+                    const selected = selectedInventoryIds.includes(item.id);
                     const serialAndFlooring = splitSerialAndFlooring(item.sku);
                     const currentCustomerName = item.customer
                       ? `${item.customer.first_name} ${item.customer.last_name}`.trim()
@@ -169,11 +206,11 @@ export default function DealInventorySelector({
                         key={item.id}
                         tabIndex={0}
                         aria-selected={selected}
-                        onClick={() => setSelectedInventoryId(item.id)}
+                        onClick={() => toggleSelection(item.id)}
                         onKeyDown={event => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            setSelectedInventoryId(item.id);
+                            toggleSelection(item.id);
                           }
                         }}
                         className={cn(
@@ -211,16 +248,20 @@ export default function DealInventorySelector({
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink-700 bg-ink-950 px-5 py-4 sm:px-6">
           <p className="min-w-0 truncate text-xs text-ink-400">
-            {selectedInventoryId
-              ? `Selected: ${items.find(item => item.id === selectedInventoryId)?.model || items.find(item => item.id === selectedInventoryId)?.product || 'inventory unit'}`
-              : 'Select a row to continue.'}
+            {selectedInventoryIds.length > 0
+              ? props.multiple
+                ? `${selectedInventoryIds.length} unit${selectedInventoryIds.length === 1 ? '' : 's'} selected`
+                : `Selected: ${items.find(item => item.id === selectedInventoryIds[0])?.model || items.find(item => item.id === selectedInventoryIds[0])?.product || 'inventory unit'}`
+              : props.multiple
+                ? 'No units selected. Saving will detach current job inventory.'
+                : 'Select a row to continue.'}
           </p>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onCancel} disabled={busy} className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-400 hover:bg-ink-800 disabled:opacity-50">Cancel</button>
             <button
               type="button"
-              onClick={() => void onConfirm(selectedInventoryId)}
-              disabled={!selectedInventoryId || loading || busy}
+              onClick={() => void confirmSelection()}
+              disabled={(!props.multiple && selectedInventoryIds.length === 0) || loading || busy}
               className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}

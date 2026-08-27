@@ -735,6 +735,7 @@ export default function DealDetail() {
       )}
       {inventorySelectorContext && (
         <DealInventorySelector
+          multiple={false}
           items={availableInventory}
           initialSelection={inventorySelectorContext === 'attach' ? deal.inventory_item_id ?? '' : selectedInventoryId}
           loading={inventoryLoading}

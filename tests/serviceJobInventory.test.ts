@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { availableInventoryForJob } from '../src/lib/jobSchedule.ts';
+import { availableInventoryForJob, inventoryChoicesForJob } from '../src/lib/jobSchedule.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -42,6 +42,22 @@ describe('New Job inventory assignment', () => {
     ], 'store-1');
 
     assert.deepEqual(available.map(candidate => candidate.id), ['available']);
+  });
+
+  it('keeps current job units visible beside available stock without exposing unrelated assignments', () => {
+    const choices = inventoryChoicesForJob([
+      item('available'),
+      item('current-job-sold', { status: 'Sold', customer_id: 'customer-1', job_id: 'job-1' }),
+      item('current-job-deal', { status: 'Sold', customer_id: 'customer-1', deal_id: 'deal-1', job_id: 'job-1' }),
+      item('other-job', { status: 'Sold', customer_id: 'customer-2', job_id: 'job-2' }),
+      item('other-store', { location_id: 'store-2' }),
+    ], 'job-1', 'store-1');
+
+    assert.deepEqual(choices.map(candidate => candidate.id), [
+      'available',
+      'current-job-sold',
+      'current-job-deal',
+    ]);
   });
 
   it('removes the ordinary status selector but keeps the internal default', async () => {
@@ -111,5 +127,37 @@ describe('New Job inventory assignment', () => {
     assert.match(sql, /v_role not in \('owner_manager', 'service_manager'\)/);
     assert.match(sql, /security definer[\s\S]*v_org := private\.auth_org\(\)/);
     assert.match(sql, /public\.delete_unscheduled_job[\s\S]*security invoker/);
+  });
+
+  it('edits the job heading and exposes attached inventory with a multi-unit replacement flow', async () => {
+    const [detail, selector, hook] = await Promise.all([
+      read('src/pages/JobDetail.tsx'),
+      read('src/components/DealInventorySelector.tsx'),
+      read('src/hooks/useServiceJobs.ts'),
+    ]);
+
+    assert.match(detail, /label="job heading"[\s\S]*field="title"[\s\S]*onSave=\{saveJob\}/);
+    assert.match(detail, /data-job-inventory[\s\S]*Units attached to this job/);
+    assert.match(detail, /attachedInventory\.map\(item =>[\s\S]*inventoryUnitLabel\(item\)/);
+    assert.match(detail, /<DealInventorySelector[\s\S]*multiple[\s\S]*initialSelection=\{attachedInventory\.map/);
+    assert.match(selector, /props\.multiple[\s\S]*setSelectedInventoryIds/);
+    assert.match(selector, /Clear every selection to detach inventory from this job/);
+    assert.match(hook, /supabase\.rpc\('replace_job_inventory'/);
+  });
+
+  it('replaces the complete job inventory set atomically and preserves unrelated unit state', async () => {
+    const sql = await read('supabase/migrations/20260827164809_replace_job_inventory.sql');
+
+    assert.match(sql, /from public\.jobs j[\s\S]*where j\.id = p_job_id[\s\S]*for update/);
+    assert.match(sql, /where i\.job_id = p_job_id or i\.id = any\(v_selected_ids\)[\s\S]*order by i\.id[\s\S]*for update/);
+    assert.match(sql, /i\.location_id = v_location_id[\s\S]*cardinality\(v_selected_ids\)/);
+    assert.match(sql, /i\.status is distinct from 'In Stock'[\s\S]*i\.customer_id is not null[\s\S]*i\.deal_id is not null[\s\S]*i\.job_id is not null/);
+    assert.match(sql, /exists \([\s\S]*from public\.deals d[\s\S]*d\.inventory_item_id = i\.id/);
+    assert.match(sql, /set job_id = null[\s\S]*i\.deal_id is not null/);
+    assert.match(sql, /status = 'In Stock'[\s\S]*customer_id = null[\s\S]*job_id = null[\s\S]*date_sold = null[\s\S]*date_delivered = null/);
+    assert.match(sql, /status = 'Sold'[\s\S]*customer_id = v_contact_id[\s\S]*job_id = p_job_id/);
+    assert.match(sql, /A deselected unit has an unexpected inventory state/);
+    assert.match(sql, /security definer[\s\S]*private\.auth_org\(\)[\s\S]*private\.auth_role\(\)/);
+    assert.match(sql, /public\.replace_job_inventory[\s\S]*security invoker/);
   });
 });

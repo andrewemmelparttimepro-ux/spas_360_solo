@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2 } from 'lucide-react';
-import { useJob, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
+import { ArrowLeft, Clock, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes } from 'lucide-react';
+import { useJob, useJobInventory, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
@@ -11,6 +11,8 @@ import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useAuth } from '@/contexts/AuthContext';
+import DealInventorySelector from '@/components/DealInventorySelector';
+import { inventoryUnitLabel } from '@/lib/dealInventory';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -150,13 +152,13 @@ function PhotoCard({ jobId }: { jobId: string }) {
 // --------------- Reusable inline editable field ---------------
 function EditableField({
   label, value, field, onSave, icon: Icon,
-  type = 'text', options, prefix, bold, color, multiline, numeric,
+  type = 'text', options, prefix, bold, heading, color, multiline, numeric,
 }: {
   label: string; value: string | number | null; field: string;
   onSave: (u: Partial<Job>) => Promise<boolean>;
   icon?: React.ElementType;
   type?: 'text' | 'number' | 'select' | 'datetime-local'; options?: string[];
-  prefix?: string; bold?: boolean; color?: string; multiline?: boolean;
+  prefix?: string; bold?: boolean; heading?: boolean; color?: string; multiline?: boolean;
   numeric?: boolean; // parse select/text drafts to a number before save (e.g. service_level)
 }) {
   const [editing, setEditing] = useState(false);
@@ -208,9 +210,10 @@ function EditableField({
   return (
     <div
       tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
+      aria-label={`Edit ${label}`}
       className={cn(
         "flex items-center text-sm cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30 transition-colors group",
-        bold && 'text-lg font-bold', color
+        bold && (heading ? 'text-xl font-bold sm:text-2xl' : 'text-lg font-bold'), color
       )}
       title="Click to edit"
     >
@@ -257,6 +260,13 @@ export default function JobDetail() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { job, isLoading, updateJob, deleteJob } = useJob(id);
+  const {
+    choices: inventoryChoices,
+    selectedItems: attachedInventory,
+    isLoading: inventoryLoading,
+    isSaving: inventorySaving,
+    replaceInventory,
+  } = useJobInventory(id, job?.location_id);
   const { notes, createNote } = useNotes({ jobId: id });
   const { tasks, createTask, completeTask } = useTasks({ jobId: id });
   const { toast } = useToast();
@@ -266,6 +276,7 @@ export default function JobDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingJob, setDeletingJob] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showInventoryEditor, setShowInventoryEditor] = useState(false);
 
   const saveJob = async (updates: Partial<Job>) => {
     const ok = await updateJob(updates);
@@ -312,6 +323,16 @@ export default function JobDetail() {
     navigate('/service', { replace: true });
   };
 
+  const handleReplaceInventory = async (inventoryItemIds: string[]) => {
+    const result = await replaceInventory(inventoryItemIds);
+    if (!result.ok) {
+      toast(result.error, 'error');
+      return;
+    }
+    toast(inventoryItemIds.length > 0 ? 'Job inventory updated' : 'Inventory detached from job', 'success');
+    setShowInventoryEditor(false);
+  };
+
   const canDelete = !job.scheduled_at
     && (profile?.role === 'owner_manager' || profile?.role === 'service_manager');
 
@@ -319,8 +340,10 @@ export default function JobDetail() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
         <Link to="/service" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
-        <div className="flex-1">
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{job.title}</h1>
+        <div className="min-w-0 flex-1">
+          <div role="heading" aria-level={1} className="text-ink-100">
+            <EditableField label="job heading" value={job.title} field="title" onSave={saveJob} bold heading />
+          </div>
           {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
         </div>
         <div className="flex items-center gap-2">
@@ -356,6 +379,21 @@ export default function JobDetail() {
         </div>
       )}
 
+      {showInventoryEditor && (
+        <DealInventorySelector
+          multiple
+          items={inventoryChoices}
+          initialSelection={attachedInventory.map(item => item.id)}
+          loading={inventoryLoading}
+          busy={inventorySaving}
+          showStore={false}
+          title="Edit job inventory"
+          actionLabel="Save inventory"
+          onCancel={() => setShowInventoryEditor(false)}
+          onConfirm={handleReplaceInventory}
+        />
+      )}
+
       {/* Field capture: time clock front and center for techs */}
       <TimeClockCard jobId={job.id} />
 
@@ -381,6 +419,38 @@ export default function JobDetail() {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
+          <div data-job-inventory className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-400 uppercase tracking-wider">
+                  <Boxes className="h-4 w-4" />Inventory
+                </h2>
+                <p className="mt-1 text-xs text-ink-500">Units attached to this job</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInventoryEditor(true)}
+                disabled={inventoryLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/40 px-3 py-2 text-sm font-semibold text-brand-300 hover:bg-brand-500/10 disabled:opacity-50"
+              >
+                <Pencil className="h-3.5 w-3.5" />Edit inventory
+              </button>
+            </div>
+            {inventoryLoading ? (
+              <p className="mt-4 text-sm text-ink-500">Loading attached inventory…</p>
+            ) : attachedInventory.length === 0 ? (
+              <p className="mt-4 rounded-lg border border-dashed border-ink-700 bg-ink-950 px-4 py-5 text-sm text-ink-500">No inventory attached to this job.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {attachedInventory.map(item => (
+                  <li key={item.id} className="rounded-lg border border-ink-700 bg-ink-950 px-4 py-3 text-sm text-ink-200">
+                    {inventoryUnitLabel(item)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Photos: proof of delivery, damage, serials */}
           <PhotoCard jobId={job.id} />
 

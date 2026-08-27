@@ -17,7 +17,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; mailing_address: string | null } | null };
 
-const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order'];
+const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'];
 
 const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
 
@@ -538,7 +538,9 @@ export default function Service() {
                           ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
                           className={cn(
                             'rounded-md px-2.5 py-2 shadow-sm cursor-grab active:cursor-grabbing',
-                            statusChipColors[unscheduledJobVisualStatus(job)] ?? 'bg-ink-800 text-ink-300',
+                            scheduleJobType(job.job_type) === 'To Do'
+                              ? jobTypeChipColors['To Do']
+                              : statusChipColors[unscheduledJobVisualStatus(job)] ?? 'bg-ink-800 text-ink-300',
                             snap.isDragging && 'ring-2 ring-brand-400 rotate-1'
                           )}
                         >

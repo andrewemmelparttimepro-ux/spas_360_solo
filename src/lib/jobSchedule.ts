@@ -6,6 +6,7 @@ export const JOB_TYPE_OPTIONS: ScheduleJobType[] = [
   'Delivery',
   'On Order',
   'Customer Pick Up',
+  'To Do',
 ];
 
 export function scheduleJobType(jobType: JobType): ScheduleJobType {

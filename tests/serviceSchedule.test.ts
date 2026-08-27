@@ -6,8 +6,8 @@ import { customerCityFromAddress, JOB_TYPE_OPTIONS, scheduleJobType, unscheduled
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 describe('Schedule job language and colors', () => {
-  it('offers exactly the five requested job types in customer-facing order', () => {
-    assert.deepEqual(JOB_TYPE_OPTIONS, ['Service', 'Warranty', 'Delivery', 'On Order', 'Customer Pick Up']);
+  it('offers the requested job types with To Do available in New Job', () => {
+    assert.deepEqual(JOB_TYPE_OPTIONS, ['Service', 'Warranty', 'Delivery', 'On Order', 'Customer Pick Up', 'To Do']);
   });
 
   it('derives the city from common stored mailing-address shapes', () => {
@@ -21,6 +21,7 @@ describe('Schedule job language and colors', () => {
     assert.equal(scheduleJobType('Installation'), 'Service');
     assert.equal(scheduleJobType('Maintenance'), 'Service');
     assert.equal(scheduleJobType('Pickup'), 'Customer Pick Up');
+    assert.equal(scheduleJobType('To Do'), 'To Do');
   });
 
   it('labels parts waiting in the unscheduled queue as On Order', () => {
@@ -62,6 +63,7 @@ describe('Schedule job language and colors', () => {
     assert.match(hook, /'Warranty': 'bg-purple-600 text-white'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'On Order': 'bg-black text-white/);
+    assert.match(hook, /'To Do': 'bg-yellow-400 text-black'/);
     assert.match(service, /jobTypeChipColors\[scheduleJobType\(job\.job_type\)\]/);
     assert.match(service, /jobTypeCardColors\[scheduleJobType\(job\.job_type\)\]/);
     assert.match(service, /statusChipColors\[unscheduledJobVisualStatus\(job\)\]/);
@@ -70,10 +72,10 @@ describe('Schedule job language and colors', () => {
     assert.match(service, /<Link to=\{`\/service\/\$\{job\.id\}`\}/);
   });
 
-  it('shows the five job-type legend filters without numeric counts', async () => {
+  it('shows the job-type legend filters with To Do after On Order and without numeric counts', async () => {
     const hook = await read('src/hooks/useServiceJobs.ts');
     const service = await read('src/pages/Service.tsx');
-    assert.match(service, /const LEGEND_JOB_TYPES: ScheduleJobType\[\] = \['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order'\]/);
+    assert.match(service, /const LEGEND_JOB_TYPES: ScheduleJobType\[\] = \['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'\]/);
     assert.match(service, /LEGEND_JOB_TYPES\.map\(jobType =>/);
     assert.match(service, /jobTypeDotColors\[jobType\]/);
     assert.match(service, /jobTypeFilter\.has\(scheduleJobType\(j\.job_type\)\)/);
@@ -83,6 +85,8 @@ describe('Schedule job language and colors', () => {
     assert.match(hook, /'Warranty': 'bg-purple-500'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-500'/);
     assert.match(hook, /'On Order': 'bg-black ring-1 ring-ink-500'/);
+    assert.match(hook, /'To Do': 'bg-yellow-400'/);
+    assert.match(service, /scheduleJobType\(job\.job_type\) === 'To Do'[\s\S]*jobTypeChipColors\['To Do'\]/);
   });
 
   it('uses purple for every Warranty treatment without recoloring other job types', async () => {
@@ -95,6 +99,7 @@ describe('Schedule job language and colors', () => {
     assert.match(hook, /'Delivery': 'bg-red-600 text-white'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'On Order': 'bg-black text-white/);
+    assert.match(hook, /'To Do': 'bg-yellow-400 text-black'/);
     assert.match(css, /\.app-main \.schedule-calendar \.text-purple-200\s*\{\s*color:\s*var\(--color-purple-200\) !important;/i);
   });
 
@@ -104,5 +109,14 @@ describe('Schedule job language and colors', () => {
     assert.match(migration, /'Repair', 'Installation', 'Maintenance', 'Pickup'/);
     assert.match(migration, /v_job_title := coalesce[\s\S]*v_customer_city[\s\S]*v_job_title \|\| ' – Delivery'/);
     assert.match(migration, /'Delivery', 'Delivery'/);
+  });
+
+  it('extends the stored job type constraint and New Job RPC for To Do', async () => {
+    const migration = await read('supabase/migrations/20260827023327_add_schedule_todo_job_type.sql');
+
+    assert.match(migration, /jobs_job_type_check[\s\S]*'Customer Pick Up', 'To Do'/);
+    assert.match(migration, /p_job_type not in \('Service', 'Warranty', 'Delivery', 'On Order', 'Customer Pick Up', 'To Do'\)/);
+    assert.match(migration, /case when p_job_type = 'To Do' then 'Pending Confirm' else 'In Progress' end/);
+    assert.doesNotMatch(migration, /update public\.jobs/);
   });
 });

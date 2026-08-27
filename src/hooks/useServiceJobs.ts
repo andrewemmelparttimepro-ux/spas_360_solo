@@ -51,6 +51,7 @@ export const jobTypeCardColors: Record<ScheduleJobType, string> = {
   'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
   'On Order': 'border-l-ink-600 bg-black text-white',
   'Customer Pick Up': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
+  'To Do': 'border-l-yellow-400 bg-yellow-500/15 text-yellow-100',
 };
 
 export const jobTypeChipColors: Record<ScheduleJobType, string> = {
@@ -59,6 +60,7 @@ export const jobTypeChipColors: Record<ScheduleJobType, string> = {
   'Delivery': 'bg-red-600 text-white',
   'On Order': 'bg-black text-white ring-1 ring-inset ring-ink-600',
   'Customer Pick Up': 'bg-emerald-600 text-white',
+  'To Do': 'bg-yellow-400 text-black',
 };
 
 export const jobTypeDotColors: Record<ScheduleJobType, string> = {
@@ -67,6 +69,7 @@ export const jobTypeDotColors: Record<ScheduleJobType, string> = {
   'Delivery': 'bg-red-500',
   'On Order': 'bg-black ring-1 ring-ink-500',
   'Customer Pick Up': 'bg-emerald-500',
+  'To Do': 'bg-yellow-400',
 };
 
 export const JOB_STATUS_OPTIONS: JobStatus[] = ['Pending Confirm', 'In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];

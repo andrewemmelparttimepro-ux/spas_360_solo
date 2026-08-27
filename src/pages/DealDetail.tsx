@@ -32,6 +32,7 @@ import {
   type DealFulfillmentType,
   type DealInventoryOption,
 } from '@/lib/dealInventory';
+import { inventoryCustomerOrStock } from '@/lib/inventoryFields';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
 
@@ -157,8 +158,12 @@ export default function DealDetail() {
       } else if (reservationsResult.error) {
         setCloseSaleError(`Current deal assignments couldn't load: ${reservationsResult.error.message}`);
       } else {
+        const inventoryRows = (inventoryResult.data ?? []) as unknown as DealInventoryOption[];
         setAvailableInventory(availableDealInventory(
-          (inventoryResult.data ?? []) as unknown as DealInventoryOption[],
+          inventoryRows.filter(item => (
+            item.id === deal.inventory_item_id
+            || inventoryCustomerOrStock(item.notes ?? null, item.customer_id ?? null) === 'Stock'
+          )),
           reservationsResult.data ?? [],
           deal.id,
           deal.inventory_item_id,

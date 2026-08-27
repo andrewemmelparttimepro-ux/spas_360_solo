@@ -13,6 +13,8 @@ const item = (
     deal_id: string | null;
     job_id: string | null;
     location_id: string;
+    notes: string | null;
+    dealAssignment: { dealId: string; customer: never } | null;
   }> = {},
 ) => ({
   id,
@@ -21,6 +23,8 @@ const item = (
   deal_id: null,
   job_id: null,
   location_id: 'store-1',
+  notes: 'Customer: STOCK',
+  dealAssignment: null,
   ...overrides,
 });
 
@@ -32,6 +36,8 @@ describe('New Job inventory assignment', () => {
       item('customer-assigned', { customer_id: 'customer-2' }),
       item('deal-assigned', { deal_id: 'deal-2' }),
       item('job-assigned', { job_id: 'job-2' }),
+      item('active-deal-reservation', { dealAssignment: { dealId: 'deal-3', customer: null as never } }),
+      item('imported-customer', { notes: 'Import metadata · Customer: Jane Doe · Need to order: No' }),
       item('other-store', { location_id: 'store-2' }),
     ], 'store-1');
 
@@ -63,17 +69,22 @@ describe('New Job inventory assignment', () => {
   });
 
   it('locks and atomically assigns only the exact available inventory row', async () => {
-    const sql = await read('supabase/migrations/20260826194847_create_job_with_inventory.sql');
+    const [sql, wrapperSql] = await Promise.all([
+      read('supabase/migrations/20260827031916_delete_unscheduled_job_release_inventory.sql'),
+      read('supabase/migrations/20260826194847_create_job_with_inventory.sql'),
+    ]);
 
     assert.match(sql, /from public\.inventory_items i[\s\S]*where i\.id = p_inventory_item_id[\s\S]*for update/);
-    assert.match(sql, /v_inventory_status is distinct from 'In Stock'[\s\S]*v_inventory_customer_id is not null[\s\S]*v_inventory_deal_id is not null[\s\S]*v_inventory_job_id is not null/);
-    assert.match(sql, /insert into public\.jobs[\s\S]*'In Progress'[\s\S]*returning id into v_job_id/);
+    assert.match(sql, /v_inventory_status is distinct from 'In Stock'[\s\S]*v_inventory_customer_id is not null[\s\S]*v_inventory_deal_id is not null[\s\S]*v_inventory_job_id is not null[\s\S]*v_inventory_customer_stock/);
+    assert.match(sql, /exists \(select 1 from public\.deals d[\s\S]*d\.inventory_item_id = p_inventory_item_id/);
+    assert.match(sql, /when 'Service' then 'In Progress'[\s\S]*insert into public\.jobs[\s\S]*v_initial_status[\s\S]*returning id into v_job_id/);
     assert.match(sql, /update public\.inventory_items[\s\S]*status = 'Sold'[\s\S]*customer_id = p_contact_id[\s\S]*job_id = v_job_id/);
     assert.match(sql, /status = 'In Stock'[\s\S]*customer_id is null[\s\S]*deal_id is null[\s\S]*job_id is null/);
     assert.match(sql, /if not found then[\s\S]*raise exception 'That inventory unit is no longer available'/);
     assert.match(sql, /security definer[\s\S]*v_org := private\.auth_org\(\)[\s\S]*v_role := private\.auth_role\(\)/);
-    assert.match(sql, /language sql[\s\S]*security invoker[\s\S]*select private\.create_job_with_inventory/);
+    assert.match(wrapperSql, /language sql[\s\S]*security invoker[\s\S]*select private\.create_job_with_inventory/);
     assert.match(sql, /revoke all on function private\.create_job_with_inventory[\s\S]*from public, anon/);
+    assert.match(sql, /create or replace function private\.require_deal_won_fulfillment[\s\S]*where i\.id = new\.inventory_item_id[\s\S]*for update/);
   });
 
   it('offers a deliberate delete flow only for unscheduled manager jobs', async () => {
@@ -90,10 +101,12 @@ describe('New Job inventory assignment', () => {
   it('atomically releases job-only inventory and preserves deal-backed sales before deleting', async () => {
     const sql = await read('supabase/migrations/20260827031916_delete_unscheduled_job_release_inventory.sql');
 
-    assert.match(sql, /from public\.jobs j[\s\S]*scheduled_at[\s\S]*for update/);
+    assert.match(sql, /select j\.scheduled_at, j\.contact_id[\s\S]*from public\.jobs j[\s\S]*for update/);
     assert.match(sql, /if v_scheduled_at is not null then[\s\S]*Only an unscheduled job can be deleted/);
+    assert.match(sql, /exists \(select 1 from public\.job_photos[\s\S]*Remove this job''s photos before deleting it/);
     assert.match(sql, /update public\.inventory_items[\s\S]*set job_id = null[\s\S]*deal_id is not null/);
-    assert.match(sql, /status = 'In Stock'[\s\S]*customer_id = null[\s\S]*job_id = null[\s\S]*date_sold = null[\s\S]*where job_id = p_job_id[\s\S]*deal_id is null/);
+    assert.match(sql, /status = 'In Stock'[\s\S]*customer_id = null[\s\S]*job_id = null[\s\S]*date_sold = null[\s\S]*where job_id = p_job_id and deal_id is null and status = 'Sold'[\s\S]*customer_id is not distinct from v_contact_id/);
+    assert.match(sql, /if exists \(select 1 from public\.inventory_items i where i\.job_id = p_job_id\)[\s\S]*unexpected inventory assignment/);
     assert.match(sql, /delete from public\.jobs[\s\S]*scheduled_at is null/);
     assert.match(sql, /v_role not in \('owner_manager', 'service_manager'\)/);
     assert.match(sql, /security definer[\s\S]*v_org := private\.auth_org\(\)/);

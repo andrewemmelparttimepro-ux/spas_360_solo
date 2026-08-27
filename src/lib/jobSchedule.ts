@@ -1,4 +1,6 @@
 import type { InventoryItem, Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
+import { inventoryCustomerOrStock } from './inventoryFields.ts';
+import type { InventoryDealAssignment } from './inventoryDealAssignment.ts';
 
 export const JOB_TYPE_OPTIONS: ScheduleJobType[] = [
   'Service',
@@ -34,13 +36,17 @@ export function calendarJobTitleClass(status: JobStatus): string | undefined {
 
 export function availableInventoryForJob<T extends Pick<
   InventoryItem,
-  'status' | 'customer_id' | 'deal_id' | 'job_id' | 'location_id'
->>(items: T[], locationId: string): T[] {
+  'status' | 'customer_id' | 'deal_id' | 'job_id' | 'location_id' | 'notes'
+> & {
+  dealAssignment: InventoryDealAssignment | null;
+}>(items: T[], locationId: string): T[] {
   return items.filter(item => (
     item.status === 'In Stock'
     && item.customer_id === null
     && item.deal_id === null
     && item.job_id === null
+    && item.dealAssignment === null
+    && inventoryCustomerOrStock(item.notes, item.customer_id) === 'Stock'
     && (!locationId || item.location_id === locationId)
   ));
 }

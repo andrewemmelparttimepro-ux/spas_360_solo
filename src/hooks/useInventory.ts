@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { sanitizeSearchTerm } from '@/lib/utils';
-import type { Contact, InventoryItem } from '@/types/database';
+import type { InventoryItem } from '@/types/database';
+import {
+  isAvailableInventoryStock,
+  mergeInventoryDealAssignments,
+  type InventoryDealAssignmentRow,
+  type InventoryWithDealAssignment,
+} from '@/lib/inventoryDealAssignment';
 
-export type InventoryListItem = InventoryItem & {
-  customer: Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone' | 'customer_type'> | null;
-  locations?: { name: string } | null;
-};
+export type InventoryListItem = InventoryWithDealAssignment;
 
 export function useInventory() {
   const { profile, activeLocationId } = useAuth();
@@ -34,31 +37,56 @@ export function useInventory() {
       query = query.or(`sku.ilike.%${needle}%,product.ilike.%${needle}%,category.ilike.%${needle}%`);
     }
 
-    const { data, error } = await query;
-    if (error) console.error('Error fetching inventory:', error);
-    setItems((data ?? []) as InventoryListItem[]);
+    const [inventoryResult, assignmentResult] = await Promise.all([
+      query,
+      supabase
+        .from('deals')
+        .select('id, inventory_item_id, contact:contact_id(id, first_name, last_name, phone, customer_type)')
+        .eq('org_id', profile.org_id)
+        .not('inventory_item_id', 'is', null),
+    ]);
+
+    if (inventoryResult.error || assignmentResult.error) {
+      console.error(
+        'Error fetching inventory assignments:',
+        inventoryResult.error ?? assignmentResult.error,
+      );
+      setIsLoading(false);
+      return;
+    }
+
+    setItems(mergeInventoryDealAssignments(
+      (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
+      (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
+    ));
     setIsLoading(false);
   }, [profile, activeLocationId, searchQuery]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  // Real-time subscription — any INSERT/UPDATE/DELETE on inventory_items refreshes everywhere
+  // Inventory fields and Deal Detail reservations both feed this table.
   useEffect(() => {
     if (!profile) return;
+    const orgFilter = `org_id=eq.${profile.org_id}`;
     const channel = supabase
       .channel(`inventory-realtime-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'inventory_items',
-      }, () => {
-        fetchItems();
-      })
+        filter: orgFilter,
+      }, fetchItems)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'deals',
+        filter: orgFilter,
+      }, fetchItems)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile, fetchItems]);
 
-  const totalInStock = items.filter(i => i.status === 'In Stock').length;
+  const totalInStock = items.filter(isAvailableInventoryStock).length;
   const awaitingDelivery = items.filter(i => i.status === 'Sold').length;
   const onOrder = items.filter(i => i.status === 'On Order').length;
   const chemicalSkus = items.filter(i => i.category === 'Chemicals');

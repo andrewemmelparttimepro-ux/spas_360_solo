@@ -21,6 +21,7 @@ import {
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 import { inventoryAgeLabel } from '@/lib/inventoryAge';
+import { effectiveInventoryCustomer } from '@/lib/inventoryDealAssignment';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
 const INVENTORY_GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
@@ -208,10 +209,15 @@ function CustomerStockCell({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const currentCustomerName = item.customer
-    ? `${item.customer.first_name} ${item.customer.last_name}`.trim()
+  const effectiveCustomer = effectiveInventoryCustomer(item);
+  const currentCustomerName = effectiveCustomer
+    ? `${effectiveCustomer.first_name} ${effectiveCustomer.last_name}`.trim()
     : null;
-  const value = inventoryCustomerOrStock(item.notes, item.customer_id, currentCustomerName);
+  const value = inventoryCustomerOrStock(
+    item.notes,
+    effectiveCustomer?.id ?? item.customer_id,
+    currentCustomerName,
+  );
 
   useEffect(() => {
     if (!editing) return;
@@ -284,6 +290,17 @@ function CustomerStockCell({
   };
 
   if (!editing) {
+    if (item.dealAssignment) {
+      return (
+        <span
+          className="inline-flex min-h-6 items-center rounded px-1.5 py-0.5 -mx-1.5"
+          title="Assigned from Deal Detail"
+        >
+          {value}
+        </span>
+      );
+    }
+
     return (
       <button
         type="button"

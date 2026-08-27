@@ -253,9 +253,18 @@ export function useDeal(id: string | undefined) {
   }, [id, fetchDeal]);
 
   const updateDeal = async (updates: Partial<Deal>) => {
-    if (!id) return;
-    const { error } = await supabase.from('deals').update(updates).eq('id', id);
-    if (error) { console.error('Error updating deal:', error); return error; }
+    if (!id) return new Error('Deal not found');
+    const { data, error } = await supabase
+      .from('deals')
+      .update(updates)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) {
+      const updateError = error ?? new Error('No deal row was updated');
+      console.error('Error updating deal:', updateError);
+      return updateError;
+    }
     await fetchDeal();
     return null;
   };

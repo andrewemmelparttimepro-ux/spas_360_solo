@@ -114,7 +114,8 @@ describe('Brandon composite UI contract', () => {
     assert.doesNotMatch(inventory, /className="flex-1 overflow-auto"/);
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);
-    assert.match(inventory, /inventoryCustomerOrStock\(item\.notes, item\.customer_id, currentCustomerName\)/);
+    assert.match(inventory, /const effectiveCustomer = effectiveInventoryCustomer\(item\)/);
+    assert.match(inventory, /inventoryCustomerOrStock\([\s\S]*effectiveCustomer\?\.id \?\? item\.customer_id,[\s\S]*currentCustomerName/);
     assert.match(inventory, /inventoryCustomerStockUpdate\(item\.notes, selection\)/);
     assert.match(inventory, /INVENTORY_STATIONARY_CHOICES\.map\(choice =>/);
     assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);

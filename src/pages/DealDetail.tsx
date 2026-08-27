@@ -106,7 +106,14 @@ export default function DealDetail() {
     return () => { alive = false; };
   }, [profile]);
 
-  const saveDeal = async (updates: Partial<Deal>) => { await updateDeal(updates); toast('Deal updated'); };
+  const saveDeal = async (updates: Partial<Deal>) => {
+    const error = await updateDeal(updates);
+    if (error) {
+      toast(`Couldn't update this deal: ${error.message}`, 'error');
+      return;
+    }
+    toast('Deal updated');
+  };
 
   // Ordinary stage changes use the board RPC. Closed-Won is handled separately
   // because the purchased-unit choice must commit in the same transaction.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { sanitizeSearchTerm } from '@/lib/utils';
@@ -17,10 +17,11 @@ export function useInventory() {
   const [items, setItems] = useState<InventoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const latestFetchId = useRef(0);
 
   const fetchItems = useCallback(async () => {
     if (!profile) return;
-    setIsLoading(true);
+    const fetchId = ++latestFetchId.current;
 
     let query = supabase
       .from('inventory_items')
@@ -51,9 +52,13 @@ export function useInventory() {
         'Error fetching inventory assignments:',
         inventoryResult.error ?? assignmentResult.error,
       );
-      setIsLoading(false);
+      if (fetchId === latestFetchId.current) setIsLoading(false);
       return;
     }
+
+    // Search and realtime refreshes keep the page mounted so the search input
+    // retains focus. Ignore slower responses for older keystrokes as well.
+    if (fetchId !== latestFetchId.current) return;
 
     setItems(mergeInventoryDealAssignments(
       (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],

@@ -4,12 +4,12 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
+import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors, statusChipColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
-import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
+import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -31,12 +31,6 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
     if (v !== value) await onSave(jobId, { status: v as JobStatus });
     setEditing(false);
   };
-  const queueLabel: Partial<Record<JobStatus, string>> = {
-    'Parts on Order': 'Parts On Order',
-    'Pending Confirm': 'To Do',
-    'In Progress': 'Service',
-  };
-
   if (editing) {
     return (
       <select
@@ -48,7 +42,7 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
       >
         {(light
           ? [
-              { value: 'Parts on Order', label: 'Parts On Order' },
+              { value: 'Parts on Order', label: unscheduledJobStatusLabel('Parts on Order') },
               { value: 'Delivery', label: 'Delivery' },
               { value: 'Warranty', label: 'Warranty' },
               { value: 'Pending Confirm', label: 'To Do' },
@@ -67,7 +61,7 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
       className={cn('text-[10px] font-bold uppercase tracking-wider cursor-pointer inline-flex items-center gap-1 group', light ? 'opacity-90 hover:opacity-100' : 'opacity-70 hover:opacity-100')}
       title="Click to change status"
     >
-      {light ? (queueLabel[value] ?? value) : value}
+      {light ? unscheduledJobStatusLabel(value) : value}
       <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-70 transition-opacity" />
     </span>
   );
@@ -544,7 +538,7 @@ export default function Service() {
                           ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}
                           className={cn(
                             'rounded-md px-2.5 py-2 shadow-sm cursor-grab active:cursor-grabbing',
-                            jobTypeChipColors[scheduleJobType(job.job_type)] ?? 'bg-ink-800 text-ink-300',
+                            statusChipColors[unscheduledJobVisualStatus(job)] ?? 'bg-ink-800 text-ink-300',
                             snap.isDragging && 'ring-2 ring-brand-400 rotate-1'
                           )}
                         >

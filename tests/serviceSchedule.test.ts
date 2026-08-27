@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { customerCityFromAddress, JOB_TYPE_OPTIONS, scheduleJobType } from '../src/lib/jobSchedule.ts';
+import { customerCityFromAddress, JOB_TYPE_OPTIONS, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '../src/lib/jobSchedule.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -23,15 +23,49 @@ describe('Schedule job language and colors', () => {
     assert.equal(scheduleJobType('Pickup'), 'Customer Pick Up');
   });
 
-  it('colors both queue and calendar chips from immutable job type', async () => {
+  it('labels parts waiting in the unscheduled queue as On Order', () => {
+    assert.equal(unscheduledJobStatusLabel('Parts on Order'), 'On Order');
+    assert.equal(unscheduledJobStatusLabel('In Progress'), 'Service');
+  });
+
+  it('classifies unscheduled fill from status even when job type and title say Delivery', () => {
+    assert.equal(unscheduledJobVisualStatus({
+      status: 'Warranty',
+      job_type: 'Delivery',
+      title: 'Customer – Hot Tub – Delivery',
+    }), 'Warranty');
+  });
+
+  it('keeps scheduled fill keyed to the stored job type', () => {
+    const job = {
+      job_type: 'Warranty',
+      status: 'Delivery',
+      title: 'Delivery inspection for customer spa',
+    } as const;
+    assert.equal(scheduleJobType(job.job_type), 'Warranty');
+  });
+
+  it('uses status colors for the queue and job-type colors for scheduled views', async () => {
     const hook = await read('src/hooks/useServiceJobs.ts');
     const service = await read('src/pages/Service.tsx');
+    const queueColors = hook.slice(
+      hook.indexOf('export const statusChipColors'),
+      hook.indexOf('// Legend dots'),
+    );
+    assert.match(queueColors, /'Delivery': 'bg-red-600 text-white'/);
+    assert.match(queueColors, /'Warranty': 'bg-orange-600 text-white'/);
+    assert.match(queueColors, /'Parts on Order': 'bg-black text-white/);
+    assert.match(queueColors, /'In Progress': 'bg-brand-500 text-white'/);
+    assert.match(queueColors, /'Ready for Pickup': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'Service': 'bg-brand-500 text-white'/);
     assert.match(hook, /'Delivery': 'bg-red-600 text-white'/);
     assert.match(hook, /'Warranty': 'bg-orange-600 text-white'/);
     assert.match(hook, /'Customer Pick Up': 'bg-emerald-600 text-white'/);
     assert.match(hook, /'On Order': 'bg-black text-white/);
-    assert.equal((service.match(/jobTypeChipColors\[scheduleJobType\(job\.job_type\)\]/g) ?? []).length, 2);
+    assert.match(service, /jobTypeChipColors\[scheduleJobType\(job\.job_type\)\]/);
+    assert.match(service, /jobTypeCardColors\[scheduleJobType\(job\.job_type\)\]/);
+    assert.match(service, /statusChipColors\[unscheduledJobVisualStatus\(job\)\]/);
+    assert.match(service, /light \? unscheduledJobStatusLabel\(value\) : value/);
     assert.match(service, /updateJob\(jobId, \{ scheduled_at:/);
     assert.match(service, /<Link to=\{`\/service\/\$\{job\.id\}`\}/);
   });

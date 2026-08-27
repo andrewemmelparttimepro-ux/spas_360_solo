@@ -19,7 +19,7 @@ export const statusColors: Record<JobStatus, string> = {
   'Cancelled': 'border-l-ink-700 bg-ink-950 text-ink-600 opacity-60 line-through',
 };
 
-// Solid Jobber-style calendar chips — white text on the status color
+// Solid Jobber-style queue chips — white text on the workflow status color
 export const statusChipColors: Record<JobStatus, string> = {
   'Pending Confirm': 'bg-amber-500 text-black',
   'Delivery': 'bg-red-600 text-white',

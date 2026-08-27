@@ -1,4 +1,4 @@
-import type { InventoryItem, JobStatus, JobType, ScheduleJobType } from '@/types/database';
+import type { InventoryItem, Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
 
 export const JOB_TYPE_OPTIONS: ScheduleJobType[] = [
   'Service',
@@ -12,6 +12,19 @@ export function scheduleJobType(jobType: JobType): ScheduleJobType {
   if (jobType === 'Repair' || jobType === 'Installation' || jobType === 'Maintenance') return 'Service';
   if (jobType === 'Pickup') return 'Customer Pick Up';
   return jobType;
+}
+
+// The queue's visible label and fill describe workflow state. Titles and the
+// scheduled job type can contain different business language.
+export function unscheduledJobVisualStatus(job: Pick<Job, 'job_type' | 'status' | 'title'>): JobStatus {
+  return job.status;
+}
+
+export function unscheduledJobStatusLabel(status: JobStatus): string {
+  if (status === 'Parts on Order') return 'On Order';
+  if (status === 'Pending Confirm') return 'To Do';
+  if (status === 'In Progress') return 'Service';
+  return status;
 }
 
 export function calendarJobTitleClass(status: JobStatus): string | undefined {

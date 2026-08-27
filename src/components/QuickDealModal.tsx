@@ -1,26 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Handshake } from 'lucide-react';
+import { X, Handshake, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import type { Contact, DealLeadSource, DealPriority, PipelineStage } from '@/types/database';
 import { useModal } from '@/hooks/useModal';
+import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 
-// Quick deal creation for a KNOWN customer — the fast lane next to the full
-// NewCustomerWizard. Same doctrine: commission stays with the customer's
-// assigned salesperson, and every deal leaves with a follow-up task. No exceptions.
+// Quick deal creation for an existing customer. Customer-specific entry points
+// preselect that customer; the Deals page uses the same form with customer search.
+// Every deal leaves with a follow-up task. No exceptions.
+
+type QuickDealContact = Contact & { assigned?: { first_name: string; last_name: string } | null };
+type DealOwner = { id: string; first_name: string; last_name: string };
+const UNSELECTED_OWNER = '__select_owner__';
 
 const PRIORITIES: { value: DealPriority; label: string }[] = [
   { value: 'High', label: 'High — close in a week' },
   { value: 'Medium', label: 'Medium — 2–4 weeks' },
   { value: 'Low', label: 'Low — nurture' },
 ];
-const FOLLOW_UPS = [
-  { label: 'Tomorrow', days: 1 },
-  { label: 'In 3 days', days: 3 },
-  { label: 'Next week', days: 7 },
-] as const;
+function nextLocalDate(): string {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  const year = next.getFullYear();
+  const month = String(next.getMonth() + 1).padStart(2, '0');
+  const day = String(next.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 const LEAD_SOURCE_OPTIONS = [
   { label: 'Facebook', storedValue: 'Facebook' },
   { label: 'Google', storedValue: 'Google' },
@@ -50,17 +58,22 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 export default function QuickDealModal({ contactId, stageId, onClose, onCreated }: {
-  contactId: string;
+  contactId?: string;
   stageId?: string; // pre-picked when the card was dropped on a stage column
   onClose: () => void;
   onCreated?: (dealId: string) => void;
 }) {
   const { dialogRef, dialogProps } = useModal(onClose);
-  const { profile, user } = useAuth();
+  const { profile, user, activeLocationId } = useAuth();
   const { toast } = useToast();
-  const [contact, setContact] = useState<(Contact & { assigned?: { first_name: string; last_name: string } | null }) | null>(null);
+  const [contact, setContact] = useState<QuickDealContact | null>(null);
+  const [customers, setCustomers] = useState<QuickDealContact[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customersLoading, setCustomersLoading] = useState(!contactId);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [stage, setStage] = useState<string>(stageId ?? '');
+  const [dealOwners, setDealOwners] = useState<DealOwner[]>([]);
+  const [dealOwner, setDealOwner] = useState(UNSELECTED_OWNER);
   const [interest, setInterest] = useState('');
   const [leadSource, setLeadSource] = useState<DealLeadSourceChoice>('Walk-In');
   const [title, setTitle] = useState('');
@@ -68,24 +81,87 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [amount, setAmount] = useState('');
   const [expectedCloseDate, setExpectedCloseDate] = useState('');
   const [priority, setPriority] = useState<DealPriority>('Medium');
-  const [followUpDays, setFollowUpDays] = useState<number>(1);
+  const [nextActivityDate, setNextActivityDate] = useState(nextLocalDate);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
-    supabase.from('contacts').select('*, assigned:assigned_to(first_name, last_name)').eq('id', contactId).single()
-      .then(({ data, error }) => {
-        if (error) { console.error('QuickDeal: contact load failed', error); toast('Could not load that customer', 'error'); onClose(); return; }
-        setContact(data as typeof contact);
-      });
-    supabase.from('pipeline_stages').select('*').eq('org_id', profile.org_id).order('position')
+    let cancelled = false;
+
+    const loadCustomers = async () => {
+      if (contactId) {
+        const { data, error } = await supabase
+          .from('contacts')
+          .select('*, assigned:assigned_to(first_name, last_name)')
+          .eq('id', contactId)
+          .single();
+        if (cancelled) return;
+        if (error) {
+          console.error('QuickDeal: contact load failed', error);
+          toast('Could not load that customer', 'error');
+          onClose();
+          return;
+        }
+        const selected = data as QuickDealContact;
+        setContact(selected);
+        setDealOwner(selected.assigned_to ?? user?.id ?? UNSELECTED_OWNER);
+        return;
+      }
+
+      setCustomersLoading(true);
+      const pageSize = 1000;
+      const allCustomers: QuickDealContact[] = [];
+      for (let from = 0; ; from += pageSize) {
+        let query = supabase
+          .from('contacts')
+          .select('*, assigned:assigned_to(first_name, last_name)')
+          .eq('org_id', profile.org_id)
+          .order('last_name', { ascending: true })
+          .order('first_name', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (activeLocationId) query = query.eq('location_id', activeLocationId);
+        const { data, error } = await query;
+        if (cancelled) return;
+        if (error) {
+          console.error('QuickDeal: customer list load failed', error);
+          toast('Could not load the customer list', 'error');
+          setCustomersLoading(false);
+          return;
+        }
+        const page = (data ?? []) as QuickDealContact[];
+        allCustomers.push(...page);
+        if (page.length < pageSize) break;
+      }
+      if (!cancelled) {
+        const seen = new Set<string>();
+        setCustomers(allCustomers.filter(customer => !seen.has(customer.id) && (seen.add(customer.id), true)));
+        setCustomersLoading(false);
+      }
+    };
+
+    void loadCustomers();
+    void supabase.from('pipeline_stages').select('*').eq('org_id', profile.org_id).order('position')
       .then(({ data }) => {
+        if (cancelled) return;
         const open = (data ?? []).filter(s => !s.is_won && !s.is_lost);
         setStages(open);
         if (!stageId && open.length > 0) setStage(open[0].id);
       });
+    void supabase.from('profiles')
+      .select('id, first_name, last_name')
+      .eq('org_id', profile.org_id)
+      .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+      .order('first_name')
+      .then(({ data }) => {
+        if (cancelled) return;
+        setDealOwners((data ?? []) as DealOwner[]);
+        if (!contactId) setDealOwner(user?.id ?? UNSELECTED_OWNER);
+      });
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contactId, profile?.org_id]);
+  }, [contactId, profile?.org_id, activeLocationId]);
 
   // Auto-title mirrors the wizard's "{Last} – {interest}" ritual; backs off once hand-edited
   useEffect(() => {
@@ -95,9 +171,24 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   }, [interest, contact, titleTouched]);
 
   const canCreate = useMemo(
-    () => !!contact && !!stage && title.trim().length > 0 && expectedCloseDate.length > 0,
-    [contact, stage, title, expectedCloseDate]
+    () => !!contact && !!stage && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0 && expectedCloseDate.length > 0,
+    [contact, stage, dealOwner, title, nextActivityDate, expectedCloseDate]
   );
+
+  const matchingCustomers = useMemo(
+    () => filterCustomersByNamePrefix(customers, customerSearch).slice(0, 8),
+    [customers, customerSearch]
+  );
+  const selectedDealOwner = useMemo(
+    () => dealOwners.find(owner => owner.id === dealOwner) ?? null,
+    [dealOwners, dealOwner]
+  );
+
+  const chooseCustomer = (selection: QuickDealContact) => {
+    setContact(selection);
+    setDealOwner(selection.assigned_to ?? user?.id ?? UNSELECTED_OWNER);
+    setCustomerSearch(`${selection.first_name} ${selection.last_name}`.trim());
+  };
 
   const handleCreate = async () => {
     if (!profile || !user || !contact || !canCreate || saving) return;
@@ -106,8 +197,8 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
       const storedLeadSource = LEAD_SOURCE_OPTIONS.find(option => option.label === leadSource)?.storedValue;
       if (!storedLeadSource) throw new Error('Choose a lead source');
 
-      // Commission integrity: credit the customer's salesperson, log the enterer
-      const creditTo = contact.assigned_to ?? user.id;
+      // Default to the customer's salesperson, while honoring the explicit Deal Owner field.
+      const creditTo = dealOwner;
       const enteredByOther = creditTo !== user.id;
 
       const { data: deal, error: dealErr } = await supabase.from('deals').insert({
@@ -126,18 +217,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
       }).select('id').single();
       if (dealErr) throw new Error(dealErr.message);
 
-      if (enteredByOther) {
-        await supabase.from('notifications').insert({
-          user_id: creditTo, type: 'deal',
-          title: `New deal on your customer: ${title.trim()}`,
-          body: `Entered by ${profile.first_name} ${profile.last_name} — credited to you.`,
-          link: `/deals/${deal.id}`,
-        });
-      }
-
       // Mandatory follow-up — every deal gets one, no exceptions
-      const due = new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000);
-      const dueDate = due.toISOString().slice(0, 10);
       const { error: taskErr } = await supabase.from('tasks').insert({
         org_id: profile.org_id,
         assigned_to: creditTo,
@@ -145,12 +225,25 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         contact_id: contact.id,
         deal_id: deal.id,
         title: `Follow up with ${contact.first_name}`,
-        due_at: `${dueDate}T09:00:00`,
+        due_at: `${nextActivityDate}T09:00:00`,
         priority: priority === 'High' ? 'High' : priority === 'Low' ? 'Low' : 'Medium',
         status: 'Pending',
         task_type: 'Follow-up',
       });
-      if (taskErr) throw new Error(taskErr.message);
+      if (taskErr) {
+        // Do not leave an active deal behind without the required next activity.
+        await supabase.from('deals').delete().eq('id', deal.id);
+        throw new Error(taskErr.message);
+      }
+
+      if (enteredByOther) {
+        await supabase.from('notifications').insert({
+          user_id: creditTo, type: 'deal',
+          title: `New deal assigned to you: ${title.trim()}`,
+          body: `Entered by ${profile.first_name} ${profile.last_name}.`,
+          link: `/deals/${deal.id}`,
+        });
+      }
 
       toast(`Deal created for ${contact.first_name} — follow-up scheduled`, 'success');
       onCreated?.(deal.id);
@@ -174,20 +267,61 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               New Deal{contact ? ` — ${contact.first_name} ${contact.last_name}` : ''}
             </h2>
             <p className="text-xs text-ink-500 mt-0.5">
-              {contact?.assigned
-                ? `Credited to ${contact.assigned.first_name} ${contact.assigned.last_name} (assigned salesperson)`
+              {selectedDealOwner
+                ? `Deal owner: ${selectedDealOwner.first_name} ${selectedDealOwner.last_name}`
                 : 'Lands on the pipeline with a follow-up already set'}
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
         </div>
 
-        {!contact ? (
+        {contactId && !contact ? (
           <div className="flex items-center justify-center py-16">
             <div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" />
           </div>
         ) : (
           <div className="px-6 py-5 space-y-5 overflow-y-auto">
+            {!contactId && (
+              <div>
+                <label htmlFor="deal-customer-search" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+                  Existing Customer *
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+                  <input
+                    id="deal-customer-search"
+                    value={customerSearch}
+                    onChange={e => { setCustomerSearch(e.target.value); setContact(null); }}
+                    placeholder="Start typing a customer name…"
+                    aria-label="Search existing customers"
+                    autoComplete="off"
+                    className={`${inputClass} pl-9`}
+                  />
+                </div>
+                <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-ink-700 bg-ink-950">
+                  {customersLoading ? (
+                    <p className="px-3 py-3 text-xs text-ink-500">Loading customer list…</p>
+                  ) : matchingCustomers.length === 0 ? (
+                    <p className="px-3 py-3 text-xs text-ink-500">No matching customers.</p>
+                  ) : matchingCustomers.map(customer => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      onClick={() => chooseCustomer(customer)}
+                      aria-pressed={contact?.id === customer.id}
+                      className={cn(
+                        'block w-full border-b border-ink-800 px-3 py-2 text-left last:border-b-0 hover:bg-brand-500/10',
+                        contact?.id === customer.id && 'bg-brand-500/15'
+                      )}
+                    >
+                      <span className="block text-sm font-semibold text-ink-200">{customer.first_name} {customer.last_name}</span>
+                      <span className="block text-[11px] text-ink-500">{customer.phone} · {customer.customer_type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label htmlFor="deal-interest" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
                 What are they shopping for?
@@ -218,22 +352,36 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               </select>
             </div>
 
+            <div>
+              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Deal Title *</p>
+              <input value={title} onChange={e => { setTitle(e.target.value); setTitleTouched(true); }} placeholder="e.g. Wyant – Hot Tub" className={inputClass} />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Deal title *</p>
-                <input value={title} onChange={e => { setTitle(e.target.value); setTitleTouched(true); }} placeholder="e.g. Wyant – Hot Tub" className={inputClass} />
+                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Stage *</p>
+                <select value={stage} onChange={e => setStage(e.target.value)} className={inputClass}>
+                  {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
               <div>
-                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Amount ($)</p>
-                <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="Optional" className={inputClass} />
+                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Deal Owner *</p>
+                <select value={dealOwner} onChange={e => setDealOwner(e.target.value)} className={inputClass}>
+                  <option value={UNSELECTED_OWNER} disabled>Select an owner</option>
+                  {dealOwners.map(owner => <option key={owner.id} value={owner.id}>{owner.first_name} {owner.last_name}</option>)}
+                </select>
               </div>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Stage</p>
-              <select value={stage} onChange={e => setStage(e.target.value)} className={inputClass}>
-                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Set Next Activity Date *</p>
+                <input type="date" value={nextActivityDate} onChange={e => setNextActivityDate(e.target.value)} className={inputClass} required />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Projected $ Amount</p>
+                <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="Optional" className={inputClass} />
+              </div>
             </div>
 
             <div>
@@ -249,12 +397,6 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               <p className="mt-1.5 text-[11px] text-ink-500">Required for an honest pipeline forecast; leave the deal uncreated if the date is not known yet.</p>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Follow-up (required)</p>
-              <div className="flex flex-wrap gap-2">
-                {FOLLOW_UPS.map(f => <Chip key={f.days} active={followUpDays === f.days} onClick={() => setFollowUpDays(f.days)}>{f.label}</Chip>)}
-              </div>
-            </div>
           </div>
         )}
 

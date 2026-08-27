@@ -44,3 +44,29 @@ test('customer New Deal shows the requested lead sources and stores the canonica
     assert.match(schema, new RegExp(`'${value.replace('/', '\\/')}'`));
   }
 });
+
+test('Deals New Deal opens the existing-customer form with the requested deal fields', async () => {
+  const [deals, modal] = await Promise.all([
+    read('src/pages/Deals.tsx'),
+    read('src/components/QuickDealModal.tsx'),
+  ]);
+
+  assert.match(deals, /onClick=\{\(\) => setQuickDeal\(\{\}\)\}[\s\S]*New Deal/);
+  assert.doesNotMatch(deals, /NewCustomerWizard|New Customer/);
+  assert.match(modal, /contactId\?: string/);
+  assert.match(modal, /Existing Customer \*/);
+  assert.match(modal, /aria-label="Search existing customers"/);
+  assert.match(modal, /filterCustomersByNamePrefix\(customers, customerSearch\)/);
+  assert.match(modal, /\.from\('contacts'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*\.range\(from, from \+ pageSize - 1\)/);
+  assert.match(modal, />Deal Title \*</);
+  assert.match(modal, />Stage \*</);
+  assert.match(modal, />Deal Owner \*</);
+  assert.match(modal, />Set Next Activity Date \*</);
+  assert.match(modal, />Projected \$ Amount</);
+  assert.match(modal, />Priority</);
+  assert.match(modal, />Expected close date \*</);
+  assert.match(modal, /assigned_to: creditTo/);
+  assert.match(modal, /due_at: `\$\{nextActivityDate\}T09:00:00`/);
+  assert.match(modal, /if \(taskErr\)[\s\S]*from\('deals'\)\.delete\(\)\.eq\('id', deal\.id\)/);
+  assert.doesNotMatch(modal, /from\('contacts'\)\.insert/);
+});

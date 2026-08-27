@@ -10,7 +10,6 @@ import { usePipeline, type PipelineDeal } from '@/hooks/usePipeline';
 import { filterDealsByFollowUp, formatFollowUpDue, getFollowUpState, type DealFollowUp, type FollowUpFilter, type FollowUpState } from '@/lib/followUp';
 import { useCustomerDrag, type DragCustomer } from '@/contexts/CustomerDragContext';
 import SalesBoard from '@/components/SalesBoard';
-import NewCustomerWizard from '@/components/NewCustomerWizard';
 import QuickDealModal from '@/components/QuickDealModal';
 import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -21,10 +20,9 @@ export default function Deals() {
   const { profile } = useAuth();
   const { toast } = useToast();
   const { dragging, activeTarget, setDropHandler } = useCustomerDrag();
-  const [showWizard, setShowWizard] = useState(false);
   // Customer card dropped from the CRM: onto a deal → attach, onto a stage → new deal
   const [attach, setAttach] = useState<{ customer: DragCustomer; dealId: string } | null>(null);
-  const [quickDeal, setQuickDeal] = useState<{ contactId: string; stageId?: string } | null>(null);
+  const [quickDeal, setQuickDeal] = useState<{ contactId?: string; stageId?: string } | null>(null);
   // IKEA effect: spotlight the customer card the salesperson just built
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState('all');
@@ -230,23 +228,12 @@ export default function Deals() {
               <Columns3 className="h-3.5 w-3.5" /> Board
             </button>
           </div>
-          {/* Violet = customer action, everywhere it appears (page color system) */}
-          <button onClick={() => setShowWizard(true)} className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
+          <button onClick={() => setQuickDeal({})} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm">
             <Plus className="w-4 h-4 mr-2" />
-            New Customer
+            New Deal
           </button>
         </div>
       </div>
-
-      {showWizard && (
-        <NewCustomerWizard
-          onClose={() => setShowWizard(false)}
-          onCreated={(dealId) => {
-            refresh();
-            if (dealId) spotlight(dealId);
-          }}
-        />
-      )}
 
       {quickDeal && (
         <QuickDealModal

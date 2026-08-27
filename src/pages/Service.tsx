@@ -4,11 +4,11 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, statusDotColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
+import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Job, JobStatus, JobType } from '@/types/database';
+import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
 import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, scheduleJobType } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
@@ -17,7 +17,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; mailing_address: string | null } | null };
 
-const LEGEND_STATUSES: JobStatus[] = ['Delivery', 'Warranty', 'Parts on Order'];
+const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order'];
 
 const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
 
@@ -106,7 +106,7 @@ export default function Service() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [statusFilter, setStatusFilter] = useState<Set<JobStatus>>(new Set());
+  const [jobTypeFilter, setJobTypeFilter] = useState<Set<ScheduleJobType>>(new Set());
 
   const saveJobStatus = async (id: string, u: { status: JobStatus }) => {
     const ok = await updateJob(id, u);
@@ -114,10 +114,10 @@ export default function Service() {
     return ok;
   };
 
-  const toggleFilter = (status: JobStatus) =>
-    setStatusFilter(prev => {
+  const toggleFilter = (jobType: ScheduleJobType) =>
+    setJobTypeFilter(prev => {
       const next = new Set(prev);
-      if (next.has(status)) next.delete(status); else next.add(status);
+      if (next.has(jobType)) next.delete(jobType); else next.add(jobType);
       return next;
     });
 
@@ -176,16 +176,10 @@ export default function Service() {
   const filteredJobs = useMemo(() => {
     return (scheduledJobs as ServiceJob[]).filter(j => {
       if (!j.scheduled_at) return false;
-      if (statusFilter.size > 0 && !statusFilter.has(j.status as JobStatus)) return false;
+      if (jobTypeFilter.size > 0 && !jobTypeFilter.has(scheduleJobType(j.job_type))) return false;
       return isWithinInterval(new Date(j.scheduled_at), { start: rangeStart, end: rangeEnd });
     });
-  }, [scheduledJobs, rangeStart, rangeEnd, statusFilter]);
-
-  const legendCounts = useMemo(() => {
-    const c = {} as Record<JobStatus, number>;
-    for (const j of jobs) c[j.status as JobStatus] = (c[j.status as JobStatus] ?? 0) + 1;
-    return c;
-  }, [jobs]);
+  }, [scheduledJobs, rangeStart, rangeEnd, jobTypeFilter]);
 
   // ─── Create job modal ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
@@ -293,12 +287,14 @@ export default function Service() {
 
       {/* Color legend = working filter (Brandon's color language) */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4 shrink-0">
-        {LEGEND_STATUSES.map(status => {
-          const active = statusFilter.has(status);
+        {LEGEND_JOB_TYPES.map(jobType => {
+          const active = jobTypeFilter.has(jobType);
           return (
             <button
-              key={status}
-              onClick={() => toggleFilter(status)}
+              key={jobType}
+              type="button"
+              aria-pressed={active}
+              onClick={() => toggleFilter(jobType)}
               className={cn(
                 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold border transition-all',
                 active
@@ -306,14 +302,13 @@ export default function Service() {
                   : 'bg-ink-900 border-ink-700 text-ink-400 hover:text-ink-200 hover:border-ink-600'
               )}
             >
-              <span className={cn('w-2 h-2 rounded-full shrink-0', statusDotColors[status])} />
-              {status === 'Parts on Order' ? 'Parts On Order' : status}
-              <span className="font-mono text-[10px] opacity-70">{legendCounts[status] ?? 0}</span>
+              <span className={cn('w-2 h-2 rounded-full shrink-0', jobTypeDotColors[jobType])} />
+              {jobType}
             </button>
           );
         })}
-        {statusFilter.size > 0 && (
-          <button onClick={() => setStatusFilter(new Set())} className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 px-2">
+        {jobTypeFilter.size > 0 && (
+          <button type="button" onClick={() => setJobTypeFilter(new Set())} className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 px-2">
             Clear filter
           </button>
         )}

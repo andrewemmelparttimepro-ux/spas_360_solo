@@ -122,7 +122,7 @@ describe('Brandon composite UI contract', () => {
     assert.doesNotMatch(inventoryEditor, />SKU</);
     assert.match(inventoryEditor, />Serial Number \*</);
     assert.match(inventoryEditor, />Model \*</);
-    assert.match(service, /const LEGEND_STATUSES: JobStatus\[\] = \['Delivery', 'Warranty', 'Parts on Order'\]/);
+    assert.match(service, /const LEGEND_JOB_TYPES: ScheduleJobType\[\] = \['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order'\]/);
     assert.match(serviceJobs, /'Service': 'bg-brand-500 text-white'/);
     assert.match(serviceJobs, /'Warranty': 'bg-orange-600 text-white'/);
     assert.match(serviceJobs, /'Delivery': 'bg-red-600 text-white'/);

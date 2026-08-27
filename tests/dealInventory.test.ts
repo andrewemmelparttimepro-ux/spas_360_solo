@@ -135,9 +135,10 @@ describe('deal inventory close flow', () => {
     assert.match(sql, /language sql[\s\S]*security invoker[\s\S]*select private\.close_deal_sale/);
   });
 
-  it('attaches inventory from the left Deal Information column before Won', async () => {
-    const [dealDetail, sql] = await Promise.all([
+  it('opens the inventory table window from Deal Information before Won', async () => {
+    const [dealDetail, selector, sql] = await Promise.all([
       readFile(new URL('../src/pages/DealDetail.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../src/components/DealInventorySelector.tsx', import.meta.url), 'utf8'),
       readFile(new URL('../supabase/migrations/20260826213000_preselect_deal_inventory.sql', import.meta.url), 'utf8'),
     ]);
 
@@ -146,11 +147,19 @@ describe('deal inventory close flow', () => {
       dealDetail.indexOf('lg:col-span-2'),
     );
 
-    assert.match(leftColumn, /htmlFor="deal-inventory-item"[^>]*>Inventory item/);
-    assert.match(leftColumn, /id="deal-inventory-item"[\s\S]*Choose inventory before Won/);
+    assert.match(leftColumn, />Inventory item<\/p>[\s\S]*setInventorySelectorContext\('attach'\)/);
+    assert.match(leftColumn, /Choose inventory unit/);
+    assert.doesNotMatch(leftColumn, /<select[\s\S]*inventory/);
     assert.match(dealDetail, /attachInventoryToDeal[\s\S]*sale_fulfillment_type: inventoryItemId \? 'inventory' : null[\s\S]*inventory_item_id: inventoryItemId \|\| null/);
     assert.match(dealDetail, /setFulfillmentType\(deal\.sale_fulfillment_type\)[\s\S]*setSelectedInventoryId\(deal\.inventory_item_id \?\? ''\)/);
     assert.match(dealDetail, /isClosedDeal[\s\S]*'Attached inventory'/);
+
+    assert.match(selector, /role="dialog"[\s\S]*The rows and color groups match Inventory/);
+    assert.match(selector, /aria-label="Filter by make or brand"/);
+    assert.match(selector, /groupInventoryItems\(visibleItems\)/);
+    assert.match(selector, /group\.headerClassName[\s\S]*group\.tintClassName/);
+    assert.match(selector, />Model<[\s\S]*>Store<[\s\S]*>Color Combination<[\s\S]*>Serial Number<[\s\S]*>On Hand Y\/N</);
+    assert.match(dealDetail, /setInventorySelectorContext\('won'\)[\s\S]*Open inventory window/);
 
     assert.match(sql, /v_current_stage_is_won and v_existing_type is not null/);
     assert.match(sql, /i\.status = 'In Stock' and i\.customer_id is null and i\.deal_id is null/);

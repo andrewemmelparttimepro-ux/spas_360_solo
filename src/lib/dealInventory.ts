@@ -6,6 +6,10 @@ export type DealInventoryOption = Pick<
   InventoryItem,
   'id' | 'sku' | 'product' | 'brand' | 'model' | 'color_finish' | 'location_id'
 > & {
+  category?: InventoryItem['category'];
+  status?: InventoryItem['status'];
+  notes?: InventoryItem['notes'];
+  created_at?: InventoryItem['created_at'];
   locations?: { name: string } | null;
 };
 

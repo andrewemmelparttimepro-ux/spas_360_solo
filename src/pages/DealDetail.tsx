@@ -16,6 +16,7 @@ import { composeMentionBody, parseMentions, notifyMentionedUsers, isAriNote, ari
 import { runAriMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
 import AriNoteCard from '@/components/AriNoteCard';
+import DealInventorySelector from '@/components/DealInventorySelector';
 import type { AriOutputFormat } from '@/lib/ariExport';
 import {
   defaultFollowUpInputValue,
@@ -90,6 +91,7 @@ export default function DealDetail() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [closeSaleBusy, setCloseSaleBusy] = useState(false);
   const [closeSaleError, setCloseSaleError] = useState<string | null>(null);
+  const [inventorySelectorContext, setInventorySelectorContext] = useState<'attach' | 'won' | null>(null);
   const handledCloseWonLocationKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -128,7 +130,7 @@ export default function DealDetail() {
       const [inventoryResult, reservationsResult] = await Promise.all([
         supabase
           .from('inventory_items')
-          .select('id,sku,product,brand,model,color_finish,location_id,locations:location_id(name)')
+          .select('id,sku,product,brand,category,model,color_finish,status,notes,created_at,location_id,locations:location_id(name)')
           .eq('org_id', profile.org_id)
           .eq('status', 'In Stock')
           .is('customer_id', null)
@@ -206,13 +208,14 @@ export default function DealDetail() {
 
   const closeCloseSale = () => {
     if (closeSaleBusy) return;
+    setInventorySelectorContext(null);
     setCloseSaleStageId(null);
     setFulfillmentType(null);
     setSelectedInventoryId('');
     setCloseSaleError(null);
   };
 
-  const attachInventoryToDeal = async (inventoryItemId: string) => {
+  const attachInventoryToDeal = async (inventoryItemId: string): Promise<boolean> => {
     setCloseSaleError(null);
     setCloseSaleBusy(true);
 
@@ -226,10 +229,12 @@ export default function DealDetail() {
       setFulfillmentType(inventoryItemId ? 'inventory' : null);
       setSelectedInventoryId(inventoryItemId);
       toast(inventoryItemId ? 'Inventory unit attached to this deal' : 'Inventory unit removed from this deal', 'success');
+      return true;
     } catch (error) {
       const message = `Couldn't attach this inventory unit: ${(error as Error).message || 'Unknown error'}`;
       setCloseSaleError(message);
       toast(message, 'error');
+      return false;
     } finally {
       setCloseSaleBusy(false);
     }
@@ -457,17 +462,27 @@ export default function DealDetail() {
             <div className="flex items-center text-sm text-ink-300"><User className="w-4 h-4 mr-2 text-ink-500" />Source: {deal.lead_source}</div>
             {!isClosedDeal && (
               <div>
-                <label htmlFor="deal-inventory-item" className="mb-1 block text-xs font-semibold text-ink-500">Inventory item</label>
-                <select
-                  id="deal-inventory-item"
-                  value={deal.inventory_item_id ?? ''}
-                  onChange={event => void attachInventoryToDeal(event.target.value)}
-                  disabled={inventoryLoading || closeSaleBusy}
-                  className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">Choose inventory before Won…</option>
-                  {availableInventory.map(item => <option key={item.id} value={item.id}>{inventoryUnitLabel(item)}</option>)}
-                </select>
+                <p className="mb-1 text-xs font-semibold text-ink-500">Inventory item</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInventorySelectorContext('attach')}
+                    disabled={inventoryLoading || closeSaleBusy}
+                    className="flex-1 rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-left text-sm font-semibold text-ink-100 outline-none transition hover:border-brand-500 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deal.inventory_item_id ? 'Change inventory unit…' : 'Choose inventory unit…'}
+                  </button>
+                  {deal.inventory_item_id && (
+                    <button
+                      type="button"
+                      onClick={() => void attachInventoryToDeal('')}
+                      disabled={inventoryLoading || closeSaleBusy}
+                      className="rounded-lg border border-ink-700 px-3 py-2 text-xs font-semibold text-ink-400 transition hover:border-red-500/50 hover:text-red-300 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
                 {inventoryLoading && <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading available units…</p>}
                 {closeSaleError && <p role="alert" className="mt-1 text-xs font-medium text-red-300">{closeSaleError}</p>}
               </div>
@@ -633,7 +648,7 @@ export default function DealDetail() {
           </div>
         </div>
       </div>
-      {closeSaleStageId && (
+      {closeSaleStageId && inventorySelectorContext !== 'won' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4" role="presentation">
           <section
             role="dialog"
@@ -650,8 +665,8 @@ export default function DealDetail() {
             </div>
 
             <div className="mt-5 space-y-3">
-              <label className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'inventory' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
-                <span className="flex items-center gap-3 text-sm font-semibold text-ink-100">
+              <div className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'inventory' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
+                <label className="flex items-center gap-3 text-sm font-semibold text-ink-100">
                   <input
                     type="radio"
                     name="sale-fulfillment"
@@ -660,24 +675,24 @@ export default function DealDetail() {
                     disabled={inventoryLoading || availableInventory.length === 0 || closeSaleBusy}
                   />
                   Current inventory
-                </span>
+                </label>
                 {inventoryLoading ? (
                   <span className="mt-3 flex items-center gap-2 text-sm text-ink-500"><Loader2 className="h-4 w-4 animate-spin" />Loading available units…</span>
                 ) : availableInventory.length === 0 ? (
                   <span className="mt-3 block text-sm text-ink-500">No unassigned In Stock units are available.</span>
                 ) : (
-                  <select
-                    value={selectedInventoryId}
-                    onChange={event => { setSelectedInventoryId(event.target.value); setFulfillmentType('inventory'); setCloseSaleError(null); }}
+                  <button
+                    type="button"
+                    onClick={() => setInventorySelectorContext('won')}
                     disabled={closeSaleBusy}
-                    aria-label="Purchased inventory unit"
-                    className="mt-3 w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500"
+                    className="mt-3 w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-left text-sm font-semibold text-ink-100 outline-none transition hover:border-brand-500 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:opacity-50"
                   >
-                    <option value="">Choose the exact unit and serial…</option>
-                    {availableInventory.map(item => <option key={item.id} value={item.id}>{inventoryUnitLabel(item)}</option>)}
-                  </select>
+                    {selectedInventoryId
+                      ? inventoryUnitLabel(availableInventory.find(item => item.id === selectedInventoryId) ?? availableInventory[0])
+                      : 'Open inventory window…'}
+                  </button>
                 )}
-              </label>
+              </div>
 
               <label className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'special_order' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
                 <span className="flex items-center gap-3 text-sm font-semibold text-ink-100">
@@ -705,6 +720,27 @@ export default function DealDetail() {
             </div>
           </section>
         </div>
+      )}
+      {inventorySelectorContext && (
+        <DealInventorySelector
+          items={availableInventory}
+          initialSelection={inventorySelectorContext === 'attach' ? deal.inventory_item_id ?? '' : selectedInventoryId}
+          loading={inventoryLoading}
+          busy={closeSaleBusy}
+          title={inventorySelectorContext === 'attach' ? 'Attach inventory to this deal' : 'Choose the purchased inventory unit'}
+          actionLabel={inventorySelectorContext === 'attach' ? 'Attach unit' : 'Use selected unit'}
+          onCancel={() => setInventorySelectorContext(null)}
+          onConfirm={async inventoryItemId => {
+            if (inventorySelectorContext === 'attach') {
+              if (await attachInventoryToDeal(inventoryItemId)) setInventorySelectorContext(null);
+              return;
+            }
+            setSelectedInventoryId(inventoryItemId);
+            setFulfillmentType('inventory');
+            setCloseSaleError(null);
+            setInventorySelectorContext(null);
+          }}
+        />
       )}
     </div>
   );

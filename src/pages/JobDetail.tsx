@@ -308,7 +308,7 @@ export default function JobDetail() {
       setDeletingJob(false);
       return;
     }
-    toast('Job deleted. Attached inventory is back in Stock.', 'success');
+    toast('Job deleted. Job-only inventory is back in Stock.', 'success');
     navigate('/service', { replace: true });
   };
 

@@ -119,4 +119,17 @@ describe('Schedule job language and colors', () => {
     assert.match(migration, /case when p_job_type = 'To Do' then 'Pending Confirm' else 'In Progress' end/);
     assert.doesNotMatch(migration, /update public\.jobs/);
   });
+
+  it('starts every New Job category in its matching queue status', async () => {
+    const migration = await read('supabase/migrations/20260827024139_align_new_job_initial_status.sql');
+
+    assert.match(migration, /when 'Service' then 'In Progress'/);
+    assert.match(migration, /when 'Warranty' then 'Warranty'/);
+    assert.match(migration, /when 'Delivery' then 'Delivery'/);
+    assert.match(migration, /when 'On Order' then 'Parts on Order'/);
+    assert.match(migration, /when 'Customer Pick Up' then 'Ready for Pickup'/);
+    assert.match(migration, /when 'To Do' then 'Pending Confirm'/);
+    assert.match(migration, /p_job_type,[\s\S]*v_initial_status, p_description/);
+    assert.doesNotMatch(migration, /update public\.jobs/);
+  });
 });

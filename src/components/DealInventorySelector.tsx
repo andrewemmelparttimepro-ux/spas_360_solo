@@ -1,19 +1,22 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
 import type { DealInventoryOption } from '@/lib/dealInventory';
 import { ALL_INVENTORY_BRANDS, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
+import { inventoryAgeLabel } from '@/lib/inventoryAge';
+import { inventoryCustomerOrStock, serialNumberForDisplay, splitSerialAndFlooring } from '@/lib/inventoryFields';
 import { cn } from '@/lib/utils';
 
 const HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
 const GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
-const ROW_CELL_CLASS = 'px-3 py-2 text-xs leading-4';
+const ROW_CELL_CLASS = 'px-3 py-0.5 text-xs leading-4';
 
 type DealInventorySelectorProps = {
   items: DealInventoryOption[];
   initialSelection: string;
   loading: boolean;
   busy?: boolean;
+  showStore: boolean;
   title: string;
   actionLabel: string;
   onCancel: () => void;
@@ -32,6 +35,7 @@ export default function DealInventorySelector({
   initialSelection,
   loading,
   busy = false,
+  showStore,
   title,
   actionLabel,
   onCancel,
@@ -66,6 +70,7 @@ export default function DealInventorySelector({
     ));
   }, [brandFilter, items, searchQuery]);
   const groupedItems = useMemo(() => groupInventoryItems(visibleItems), [visibleItems]);
+  const columnCount = showStore ? 9 : 8;
 
   return (
     <div
@@ -123,26 +128,29 @@ export default function DealInventorySelector({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <table data-density="compact" className="w-full min-w-[760px] border-collapse text-left">
+          <table data-density="compact" className="w-full min-w-[1220px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-ink-900">
               <tr className="border-b border-ink-700">
-                <th className={cn(HEADER_CELL_CLASS, 'w-12')}><span className="sr-only">Select</span></th>
                 <th className={HEADER_CELL_CLASS}>Model</th>
-                <th className={HEADER_CELL_CLASS}>Store</th>
+                {showStore && <th className={HEADER_CELL_CLASS}>Store</th>}
                 <th className={HEADER_CELL_CLASS}>Color Combination</th>
                 <th className={HEADER_CELL_CLASS}>Serial Number</th>
+                <th className={HEADER_CELL_CLASS}>Inventory Flooring Status</th>
+                <th className={HEADER_CELL_CLASS}>Inventory Age</th>
+                <th className={HEADER_CELL_CLASS}>Customer/Stock</th>
+                <th className={HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
               {loading ? (
-                <tr><td colSpan={6} className="p-10 text-center text-sm text-ink-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading available units…</td></tr>
+                <tr><td colSpan={columnCount} className="p-10 text-center text-sm text-ink-500"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading available units…</td></tr>
               ) : visibleItems.length === 0 ? (
-                <tr><td colSpan={6} className="p-10 text-center text-sm text-ink-500">No available units match these filters.</td></tr>
+                <tr><td colSpan={columnCount} className="p-10 text-center text-sm text-ink-500">No available units match these filters.</td></tr>
               ) : groupedItems.map(group => (
                 <Fragment key={group.key}>
                   <tr className={cn('border-y border-ink-700', group.headerClassName)}>
-                    <th colSpan={6} scope="rowgroup" className={GROUP_HEADER_CELL_CLASS}>
+                    <th colSpan={columnCount} scope="rowgroup" className={GROUP_HEADER_CELL_CLASS}>
                       <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em]">
                         <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', group.dotClassName)} />
                         {group.label}
@@ -152,6 +160,10 @@ export default function DealInventorySelector({
                   </tr>
                   {group.items.map(item => {
                     const selected = selectedInventoryId === item.id;
+                    const serialAndFlooring = splitSerialAndFlooring(item.sku);
+                    const currentCustomerName = item.customer
+                      ? `${item.customer.first_name} ${item.customer.last_name}`.trim()
+                      : null;
                     return (
                       <tr
                         key={item.id}
@@ -170,20 +182,24 @@ export default function DealInventorySelector({
                           selected && 'ring-2 ring-inset ring-brand-500 bg-brand-500/10',
                         )}
                       >
-                        <td className={ROW_CELL_CLASS}>
-                          <span className={cn('inline-flex h-5 w-5 items-center justify-center rounded-full border', selected ? 'border-brand-400 bg-brand-500 text-white' : 'border-ink-600 bg-ink-950')}>
-                            {selected && <Check className="h-3 w-3" />}
-                          </span>
-                        </td>
                         <td className={cn(ROW_CELL_CLASS, 'font-semibold text-ink-200')}>{item.model || item.product || '—'}</td>
-                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>
-                          <span className="inline-flex whitespace-nowrap rounded-full border border-ink-700 bg-ink-950 px-2 py-0.5 text-xs font-medium">
-                            {item.locations?.name?.split(' (')[0] ?? '—'}
-                          </span>
-                        </td>
+                        {showStore && (
+                          <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>
+                            <span
+                              className="inline-flex whitespace-nowrap rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium"
+                              title={item.locations?.name ?? undefined}
+                            >
+                              {(item.locations?.name ?? '—').split(' (')[0]}
+                            </span>
+                          </td>
+                        )}
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-400')}>{item.color_finish || '—'}</td>
-                        <td className={cn(ROW_CELL_CLASS, 'font-medium text-ink-300')}>{item.sku || '—'}</td>
-                        <td className={cn(ROW_CELL_CLASS, 'font-semibold text-ink-200')}>Yes</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialNumberForDisplay(serialAndFlooring.serial) || '—'}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialAndFlooring.flooring || '—'}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>{inventoryAgeLabel(item.created_at ?? '')}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{inventoryCustomerOrStock(item.notes ?? null, item.customer_id ?? null, currentCustomerName)}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.date_delivered || '—'}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'font-semibold text-ink-200')}>{item.status === 'In Stock' || item.status === 'Sold' ? 'Yes' : 'No'}</td>
                       </tr>
                     );
                   })}

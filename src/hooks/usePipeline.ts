@@ -203,7 +203,7 @@ export function useDeal(id: string | undefined) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('deals')
-      .select('*, contact:contact_id(first_name, last_name, phone), inventory_item:inventory_item_id(id,sku,product,brand,category,model,color_finish,status,notes,created_at,location_id,locations:location_id(name))')
+      .select('*, contact:contact_id(first_name, last_name, phone), inventory_item:inventory_item_id(id,sku,product,brand,category,model,color_finish,status,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name))')
       .eq('id', id)
       .single();
     if (error || !data) {
@@ -217,7 +217,7 @@ export function useDeal(id: string | undefined) {
     if (!data.inventory_item && data.sale_fulfillment_type !== 'special_order' && data.contact_id) {
       const { data: assignedUnits, error: assignedUnitsError } = await supabase
         .from('inventory_items')
-        .select('id,sku,product,brand,category,model,color_finish,status,notes,created_at,location_id,locations:location_id(name)')
+        .select('id,sku,product,brand,category,model,color_finish,status,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name)')
         .eq('org_id', data.org_id)
         .eq('customer_id', data.contact_id)
         .is('deal_id', null)

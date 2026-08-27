@@ -136,9 +136,10 @@ describe('deal inventory close flow', () => {
   });
 
   it('opens the inventory table window from Deal Information before Won', async () => {
-    const [dealDetail, selector, sql] = await Promise.all([
+    const [dealDetail, selector, inventory, sql] = await Promise.all([
       readFile(new URL('../src/pages/DealDetail.tsx', import.meta.url), 'utf8'),
       readFile(new URL('../src/components/DealInventorySelector.tsx', import.meta.url), 'utf8'),
+      readFile(new URL('../src/pages/Inventory.tsx', import.meta.url), 'utf8'),
       readFile(new URL('../supabase/migrations/20260826213000_preselect_deal_inventory.sql', import.meta.url), 'utf8'),
     ]);
 
@@ -158,7 +159,25 @@ describe('deal inventory close flow', () => {
     assert.match(selector, /aria-label="Filter by make or brand"/);
     assert.match(selector, /groupInventoryItems\(visibleItems\)/);
     assert.match(selector, /group\.headerClassName[\s\S]*group\.tintClassName/);
-    assert.match(selector, />Model<[\s\S]*>Store<[\s\S]*>Color Combination<[\s\S]*>Serial Number<[\s\S]*>On Hand Y\/N</);
+    const headerPattern = /<th className=\{(?:INVENTORY_)?HEADER_CELL_CLASS\}>([^<]+)<\/th>/g;
+    const selectorHeaders = Array.from(selector.matchAll(headerPattern), match => match[1]);
+    const inventoryHeaders = Array.from(inventory.matchAll(headerPattern), match => match[1]);
+    assert.deepEqual(selectorHeaders, inventoryHeaders);
+    assert.deepEqual(selectorHeaders, [
+      'Model',
+      'Store',
+      'Color Combination',
+      'Serial Number',
+      'Inventory Flooring Status',
+      'Inventory Age',
+      'Customer/Stock',
+      'Delivery Date',
+      'On Hand Y/N',
+    ]);
+    assert.match(selector, /splitSerialAndFlooring\(item\.sku\)[\s\S]*serialNumberForDisplay\(serialAndFlooring\.serial\)/);
+    assert.match(selector, /inventoryAgeLabel\(item\.created_at \?\? ''\)/);
+    assert.match(selector, /inventoryCustomerOrStock\(item\.notes \?\? null, item\.customer_id \?\? null, currentCustomerName\)/);
+    assert.match(selector, /showStore[\s\S]*title=\{item\.locations\?\.name \?\? undefined\}[\s\S]*\.split\(' \('\)\[0\]/);
     assert.match(dealDetail, /setInventorySelectorContext\('won'\)[\s\S]*Open inventory window/);
 
     assert.match(sql, /v_current_stage_is_won and v_existing_type is not null/);

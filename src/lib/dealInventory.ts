@@ -10,6 +10,9 @@ export type DealInventoryOption = Pick<
   status?: InventoryItem['status'];
   notes?: InventoryItem['notes'];
   created_at?: InventoryItem['created_at'];
+  customer_id?: InventoryItem['customer_id'];
+  date_delivered?: InventoryItem['date_delivered'];
+  customer?: { first_name: string; last_name: string } | null;
   locations?: { name: string } | null;
 };
 

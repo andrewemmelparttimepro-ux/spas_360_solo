@@ -73,7 +73,7 @@ export default function DealDetail() {
   const { notes, createNote } = useNotes({ dealId: id });
   const { tasks, createTask, completeTask } = useTasks({ dealId: id });
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, activeLocationId } = useAuth();
   const [newNote, setNewNote] = useState('');
   const pickedRef = useRef<PickedMention[]>([]);
   const [ariBusy, setAriBusy] = useState(false);
@@ -130,7 +130,7 @@ export default function DealDetail() {
       const [inventoryResult, reservationsResult] = await Promise.all([
         supabase
           .from('inventory_items')
-          .select('id,sku,product,brand,category,model,color_finish,status,notes,created_at,location_id,locations:location_id(name)')
+          .select('id,sku,product,brand,category,model,color_finish,status,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name)')
           .eq('org_id', profile.org_id)
           .eq('status', 'In Stock')
           .is('customer_id', null)
@@ -727,6 +727,7 @@ export default function DealDetail() {
           initialSelection={inventorySelectorContext === 'attach' ? deal.inventory_item_id ?? '' : selectedInventoryId}
           loading={inventoryLoading}
           busy={closeSaleBusy}
+          showStore={!activeLocationId}
           title={inventorySelectorContext === 'attach' ? 'Attach inventory to this deal' : 'Choose the purchased inventory unit'}
           actionLabel={inventorySelectorContext === 'attach' ? 'Attach unit' : 'Use selected unit'}
           onCancel={() => setInventorySelectorContext(null)}

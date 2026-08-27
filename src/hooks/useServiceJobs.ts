@@ -206,5 +206,15 @@ export function useJob(id: string | undefined) {
     return true;
   }, [id, fetchJob]);
 
-  return { job, isLoading, updateJob };
+  const deleteJob = useCallback(async () => {
+    if (!id) return { ok: false, error: 'Job not found.' };
+    const { error } = await supabase.rpc('delete_unscheduled_job', { p_job_id: id });
+    if (error) {
+      console.error('Error deleting job:', error);
+      return { ok: false, error: error.message || 'The job could not be deleted.' };
+    }
+    return { ok: true, error: null };
+  }, [id]);
+
+  return { job, isLoading, updateJob, deleteJob };
 }

@@ -47,14 +47,16 @@ describe('New Job inventory assignment', () => {
     assert.match(service, /job_type: newJob\.job_type, status: 'In Progress'/);
   });
 
-  it('uses the existing exact-unit label and reports RPC failures without closing', async () => {
+  it('uses the searchable Inventory-style chooser and reports RPC failures without closing', async () => {
     const [service, hook] = await Promise.all([
       read('src/pages/Service.tsx'),
       read('src/hooks/useServiceJobs.ts'),
     ]);
 
-    assert.match(service, /Current Inventory \(optional\)/);
-    assert.match(service, /availableInventory\.map\(item => <option[\s\S]*inventoryUnitLabel\(item\)/);
+    assert.match(service, /<DealInventorySelector/);
+    assert.match(service, /items=\{availableInventory\}/);
+    assert.match(service, /title="Attach inventory to this job"/);
+    assert.match(service, /selectedInventory \? inventoryUnitLabel\(selectedInventory\)/);
     assert.match(service, /if \(!result\.id\) \{[\s\S]*setCreateJobError\(message\)[\s\S]*return;[\s\S]*setShowCreate\(false\)/);
     assert.match(hook, /supabase\.rpc\('create_job_with_inventory'/);
     assert.doesNotMatch(hook, /const createJob[\s\S]{0,1200}\.from\('jobs'\)\.insert/);
@@ -72,5 +74,29 @@ describe('New Job inventory assignment', () => {
     assert.match(sql, /security definer[\s\S]*v_org := private\.auth_org\(\)[\s\S]*v_role := private\.auth_role\(\)/);
     assert.match(sql, /language sql[\s\S]*security invoker[\s\S]*select private\.create_job_with_inventory/);
     assert.match(sql, /revoke all on function private\.create_job_with_inventory[\s\S]*from public, anon/);
+  });
+
+  it('offers a deliberate delete flow only for unscheduled manager jobs', async () => {
+    const detail = await read('src/pages/JobDetail.tsx');
+
+    assert.match(detail, /const canDelete = !job\.scheduled_at/);
+    assert.match(detail, /profile\?\.role === 'owner_manager'[\s\S]*profile\?\.role === 'service_manager'/);
+    assert.match(detail, /Delete this unscheduled job\?/);
+    assert.match(detail, /Any inventory attached only to this job returns to Stock/);
+    assert.match(detail, /await deleteJob\(\)/);
+    assert.match(detail, /navigate\('\/service', \{ replace: true \}\)/);
+  });
+
+  it('atomically releases job-only inventory and preserves deal-backed sales before deleting', async () => {
+    const sql = await read('supabase/migrations/20260827031916_delete_unscheduled_job_release_inventory.sql');
+
+    assert.match(sql, /from public\.jobs j[\s\S]*scheduled_at[\s\S]*for update/);
+    assert.match(sql, /if v_scheduled_at is not null then[\s\S]*Only an unscheduled job can be deleted/);
+    assert.match(sql, /update public\.inventory_items[\s\S]*set job_id = null[\s\S]*deal_id is not null/);
+    assert.match(sql, /status = 'In Stock'[\s\S]*customer_id = null[\s\S]*job_id = null[\s\S]*date_sold = null[\s\S]*where job_id = p_job_id[\s\S]*deal_id is null/);
+    assert.match(sql, /delete from public\.jobs[\s\S]*scheduled_at is null/);
+    assert.match(sql, /v_role not in \('owner_manager', 'service_manager'\)/);
+    assert.match(sql, /security definer[\s\S]*v_org := private\.auth_org\(\)/);
+    assert.match(sql, /public\.delete_unscheduled_job[\s\S]*security invoker/);
   });
 });

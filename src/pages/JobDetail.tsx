@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2 } from 'lucide-react';
 import { useJob, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
@@ -10,6 +10,7 @@ import { cn, toLocalInputValue } from '@/lib/utils';
 import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -253,13 +254,18 @@ function EditableStatusBadge({ value, onSave }: { value: JobStatus; onSave: (u: 
 
 export default function JobDetail() {
   const { id } = useParams();
-  const { job, isLoading, updateJob } = useJob(id);
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { job, isLoading, updateJob, deleteJob } = useJob(id);
   const { notes, createNote } = useNotes({ jobId: id });
   const { tasks, createTask, completeTask } = useTasks({ jobId: id });
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingJob, setDeletingJob] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const saveJob = async (updates: Partial<Job>) => {
     const ok = await updateJob(updates);
@@ -292,6 +298,23 @@ export default function JobDetail() {
     setShowTaskForm(false);
   };
 
+  const handleDeleteJob = async () => {
+    if (!job || deletingJob) return;
+    setDeletingJob(true);
+    setDeleteError(null);
+    const result = await deleteJob();
+    if (!result.ok) {
+      setDeleteError(result.error);
+      setDeletingJob(false);
+      return;
+    }
+    toast('Job deleted. Attached inventory is back in Stock.', 'success');
+    navigate('/service', { replace: true });
+  };
+
+  const canDelete = !job.scheduled_at
+    && (profile?.role === 'owner_manager' || profile?.role === 'service_manager');
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
@@ -300,8 +323,38 @@ export default function JobDetail() {
           <h1 className="text-xl sm:text-2xl font-bold text-ink-100">{job.title}</h1>
           {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
         </div>
-        <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
+        <div className="flex items-center gap-2">
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-sm font-semibold text-red-300 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-4 w-4" />Delete
+            </button>
+          )}
+          <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
+        </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-job-title" className="w-full max-w-md rounded-2xl border border-red-500/30 bg-ink-900 p-6 shadow-2xl">
+            <DialogKeys onClose={() => { if (!deletingJob) setShowDeleteConfirm(false); }} />
+            <h2 id="delete-job-title" className="text-lg font-bold text-ink-100">Delete this unscheduled job?</h2>
+            <p className="mt-2 text-sm leading-6 text-ink-400">
+              This removes the job and its job records. Any inventory attached only to this job returns to Stock. Inventory tied to a deal keeps its sold assignment.
+            </p>
+            {deleteError && <p role="alert" className="mt-3 text-sm font-medium text-red-300">{deleteError}</p>}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} disabled={deletingJob} className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-300 hover:bg-ink-800 disabled:opacity-50">Keep job</button>
+              <button type="button" onClick={() => void handleDeleteJob()} disabled={deletingJob} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                <Trash2 className="h-4 w-4" />{deletingJob ? 'Deleting…' : 'Delete job'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Field capture: time clock front and center for techs */}
       <TimeClockCard jobId={job.id} />

@@ -5,12 +5,15 @@ import { describe, it } from 'node:test';
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 describe('Schedule inventory delivery dates', () => {
-  it('shows the exact Select Dates label for the New Job datetime input', async () => {
+  it('keeps Select Dates while exposing start and optional end date inputs', async () => {
     const service = await read('src/pages/Service.tsx');
     const modal = service.slice(service.indexOf('{/* Create Job Modal */}'), service.indexOf('<DragDropContext'));
 
-    assert.match(modal, /<label htmlFor="new-job-scheduled-at"[^>]*>Select Dates<\/label>/);
+    assert.match(modal, /<legend[^>]*>Select Dates<\/legend>/);
+    assert.match(modal, /<label htmlFor="new-job-scheduled-at"[^>]*>Start date and time<\/label>/);
     assert.match(modal, /<input id="new-job-scheduled-at" type="datetime-local"/);
+    assert.match(modal, /<label htmlFor="new-job-scheduled-end-date"[^>]*>End date/);
+    assert.match(modal, /<input id="new-job-scheduled-end-date" type="date"/);
   });
 
   it('copies or clears the date when the exact inventory job link changes', async () => {

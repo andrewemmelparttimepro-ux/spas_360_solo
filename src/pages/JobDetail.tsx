@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes } from 'lucide-react';
+import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes } from 'lucide-react';
 import { useJob, useJobInventory, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
@@ -13,6 +13,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 import { useAuth } from '@/contexts/AuthContext';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
+import { scheduleDateRangeError } from '@/lib/jobSchedule';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -224,6 +225,80 @@ function EditableField({
   );
 }
 
+function ScheduleDateRangeEditor({
+  job,
+  onSave,
+}: {
+  job: Pick<Job, 'scheduled_at' | 'scheduled_end_date'>;
+  onSave: (updates: Partial<Job>) => Promise<boolean>;
+}) {
+  const storedStart = job.scheduled_at ? toLocalInputValue(job.scheduled_at) : '';
+  const storedEnd = job.scheduled_end_date ?? '';
+  const [start, setStart] = useState(storedStart);
+  const [end, setEnd] = useState(storedEnd);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setStart(storedStart); }, [storedStart]);
+  useEffect(() => { setEnd(storedEnd); }, [storedEnd]);
+
+  const validationError = scheduleDateRangeError(start, end);
+  const dirty = start !== storedStart || end !== storedEnd;
+
+  const save = async () => {
+    if (!dirty || validationError || saving) return;
+    setSaving(true);
+    const ok = await onSave({
+      scheduled_at: start ? new Date(start).toISOString() : null,
+      scheduled_end_date: start && end ? end : null,
+    });
+    setSaving(false);
+    if (!ok) {
+      setStart(storedStart);
+      setEnd(storedEnd);
+    }
+  };
+
+  return (
+    <fieldset className="rounded-lg border border-ink-700 p-3">
+      <legend className="px-1 text-xs font-semibold text-ink-400">Schedule dates</legend>
+      <div className="space-y-3">
+        <div>
+          <label htmlFor="job-scheduled-at" className="mb-1 block text-xs font-semibold text-ink-400">Start date and time</label>
+          <input
+            id="job-scheduled-at"
+            type="datetime-local"
+            value={start}
+            onChange={event => setStart(event.target.value)}
+            className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm outline-none focus:border-brand-500"
+          />
+        </div>
+        <div>
+          <label htmlFor="job-scheduled-end-date" className="mb-1 block text-xs font-semibold text-ink-400">End date <span className="font-normal text-ink-500">(optional)</span></label>
+          <input
+            id="job-scheduled-end-date"
+            type="date"
+            min={start.slice(0, 10) || undefined}
+            value={end}
+            onChange={event => setEnd(event.target.value)}
+            className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm outline-none focus:border-brand-500"
+          />
+        </div>
+        {validationError && <p role="alert" className="text-xs font-medium text-red-300">{validationError}</p>}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={!dirty || Boolean(validationError) || saving}
+            className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-40"
+          >
+            {saving ? 'Saving…' : 'Save dates'}
+          </button>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
+
 // --------------- Editable status badge ---------------
 function EditableStatusBadge({ value, onSave }: { value: JobStatus; onSave: (u: Partial<Job>) => Promise<boolean> }) {
   const [editing, setEditing] = useState(false);
@@ -407,7 +482,7 @@ export default function JobDetail() {
             <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS.some(option => option === job.job_type) ? JOB_TYPE_OPTIONS : [job.job_type, ...JOB_TYPE_OPTIONS]} />
             {location && <div className="flex items-center text-sm"><MapPin className="w-4 h-4 mr-2 text-ink-500" />{location.name}</div>}
             {property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
-            <EditableField label="Scheduled" value={job.scheduled_at ? toLocalInputValue(job.scheduled_at) : null} field="scheduled_at" onSave={saveJob} icon={Clock} type="datetime-local" />
+            <ScheduleDateRangeEditor job={job} onSave={saveJob} />
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
             {job.description && <div className="text-sm text-ink-300 bg-ink-950 p-3 rounded-lg">{job.description}</div>}
             <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />

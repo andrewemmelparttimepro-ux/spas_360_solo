@@ -34,6 +34,77 @@ export function calendarJobTitleClass(status: JobStatus): string | undefined {
   return status === 'Completed' ? 'line-through decoration-solid decoration-2' : undefined;
 }
 
+const CALENDAR_DAY_MS = 24 * 60 * 60 * 1000;
+
+function calendarDayNumber(date: Date): number | null {
+  if (Number.isNaN(date.getTime())) return null;
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / CALENDAR_DAY_MS;
+}
+
+function storedCalendarDayNumber(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / CALENDAR_DAY_MS;
+}
+
+function formatStoredCalendarDay(dayNumber: number): string {
+  return new Date(dayNumber * CALENDAR_DAY_MS).toISOString().slice(0, 10);
+}
+
+export function jobOccursOnCalendarDay(
+  job: Pick<Job, 'scheduled_at' | 'scheduled_end_date'>,
+  day: Date,
+): boolean {
+  if (!job.scheduled_at) return false;
+  const startDay = calendarDayNumber(new Date(job.scheduled_at));
+  const requestedDay = calendarDayNumber(day);
+  if (startDay === null || requestedDay === null) return false;
+  const endDay = storedCalendarDayNumber(job.scheduled_end_date) ?? startDay;
+  return requestedDay >= startDay && requestedDay <= endDay;
+}
+
+export function jobOverlapsCalendarRange(
+  job: Pick<Job, 'scheduled_at' | 'scheduled_end_date'>,
+  rangeStart: Date,
+  rangeEnd: Date,
+): boolean {
+  if (!job.scheduled_at) return false;
+  const jobStart = calendarDayNumber(new Date(job.scheduled_at));
+  const firstVisibleDay = calendarDayNumber(rangeStart);
+  const lastVisibleDay = calendarDayNumber(rangeEnd);
+  if (jobStart === null || firstVisibleDay === null || lastVisibleDay === null) return false;
+  const jobEnd = storedCalendarDayNumber(job.scheduled_end_date) ?? jobStart;
+  return jobStart <= lastVisibleDay && jobEnd >= firstVisibleDay;
+}
+
+export function scheduleDateRangeError(startDateTime: string, endDate: string): string | null {
+  if (!endDate) return null;
+  if (!startDateTime) return 'Choose a start date before an end date.';
+  return endDate < startDateTime.slice(0, 10) ? 'End date cannot be before start date.' : null;
+}
+
+export function moveJobScheduleToDay(
+  job: Pick<Job, 'scheduled_at' | 'scheduled_end_date'>,
+  targetDate: string,
+): Pick<Job, 'scheduled_at' | 'scheduled_end_date'> {
+  const existingStart = job.scheduled_at ? new Date(job.scheduled_at) : null;
+  const targetStart = new Date(`${targetDate}T${existingStart && !Number.isNaN(existingStart.getTime())
+    ? `${String(existingStart.getHours()).padStart(2, '0')}:${String(existingStart.getMinutes()).padStart(2, '0')}:${String(existingStart.getSeconds()).padStart(2, '0')}`
+    : '09:00:00'}`);
+  const startDay = existingStart ? calendarDayNumber(existingStart) : null;
+  const endDay = storedCalendarDayNumber(job.scheduled_end_date);
+  const targetDay = storedCalendarDayNumber(targetDate);
+  const spanDays = startDay !== null && endDay !== null ? Math.max(0, endDay - startDay) : null;
+
+  return {
+    scheduled_at: targetStart.toISOString(),
+    scheduled_end_date: targetDay !== null && spanDays !== null
+      ? formatStoredCalendarDay(targetDay + spanDays)
+      : null,
+  };
+}
+
 export function availableInventoryForJob<T extends Pick<
   InventoryItem,
   'status' | 'customer_id' | 'deal_id' | 'job_id' | 'location_id' | 'notes'

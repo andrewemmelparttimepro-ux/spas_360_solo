@@ -30,7 +30,7 @@ describe('completed jobs on the Schedule calendar', () => {
 
     assert.match(monthView, /jobTypeChipColors\[scheduleJobType\(job\.job_type\)\]/);
     assert.match(monthView, /<span className=\{calendarJobTitleClass\(job\.status\)\}>\{job\.title\}<\/span>/);
-    assert.match(monthView, /draggableId=\{`sch-\$\{job\.id\}`\}/);
+    assert.match(monthView, /draggableId=\{scheduledDraggableId\(job\.id, day\)\}/);
   });
 
   it('does not apply the calendar strike helper to the unscheduled queue', async () => {

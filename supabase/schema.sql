@@ -173,12 +173,19 @@ CREATE TABLE jobs (
     CHECK (status IN ('Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'In Progress', 'Completed', 'Cancelled')),
   description TEXT,
   scheduled_at TIMESTAMPTZ,
+  scheduled_end_date DATE,
   estimated_duration INT, -- minutes
   priority TEXT CHECK (priority IN ('High', 'Medium', 'Low')),
   amount_to_collect DECIMAL(12,2),
   created_by UUID NOT NULL REFERENCES profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT jobs_schedule_range_check CHECK (
+    scheduled_end_date IS NULL OR (
+      scheduled_at IS NOT NULL
+      AND scheduled_end_date >= (scheduled_at AT TIME ZONE 'America/Chicago')::DATE
+    )
+  )
 );
 CREATE INDEX idx_jobs_org ON jobs(org_id);
 CREATE INDEX idx_jobs_contact ON jobs(contact_id);

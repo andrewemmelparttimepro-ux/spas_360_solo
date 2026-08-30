@@ -2,14 +2,14 @@ import { Calendar as CalendarIcon, Check, ChevronDown, Clock, Plus, Search, X, P
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors, statusChipColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
-import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
+import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, jobOccursOnCalendarDay, jobOverlapsCalendarRange, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -24,6 +24,7 @@ type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; ma
 const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'];
 
 const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
+const scheduledDraggableId = (jobId: string, day: Date) => `sch-${jobId}@${format(day, 'yyyy-MM-dd')}`;
 
 type ScheduleCustomer = Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone'>;
 
@@ -259,19 +260,22 @@ export default function Service() {
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination || destination.droppableId === source.droppableId) return;
-    const jobId = draggableId.replace(/^(un|sch)-/, '');
+    const jobId = draggableId.replace(/^(un|sch)-/, '').split('@')[0];
 
     if (destination.droppableId === 'queue') {
       if (!draggableId.startsWith('sch-')) return;
-      const ok = await updateJob(jobId, { scheduled_at: null });
+      const ok = await updateJob(jobId, { scheduled_at: null, scheduled_end_date: null });
       toast(ok ? 'Moved to Unscheduled Queue' : 'Failed to move', ok ? 'success' : 'error');
       return;
     }
     if (destination.droppableId.startsWith('day-')) {
       const dateStr = destination.droppableId.slice(4); // yyyy-MM-dd
       const job = jobs.find(j => j.id === jobId);
-      const time = job?.scheduled_at ? format(new Date(job.scheduled_at), 'HH:mm:ss') : '09:00:00';
-      const ok = await updateJob(jobId, { scheduled_at: `${dateStr}T${time}` });
+      if (!job) {
+        toast('Failed to find that job', 'error');
+        return;
+      }
+      const ok = await updateJob(jobId, moveJobScheduleToDay(job, dateStr));
       toast(ok ? `Scheduled for ${format(new Date(`${dateStr}T12:00:00`), 'EEE, MMM d')}` : 'Failed to schedule', ok ? 'success' : 'error');
     }
   };
@@ -311,7 +315,7 @@ export default function Service() {
     return (scheduledJobs as ServiceJob[]).filter(j => {
       if (!j.scheduled_at) return false;
       if (jobTypeFilter.size > 0 && !jobTypeFilter.has(scheduleJobType(j.job_type))) return false;
-      return isWithinInterval(new Date(j.scheduled_at), { start: rangeStart, end: rangeEnd });
+      return jobOverlapsCalendarRange(j, rangeStart, rangeEnd);
     });
   }, [scheduledJobs, rangeStart, rangeEnd, jobTypeFilter]);
 
@@ -362,23 +366,31 @@ export default function Service() {
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
     inventory_item_id: '', job_type: 'Service' as JobType,
-    description: '', scheduled_at: '', priority: 'Medium' as 'High' | 'Medium' | 'Low', amount_to_collect: '',
+    description: '', scheduled_at: '', scheduled_end_date: '',
+    priority: 'Medium' as 'High' | 'Medium' | 'Low', amount_to_collect: '',
   });
   const availableInventory = useMemo(
     () => availableInventoryForJob(inventoryItems, newJob.location_id),
     [inventoryItems, newJob.location_id],
   );
   const selectedInventory = availableInventory.find(item => item.id === newJob.inventory_item_id) ?? null;
+  const newJobDateError = scheduleDateRangeError(newJob.scheduled_at, newJob.scheduled_end_date);
 
   const handleCreate = async () => {
     if (creatingJob) return;
+    if (newJobDateError) {
+      setCreateJobError(newJobDateError);
+      return;
+    }
     setCreatingJob(true);
     setCreateJobError(null);
     const result = await createJob({
       title: newJob.title, contact_id: newJob.contact_id,
       location_id: newJob.location_id || (locations[0]?.id ?? ''),
       job_type: newJob.job_type, status: 'In Progress',
-      description: newJob.description || null, scheduled_at: newJob.scheduled_at || null,
+      description: newJob.description || null,
+      scheduled_at: newJob.scheduled_at ? new Date(newJob.scheduled_at).toISOString() : null,
+      scheduled_end_date: newJob.scheduled_end_date || null,
       priority: newJob.priority,
       amount_to_collect: newJob.amount_to_collect ? parseFloat(newJob.amount_to_collect) : null,
     }, newJob.inventory_item_id || null);
@@ -393,7 +405,7 @@ export default function Service() {
     toast('Job created', 'success');
     setShowInventorySelector(false);
     setShowCreate(false);
-    setNewJob({ title: '', contact_id: '', location_id: '', inventory_item_id: '', job_type: 'Service', description: '', scheduled_at: '', priority: 'Medium', amount_to_collect: '' });
+    setNewJob({ title: '', contact_id: '', location_id: '', inventory_item_id: '', job_type: 'Service', description: '', scheduled_at: '', scheduled_end_date: '', priority: 'Medium', amount_to_collect: '' });
     setCreatingJob(false);
   };
 
@@ -509,17 +521,27 @@ export default function Service() {
                   <option value="High">High Priority</option><option value="Medium">Medium Priority</option><option value="Low">Low Priority</option>
                 </select>
               </div>
-              <div>
-                <label htmlFor="new-job-scheduled-at" className="mb-1.5 block text-xs font-semibold text-ink-300">Select Dates</label>
-                <input id="new-job-scheduled-at" type="datetime-local" value={newJob.scheduled_at} onChange={e => setNewJob({...newJob, scheduled_at: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              </div>
+              <fieldset className="rounded-xl border border-ink-700 p-3">
+                <legend className="px-1 text-xs font-semibold text-ink-300">Select Dates</legend>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="new-job-scheduled-at" className="mb-1.5 block text-xs font-semibold text-ink-300">Start date and time</label>
+                    <input id="new-job-scheduled-at" type="datetime-local" value={newJob.scheduled_at} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_at: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+                  </div>
+                  <div>
+                    <label htmlFor="new-job-scheduled-end-date" className="mb-1.5 block text-xs font-semibold text-ink-300">End date <span className="font-normal text-ink-500">(optional)</span></label>
+                    <input id="new-job-scheduled-end-date" type="date" min={newJob.scheduled_at.slice(0, 10) || undefined} value={newJob.scheduled_end_date} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_end_date: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+                  </div>
+                </div>
+                {newJobDateError && <p role="alert" className="mt-2 text-xs font-medium text-red-300">{newJobDateError}</p>}
+              </fieldset>
               <input placeholder="Amount to Collect ($)" type="number" value={newJob.amount_to_collect} onChange={e => setNewJob({...newJob, amount_to_collect: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <textarea placeholder="Description / Notes" value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} rows={3} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-none" />
               {createJobError && <p role="alert" className="text-xs font-medium text-red-300">{createJobError}</p>}
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button onClick={() => setShowCreate(false)} disabled={creatingJob} className="px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 rounded-lg disabled:opacity-50">Cancel</button>
-              <button onClick={handleCreate} disabled={creatingJob || !newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">{creatingJob ? 'Creating…' : 'Create Job'}</button>
+              <button onClick={handleCreate} disabled={creatingJob || Boolean(newJobDateError) || !newJob.title || !newJob.contact_id || !newJob.location_id} className="px-4 py-2 text-sm bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-medium disabled:opacity-50">{creatingJob ? 'Creating…' : 'Create Job'}</button>
             </div>
           </div>
         </div>
@@ -581,7 +603,7 @@ export default function Service() {
                           <p className="text-xs text-ink-600 mt-1">Drag one over from the queue</p>
                         </div>
                       ) : filteredJobs.map((job, i) => (
-                        <Draggable key={job.id} draggableId={`sch-${job.id}`} index={i}>
+                        <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, currentDate)} index={i}>
                           {(p) => (
                             <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
                               <JobCard job={job} saveJobStatus={saveJobStatus} />
@@ -600,7 +622,7 @@ export default function Service() {
                 <div className="divide-y divide-ink-800">
                   {eachDayOfInterval({ start: rangeStart, end: rangeEnd }).map(date => {
                     const isToday = isSameDay(date, new Date());
-                    const dayJobs = filteredJobs.filter(j => j.scheduled_at && isSameDay(new Date(j.scheduled_at), date));
+                    const dayJobs = filteredJobs.filter(j => jobOccursOnCalendarDay(j, date));
                     return (
                       <Droppable key={date.toISOString()} droppableId={`day-${format(date, 'yyyy-MM-dd')}`}>
                         {(provided, snapshot) => (
@@ -614,7 +636,7 @@ export default function Service() {
                             </div>
                             <div className="ml-[52px] space-y-2">
                               {dayJobs.map((job, i) => (
-                                <Draggable key={job.id} draggableId={`sch-${job.id}`} index={i}>
+                                <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, date)} index={i}>
                                   {(p) => (
                                     <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
                                       <JobCard job={job} saveJobStatus={saveJobStatus} />
@@ -647,7 +669,7 @@ export default function Service() {
                     }).map(day => {
                       const isCurrentMonth = day.getMonth() === currentDate.getMonth();
                       const isToday = isSameDay(day, new Date());
-                      const dayJobs = filteredJobs.filter(j => j.scheduled_at && isSameDay(new Date(j.scheduled_at), day));
+                      const dayJobs = filteredJobs.filter(j => jobOccursOnCalendarDay(j, day));
                       return (
                         <Droppable key={day.toISOString()} droppableId={`day-${format(day, 'yyyy-MM-dd')}`}>
                           {(provided, snapshot) => (
@@ -672,7 +694,7 @@ export default function Service() {
                               </div>
                               <div className="space-y-[3px]">
                                 {dayJobs.slice(0, 3).map((job, i) => (
-                                  <Draggable key={job.id} draggableId={`sch-${job.id}`} index={i}>
+                                  <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, day)} index={i}>
                                     {(p, snap) => (
                                       <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
                                         <Link

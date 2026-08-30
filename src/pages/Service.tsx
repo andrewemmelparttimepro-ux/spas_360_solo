@@ -16,6 +16,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import type { Contact } from '@/types/database';
 import DealInventorySelector from '@/components/DealInventorySelector';
+import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
 
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; mailing_address: string | null } | null };
@@ -339,12 +340,12 @@ export default function Service() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
   const autoTitleRef = useRef('');
-  const applyAutoTitle = (contactId: string, jobType: string) => {
+  const applyAutoTitle = (contactId: string) => {
     const c = contacts.find(x => x.id === contactId);
     if (!c) return;
-    const auto = `${c.last_name} – ${jobType}`;
+    const auto = newJobTitleForCustomer(c);
     setNewJob(j => {
-      if (j.title !== '' && j.title !== autoTitleRef.current) return j; // hand-edited: leave it alone
+      if (!canReplaceNewJobTitle(j.title, autoTitleRef.current)) return j; // hand-edited: leave it alone
       autoTitleRef.current = auto;
       return { ...j, title: auto };
     });
@@ -354,7 +355,7 @@ export default function Service() {
     const cid = pendingContactRef.current;
     if (cid && contacts.some(c => c.id === cid)) {
       pendingContactRef.current = null;
-      applyAutoTitle(cid, newJob.job_type);
+      applyAutoTitle(cid);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts]);
@@ -466,10 +467,10 @@ export default function Service() {
                 selectedId={newJob.contact_id}
                 onSelect={contactId => {
                   setNewJob(current => ({ ...current, contact_id: contactId }));
-                  if (contactId) applyAutoTitle(contactId, newJob.job_type);
+                  if (contactId) applyAutoTitle(contactId);
                 }}
               />
-              <select value={newJob.job_type} onChange={e => { setNewJob({...newJob, job_type: e.target.value as JobType}); applyAutoTitle(newJob.contact_id, e.target.value); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
+              <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                 {JOB_TYPE_OPTIONS.map(jobType => <option key={jobType}>{jobType}</option>)}
               </select>
               <div className="rounded-xl border border-ink-700 bg-ink-950 p-3">

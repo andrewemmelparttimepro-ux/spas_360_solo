@@ -15,7 +15,17 @@ import { normalizeCustomerAddress } from '@/lib/customerAddress';
  */
 
 const SOURCES = ['Walk-in', 'Website', 'Referral', 'Ad', 'Phone', 'Event', 'Other'] as const;
-const INTERESTS = ['Hot Tub', 'Swim Spa', 'Sauna', 'Cold Plunge', 'Game Room', 'Parts & Chemicals'] as const;
+const INTERESTS = [
+  'Hot Tubs',
+  'Swim Spas',
+  'Saunas',
+  'Game Room',
+  'Pools',
+  'Patio Furniture',
+  'Gazebo',
+  'Massage Chair',
+  'Other',
+] as const;
 const PRIORITIES = [
   { value: 'High', label: 'High', hint: 'Could close within a week' },
   { value: 'Medium', label: 'Medium', hint: 'Closing in 2–4 weeks' },
@@ -349,7 +359,10 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             <div className="flex flex-wrap gap-2 mb-3">
               {INTERESTS.map(i => <Chip key={i} active={interests.includes(i)} onClick={() => toggleInterest(i)}>{i}</Chip>)}
             </div>
-            <input placeholder="Estimated value $ (optional)" type="number" value={amount} onChange={e => setAmount(e.target.value)} className={cn(inputClass, 'max-w-[220px]')} />
+            <label className="block max-w-[220px]" htmlFor="new-customer-estimated-value">
+              <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">Estimated Value (Optional)</span>
+              <input id="new-customer-estimated-value" placeholder="$" type="number" value={amount} onChange={e => setAmount(e.target.value)} className={inputClass} />
+            </label>
           </section>
 
           {/* Step 4 — priority and an explicit forecast date */}

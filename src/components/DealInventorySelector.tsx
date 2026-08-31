@@ -175,7 +175,7 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
                 <th className={HEADER_CELL_CLASS}>Inventory Flooring Status</th>
                 <th className={HEADER_CELL_CLASS}>Inventory Age</th>
                 <th className={HEADER_CELL_CLASS}>Customer</th>
-                <th className={HEADER_CELL_CLASS}>Stock</th>
+                <th className={HEADER_CELL_CLASS}>Status</th>
                 <th className={HEADER_CELL_CLASS}>Order Date</th>
                 <th className={HEADER_CELL_CLASS}>Date Received</th>
                 <th className={HEADER_CELL_CLASS}>Delivery Date</th>

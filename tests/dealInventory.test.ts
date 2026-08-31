@@ -183,7 +183,7 @@ describe('deal inventory close flow', () => {
       'Inventory Flooring Status',
       'Inventory Age',
       'Customer',
-      'Stock',
+      'Status',
       'Order Date',
       'Date Received',
       'Delivery Date',

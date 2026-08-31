@@ -13,8 +13,8 @@ import { useModal } from '@/hooks/useModal';
  * Inventory editor — slide-over drawer, create + edit. Same guided-clicks
  * language as the customer wizard: chips for everything choosable, smart
  * defaults (your store, In Stock, received today), live margin math, a
- * Mark Sold flow that links the actual customer, and a two-step delete
- * (managers only — mirrors the RLS policy).
+ * Mark Sold flow that links the actual customer, and an owner-only two-step
+ * removal that keeps the row available to deal and job history.
  */
 
 const BRANDS = [
@@ -73,16 +73,16 @@ interface Props {
   item?: InventoryItem | null; // null/undefined = create mode
   onClose: () => void;
   onSave: (values: Partial<InventoryItem>, id?: string) => Promise<boolean>;
-  onDelete?: (id: string) => Promise<boolean>;
+  onRemove?: (id: string) => Promise<boolean>;
 }
 
-export default function InventoryEditor({ item, onClose, onSave, onDelete }: Props) {
+export default function InventoryEditor({ item, onClose, onSave, onRemove }: Props) {
   const { dialogRef, dialogProps } = useModal(onClose);
   const { profile, locations, activeLocationId } = useAuth();
   const { contacts } = useContacts();
   const { toast } = useToast();
   const isEdit = !!item;
-  const isManager = profile?.role === 'owner_manager' || profile?.role === 'service_manager';
+  const isOwner = profile?.role === 'owner_manager';
 
   const today = new Date().toISOString().split('T')[0];
   const [v, setV] = useState({
@@ -174,10 +174,10 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
   };
 
   const handleDelete = async () => {
-    if (!item || !onDelete) return;
-    const ok = await onDelete(item.id);
+    if (!item || !onRemove) return;
+    const ok = await onRemove(item.id);
     if (ok) { toast(`${item.product} removed from inventory`, 'success'); onClose(); }
-    else toast('Delete failed', 'error');
+    else toast('Remove failed', 'error');
   };
 
   return (
@@ -275,15 +275,15 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
 
           <div><label className={labelClass}>Notes</label><textarea value={v.notes} onChange={e => set({ notes: e.target.value })} rows={3} className={cn(inputClass, 'resize-none')} placeholder="Size, cover, order refs…" /></div>
 
-          {/* Danger zone — managers only, two-step */}
-          {isEdit && isManager && onDelete && (
+          {/* Owner-only soft removal; deal and job history retain this row. */}
+          {isEdit && isOwner && onRemove && (
             <div className="pt-2 border-t border-ink-800">
               {confirmDelete ? (
                 <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-                  <span className="text-xs text-red-300 font-medium">Remove this unit permanently?</span>
+                  <span className="text-xs text-red-300 font-medium">Remove from Inventory? Deal and job history will be kept.</span>
                   <span className="flex gap-2 shrink-0">
                     <button onClick={() => setConfirmDelete(false)} className="text-xs font-semibold text-ink-300 hover:text-ink-100 px-2 py-1">Keep</button>
-                    <button onClick={handleDelete} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md">Delete</button>
+                    <button onClick={handleDelete} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md">Remove</button>
                   </span>
                 </div>
               ) : (

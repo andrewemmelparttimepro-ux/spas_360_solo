@@ -143,6 +143,7 @@ export default function DealDetail() {
           .eq('status', 'In Stock')
           .is('customer_id', null)
           .is('deal_id', null)
+          .is('removed_at', null)
           .order('brand', { ascending: true, nullsFirst: false })
           .order('model', { ascending: true, nullsFirst: false })
           .order('sku', { ascending: true }),

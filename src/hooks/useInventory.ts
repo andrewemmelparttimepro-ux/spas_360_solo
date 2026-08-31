@@ -5,6 +5,7 @@ import { sanitizeSearchTerm } from '@/lib/utils';
 import type { InventoryItem } from '@/types/database';
 import {
   isAvailableInventoryStock,
+  isCompletedDealSaleInventory,
   mergeInventoryDealAssignments,
   type InventoryDealAssignmentRow,
   type InventoryWithDealAssignment,
@@ -29,8 +30,9 @@ export function useInventory(enabled = true) {
 
     let query = supabase
       .from('inventory_items')
-      .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)')
+      .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type), job:job_id(id, status)')
       .eq('org_id', profile.org_id)
+      .is('removed_at', null)
       .order('created_at', { ascending: false });
 
     if (activeLocationId) {
@@ -91,6 +93,12 @@ export function useInventory(enabled = true) {
         table: 'deals',
         filter: orgFilter,
       }, fetchItems)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'jobs',
+        filter: orgFilter,
+      }, fetchItems)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [profile, fetchItems, enabled]);
@@ -129,11 +137,12 @@ export function useInventory(enabled = true) {
     return true;
   }, [fetchItems]);
 
-  const deleteItem = useCallback(async (id: string) => {
-    // .select() so RLS-denied deletes (0 rows) report as failure, not silent success
-    const { data, error } = await supabase.from('inventory_items').delete().eq('id', id).select('id');
-    if (error || !data || data.length === 0) {
-      console.error('Error deleting inventory item:', error ?? 'no rows deleted (permissions?)');
+  const removeItem = useCallback(async (id: string) => {
+    const { data, error } = await supabase.rpc('remove_inventory_item', {
+      p_inventory_item_id: id,
+    });
+    if (error || data !== id) {
+      console.error('Error removing inventory item:', error ?? 'unexpected removal result');
       return false;
     }
     await fetchItems();
@@ -151,7 +160,8 @@ export function useInventory(enabled = true) {
     lowStockAlerts,
     createItem,
     updateItem,
-    deleteItem,
+    removeItem,
+    isCompletedSale: isCompletedDealSaleInventory,
     refresh: fetchItems,
   };
 }

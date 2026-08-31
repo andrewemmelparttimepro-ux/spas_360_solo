@@ -71,6 +71,7 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
         .eq('org_id', profile.org_id).ilike('title', term).limit(5),
       supabase.from('inventory_items').select('id, product, sku, brand, status')
         .eq('org_id', profile.org_id)
+        .is('removed_at', null)
         .or(`product.ilike.${term},sku.ilike.${term},brand.ilike.${term}`)
         .limit(5),
       supabase.rpc('search_knowledge_v2', {

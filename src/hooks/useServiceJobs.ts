@@ -278,6 +278,7 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
         .select(inventorySelect)
         .eq('org_id', profile.org_id)
         .eq('location_id', locationId)
+        .is('removed_at', null)
         .order('created_at', { ascending: false })
       : Promise.resolve({ data: [], error: null });
 

@@ -1,4 +1,4 @@
-import type { Contact, InventoryItem } from '@/types/database';
+import type { Contact, InventoryItem, JobStatus } from '@/types/database';
 
 export type InventoryCustomerSummary = Pick<
   Contact,
@@ -19,6 +19,7 @@ export type InventoryDealAssignment = {
 export type InventoryWithDealAssignment = InventoryItem & {
   customer: InventoryCustomerSummary | null;
   locations?: { name: string } | null;
+  job?: { id: string; status: JobStatus } | null;
   dealAssignment: InventoryDealAssignment | null;
 };
 
@@ -65,4 +66,13 @@ export function isAvailableInventoryStock(item: InventoryWithDealAssignment) {
   return item.status === 'In Stock'
     && item.customer_id === null
     && !hasManagedInventoryAssignment(item);
+}
+
+export function isCompletedDealSaleInventory(item: Pick<
+  InventoryWithDealAssignment,
+  'status' | 'dealAssignment' | 'job'
+>) {
+  return item.status === 'Sold'
+    && item.dealAssignment !== null
+    && item.job?.status === 'Completed';
 }

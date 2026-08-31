@@ -435,8 +435,8 @@ function OnHandCell({
 
 // =============== Main page component ===============
 export default function Inventory() {
-  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, deleteItem } = useInventory();
-  const { locations, activeLocationId } = useAuth();
+  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, removeItem, isCompletedSale } = useInventory();
+  const { locations, activeLocationId, profile } = useAuth();
   // With every store on screen, each row must say which floor it's on
   const showStore = !activeLocationId;
   const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
@@ -486,7 +486,7 @@ export default function Inventory() {
           item={editorTarget === 'new' ? null : editorTarget}
           onClose={() => setEditorTarget(null)}
           onSave={handleEditorSave}
-          onDelete={deleteItem}
+          onRemove={profile?.role === 'owner_manager' ? removeItem : undefined}
         />
       )}
 
@@ -543,55 +543,69 @@ export default function Inventory() {
                       </span>
                     </th>
                   </tr>
-                  {group.items.map(item => (
-                    <tr key={item.id} onDoubleClick={() => setEditorTarget(item)} className={cn('transition-colors', group.tintClassName)}>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 whitespace-nowrap')}>
-                    <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
-                      {item.model || item.product}
-                    </Link>
-                  </td>
-                  {showStore && (
-                    <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                      <span
-                        className="inline-flex items-center whitespace-nowrap rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium"
-                        title={((item as unknown as { locations?: { name?: string } }).locations?.name) ?? undefined}
+                  {group.items.map(item => {
+                    const completedSale = isCompletedSale(item);
+                    return (
+                      <tr
+                        key={item.id}
+                        onDoubleClick={() => setEditorTarget(item)}
+                        data-completed-sale={completedSale ? 'true' : undefined}
+                        title={completedSale ? 'Sold inventory with a completed scheduled job' : undefined}
+                        className={cn(
+                          'transition-colors',
+                          completedSale
+                            ? 'border-l-4 border-red-500 bg-red-500/20 hover:bg-red-500/25'
+                            : group.tintClassName,
+                        )}
                       >
-                        {(((item as unknown as { locations?: { name?: string } }).locations?.name) ?? '—').split(' (')[0]}
-                      </span>
-                    </td>
-                  )}
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-400')}>
-                    <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <InventoryTextCell item={item} part="serial" onSave={updateItem} />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
-                    {inventoryAgeLabelForItem(item.date_received, item.created_at)}
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <CustomerCell item={item} onSave={updateItem} />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <StockStateCell item={item} onSave={updateItem} />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <EditableCell value={item.order_date} field="order_date" itemId={item.id} onSave={updateItem} type="date" />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <EditableCell value={item.date_received} field="date_received" itemId={item.id} onSave={updateItem} type="date" />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
-                  </td>
-                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'font-semibold text-ink-200')}>
-                    <OnHandCell item={item} onSave={updateItem} />
-                  </td>
-                    </tr>
-                  ))}
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 whitespace-nowrap')}>
+                          <Link to={`/inventory/${item.id}`} className="text-brand-400 hover:text-brand-300 hover:underline">
+                            {item.model || item.product}
+                          </Link>
+                        </td>
+                        {showStore && (
+                          <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                            <span
+                              className="inline-flex items-center whitespace-nowrap rounded-full bg-ink-950 border border-ink-700 px-2 py-0.5 text-xs font-medium"
+                              title={((item as unknown as { locations?: { name?: string } }).locations?.name) ?? undefined}
+                            >
+                              {(((item as unknown as { locations?: { name?: string } }).locations?.name) ?? '—').split(' (')[0]}
+                            </span>
+                          </td>
+                        )}
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-400')}>
+                          <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <InventoryTextCell item={item} part="serial" onSave={updateItem} />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
+                          {inventoryAgeLabelForItem(item.date_received, item.created_at)}
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <CustomerCell item={item} onSave={updateItem} />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <StockStateCell item={item} onSave={updateItem} />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <EditableCell value={item.order_date} field="order_date" itemId={item.id} onSave={updateItem} type="date" />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <EditableCell value={item.date_received} field="date_received" itemId={item.id} onSave={updateItem} type="date" />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                          <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
+                        </td>
+                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'font-semibold text-ink-200')}>
+                          <OnHandCell item={item} onSave={updateItem} />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               ))}
             </tbody>

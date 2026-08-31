@@ -19,7 +19,7 @@ export default function StoreSwitcher({ countSource = 'inventory' }: { countSour
     (async () => {
       const baseQuery = countSource === 'scheduledJobs'
         ? supabase.from('jobs').select('location_id').eq('org_id', profile.org_id).not('scheduled_at', 'is', null)
-        : supabase.from('inventory_items').select('location_id').eq('org_id', profile.org_id);
+        : supabase.from('inventory_items').select('location_id').eq('org_id', profile.org_id).is('removed_at', null);
       const { data } = await baseQuery;
       if (!alive || !data) return;
       const c: Record<string, number> = {};

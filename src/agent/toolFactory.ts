@@ -304,7 +304,8 @@ export function createAgentTools(
         : 'product_attributes(seats, lounge, jets, series, gallons)';
       let q = client
         .from('inventory_items')
-        .select(`id, sku, product, brand, category, model, color_finish, status, msrp, sale_price, locations:location_id(name), ${attrSel}`);
+        .select(`id, sku, product, brand, category, model, color_finish, status, msrp, sale_price, locations:location_id(name), ${attrSel}`)
+        .is('removed_at', null);
       if (query) { const needle = cleanTerm(query); q = q.or(`product.ilike.%${needle}%,brand.ilike.%${needle}%,sku.ilike.%${needle}%,category.ilike.%${needle}%,model.ilike.%${needle}%`); }
       if (status) q = q.eq('status', status);
       if (min_seats) q = q.gte('product_attributes.seats', Number(min_seats));

@@ -224,6 +224,7 @@ export function useDeal(id: string | undefined) {
         .eq('org_id', data.org_id)
         .eq('customer_id', data.contact_id)
         .is('deal_id', null)
+        .is('removed_at', null)
         .order('updated_at', { ascending: false })
         .order('id', { ascending: true });
 

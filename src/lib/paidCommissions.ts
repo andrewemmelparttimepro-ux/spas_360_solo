@@ -4,7 +4,7 @@ export const PAID_COMMISSION_SALESPEOPLE = [
   'Grace',
   'Bryson',
   'David',
-  'Bad',
+  'Brad',
 ] as const;
 
 export type PaidCommissionSalesperson = typeof PAID_COMMISSION_SALESPEOPLE[number];

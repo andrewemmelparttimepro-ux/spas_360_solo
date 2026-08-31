@@ -16,7 +16,7 @@ const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, im
 
 describe('paid commissions tracker', () => {
   it('keeps the exact requested salesperson order and validates paid periods', () => {
-    assert.deepEqual(PAID_COMMISSION_SALESPEOPLE, ['Alex', 'Ben', 'Grace', 'Bryson', 'David', 'Bad']);
+    assert.deepEqual(PAID_COMMISSION_SALESPEOPLE, ['Alex', 'Ben', 'Grace', 'Bryson', 'David', 'Brad']);
     assert.equal(paidCommissionDateValid('2026-08-31'), true);
     assert.equal(paidCommissionDateValid('2026-02-29'), false);
     assert.equal(paidCommissionDateRangeValid({ startDate: '2026-08-01', endDate: '2026-08-31' }), true);
@@ -46,9 +46,10 @@ describe('paid commissions tracker', () => {
   });
 
   it('wires persistent owner-only CRUD and derives amounts in the database', async () => {
-    const [migration, paidDateMigration, hook, component, page] = await Promise.all([
+    const [migration, paidDateMigration, bradMigration, hook, component, page] = await Promise.all([
       read('supabase/migrations/20260831203735_add_paid_commissions_tracker.sql'),
       read('supabase/migrations/20260831220843_add_paid_commission_date.sql'),
+      read('supabase/migrations/20260831224340_rename_bad_paid_commission_salesperson.sql'),
       read('src/hooks/usePaidCommissions.ts'),
       read('src/components/PaidCommissionsTracker.tsx'),
       read('src/pages/OwnersCorner.tsx'),
@@ -68,6 +69,7 @@ describe('paid commissions tracker', () => {
     assert.match(paidDateMigration, /alter column paid_on set not null/i);
     assert.match(paidDateMigration, /create index if not exists paid_commissions_org_paid_on_salesperson_idx/i);
     assert.match(paidDateMigration, /grant insert \(paid_on\)[\s\S]*grant update \(paid_on\)/i);
+    assert.match(bradMigration, /drop constraint if exists paid_commissions_salesperson_check[\s\S]*update public\.paid_commissions[\s\S]*set salesperson_name = 'Brad'[\s\S]*where salesperson_name = 'Bad'[\s\S]*add constraint paid_commissions_salesperson_check[\s\S]*'Brad'/i);
     assert.match(hook, /\.from\('paid_commissions'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*\.gte\('paid_on', startDate\)[\s\S]*\.lte\('paid_on', endDate\)/);
     assert.match(hook, /\.insert\([\s\S]*created_by: profile\.id/);
     assert.match(component, /commissionPercentage\.trim\(\) !== ''/);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { BarChart3, Building2, Crown, FileText, LoaderCircle, LockKeyhole, Settings, ShieldCheck } from 'lucide-react';
+import { BarChart3, Building2, Crown, Download, FileSpreadsheet, FileText, LoaderCircle, LockKeyhole, Settings, ShieldCheck } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOwnersReport } from '@/hooks/useOwnersReport';
@@ -44,7 +44,7 @@ const OWNER_DESTINATIONS = [
 ] as const;
 
 export default function OwnersCorner() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const isOwner = profile?.role === 'owner_manager';
 
   return (
@@ -64,6 +64,7 @@ export default function OwnersCorner() {
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
             <p>Owner access is active. Each destination keeps its existing permissions and data controls.</p>
           </div>
+          <InventoryProfitsCard accessToken={session?.access_token ?? null} />
           <section aria-label="Owner destinations" className="grid gap-4 md:grid-cols-3">
             {OWNER_DESTINATIONS.map(destination => (
               <NavLink
@@ -93,6 +94,69 @@ export default function OwnersCorner() {
         </section>
       )}
     </div>
+  );
+}
+
+function InventoryProfitsCard({ accessToken }: { accessToken: string | null }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const downloadWorkbook = async () => {
+    if (!accessToken) {
+      setDownloadError('Your session expired. Sign in again to download Inventory Profits.');
+      return;
+    }
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      const response = await fetch('/api/owners/inventory-profits', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error || 'Inventory Profits could not be downloaded.');
+      }
+      const workbook = await response.blob();
+      if (!workbook.size) throw new Error('Inventory Profits could not be downloaded.');
+      const url = URL.createObjectURL(workbook);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Inventory Profits.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'Inventory Profits could not be downloaded.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="inventory-profits-heading" className="flex flex-col gap-4 rounded-2xl border border-amber-500/30 bg-ink-900 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
+          <FileSpreadsheet className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 id="inventory-profits-heading" className="text-base font-bold text-ink-100">Inventory Profits</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-500">
+            Download the dealership profitability workbook in its original format, including every built-in cell formula.
+          </p>
+          {downloadError && <p role="alert" className="mt-2 text-xs font-semibold text-red-600">{downloadError}</p>}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={downloadWorkbook}
+        disabled={isDownloading}
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {isDownloading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        {isDownloading ? 'Preparing…' : 'Download Excel sheet'}
+      </button>
+    </section>
   );
 }
 

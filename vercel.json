@@ -1,5 +1,6 @@
 {
   "functions": {
+    "api/owners/inventory-profits.ts": { "includeFiles": "api/_assets/Inventory Profits.xlsx" },
     "api/migrations/process.ts": { "maxDuration": 60 },
     "api/migrations/callback-hubspot.ts": { "maxDuration": 30 },
     "api/migrations/callback-jobber.ts": { "maxDuration": 30 },

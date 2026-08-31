@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { useModal } from '@/hooks/useModal';
+import { normalizeCustomerAddress } from '@/lib/customerAddress';
 
 /**
  * Guided new-customer flow: chips + progressive steps, every earlier answer
@@ -74,6 +75,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const [last, setLast] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
   const [matches, setMatches] = useState<DupeMatch[]>([]);
   const [existing, setExisting] = useState<DupeMatch | null>(null); // chosen existing customer
   const navigate = useNavigate();
@@ -148,7 +150,20 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
           toast('An exact phone or email match already exists. Choose that customer before creating the deal.', 'error');
           return;
         }
-        contactId = result.contact.id;
+        const createdContactId = result.contact.id;
+        const mailingAddress = normalizeCustomerAddress(address);
+        if (mailingAddress) {
+          const { data: savedContact, error: addressError } = await supabase
+            .from('contacts')
+            .update({ mailing_address: mailingAddress })
+            .eq('id', createdContactId)
+            .eq('org_id', profile.org_id)
+            .select('id, mailing_address')
+            .single();
+          if (addressError) throw new Error(`Customer was created, but the address could not be saved: ${addressError.message}`);
+          if (savedContact?.mailing_address !== mailingAddress) throw new Error('Customer was created, but the saved address could not be verified');
+        }
+        contactId = createdContactId;
         contactFirst = result.contact.first_name;
       }
 
@@ -257,6 +272,18 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
               <input placeholder="Phone *" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} disabled={!!existing} />
               <input placeholder="Email (optional)" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} disabled={!!existing} />
             </div>
+            <label className="mt-3 block" htmlFor="new-customer-address">
+              <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">Customer Address (Optional)</span>
+              <textarea
+                id="new-customer-address"
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                placeholder="Street, city, state, ZIP"
+                rows={2}
+                className={cn(inputClass, 'resize-y')}
+                disabled={!!existing}
+              />
+            </label>
 
             {/* Locked onto an existing customer */}
             {existing && (

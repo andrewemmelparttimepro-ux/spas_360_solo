@@ -1,5 +1,9 @@
 const MISSING_ADDRESS = 'Not provided';
 
+export function normalizeCustomerAddress(address: string): string | null {
+  return address.trim() || null;
+}
+
 /**
  * Display the stored mailing address without inventing missing components.
  * Multi-line entries are compacted for the table while retaining every line.

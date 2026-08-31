@@ -21,6 +21,7 @@ import {
   type DealOwnerFilter,
 } from '@/lib/dealOwnerFilter';
 import type { DealPriority } from '@/types/database';
+import { formatDealCreated } from '@/lib/dealCreated';
 
 export default function Deals() {
   const { stages, deals, salespeople, followUpsByDeal, isLoading, moveDeal, moveDealToStage, refresh } = usePipeline();
@@ -326,19 +327,20 @@ export default function Deals() {
           aria-label="Active deals table"
           tabIndex={0}
         >
-          <table className="w-full min-w-[800px] table-fixed divide-y divide-ink-800 text-[11px]">
+          <table className="w-full min-w-[900px] table-fixed divide-y divide-ink-800 text-[11px]">
             <thead className="sticky top-0 z-10 bg-ink-950 text-left text-[9px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-500">
               <tr>
-                <th className="w-[12%] px-1.5 py-2">Deal</th>
-                <th className="w-[10%] px-1.5 py-2">Customer</th>
-                <th className="w-[11%] px-1.5 py-2">Stage</th>
-                <th className="w-[9%] px-1.5 py-2">Deal owner</th>
-                <th className="w-[14%] px-1.5 py-2">Next activity</th>
-                <th className="w-[9%] px-1.5 py-2">Amount</th>
-                <th className="w-[8%] px-1.5 py-2">Priority</th>
-                <th className="w-[10%] px-1.5 py-2">Expected close</th>
+                <th className="w-[11%] px-1.5 py-2">Deal</th>
+                <th className="w-[9%] px-1.5 py-2">Customer</th>
+                <th className="w-[10%] px-1.5 py-2">Stage</th>
+                <th className="w-[8%] px-1.5 py-2">Deal owner</th>
+                <th className="w-[13%] px-1.5 py-2">Next activity</th>
+                <th className="w-[8%] px-1.5 py-2">Amount</th>
+                <th className="w-[7%] px-1.5 py-2">Priority</th>
+                <th className="w-[11%] px-1.5 py-2">Deal Created</th>
+                <th className="w-[10%] px-1.5 py-2">Expected Close</th>
                 <th className="w-[5%] px-1.5 py-2">Open tasks</th>
-                <th className="w-[12%] px-1 py-2">Outcome</th>
+                <th className="w-[8%] px-1 py-2">Outcome</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800/80">
@@ -398,6 +400,7 @@ export default function Deals() {
                           : 'border-ink-700 bg-ink-950 text-ink-300',
                       )}>{deal.priority}</span>
                     </td>
+                    <td className="whitespace-nowrap px-1.5 py-2 text-[10px] text-ink-400" title={deal.created_at}>{formatDealCreated(deal.created_at)}</td>
                     <td className="whitespace-nowrap px-1.5 py-2 text-[10px] text-ink-400">{deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString() : '—'}</td>
                     <td className="px-1.5 py-2 text-center font-mono text-[10px] text-ink-300">{followUp?.openTaskCount ?? 0}</td>
                     <td className="px-1 py-2">
@@ -429,7 +432,7 @@ export default function Deals() {
               })}
               {filteredActiveDeals.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-5 py-10 text-center text-sm text-ink-500">
+                  <td colSpan={11} className="px-5 py-10 text-center text-sm text-ink-500">
                     No active deals match the selected follow-up, salesperson, priority, and search filters.
                   </td>
                 </tr>

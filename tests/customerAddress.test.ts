@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { formatCustomerAddress } from '../src/lib/customerAddress.ts';
+import { formatCustomerAddress, normalizeCustomerAddress } from '../src/lib/customerAddress.ts';
 import { formatPhone } from '../src/lib/utils.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
@@ -26,6 +26,29 @@ describe('Customers table address', () => {
       formatCustomerAddress('Suite 200\n456 North Ave\nMinot, ND 58701'),
       'Suite 200, 456 North Ave, Minot, ND 58701',
     );
+  });
+
+  it('normalizes optional New Customer address input without making blank values required', () => {
+    assert.equal(normalizeCustomerAddress(' 123 Main St\nBismarck, ND 58501 '), '123 Main St\nBismarck, ND 58501');
+    assert.equal(normalizeCustomerAddress('   '), null);
+  });
+
+  it('shows and verifies optional address persistence in the shared New Customer wizard', async () => {
+    const [wizard, dashboardEntry, customerEntry, dealEntry, detail] = await Promise.all([
+      read('src/components/NewCustomerWizard.tsx'),
+      read('src/components/QuickCreate.tsx'),
+      read('src/pages/Customers.tsx'),
+      read('src/components/layout/AdminRail.tsx'),
+      read('src/pages/ContactDetail.tsx'),
+    ]);
+
+    assert.match(wizard, /Customer Address \(Optional\)[\s\S]*id="new-customer-address"/);
+    assert.match(wizard, /normalizeCustomerAddress\(address\)/);
+    assert.match(wizard, /from\('contacts'\)[\s\S]*update\(\{ mailing_address: mailingAddress \}\)[\s\S]*select\('id, mailing_address'\)[\s\S]*savedContact\?\.mailing_address !== mailingAddress/);
+    assert.match(dashboardEntry, /NewCustomerWizard/);
+    assert.match(customerEntry, /NewCustomerWizard/);
+    assert.match(dealEntry, /NewCustomerWizard/);
+    assert.match(detail, /label="Address" value=\{contact\.mailing_address\}/);
   });
 
   it('puts Address between Customer and Phone and removes Status only from list view', async () => {

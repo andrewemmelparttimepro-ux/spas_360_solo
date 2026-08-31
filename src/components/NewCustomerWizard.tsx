@@ -126,7 +126,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const step2Done = source !== null;
   const step3Done = interests.length > 0;
   const step4Done = priority !== null && expectedCloseDate.length > 0;
-  const step5Done = followupDate.length > 0;
+  const step5Done = followupDate.length > 0 && firstNote.trim().length > 0;
   const doneCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
   const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !saving;
 
@@ -228,12 +228,11 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       });
       if (taskErr) throw new Error(taskErr.message);
 
-      // 4. Optional first note
-      if (firstNote.trim()) {
-        await supabase.from('notes').insert({
-          contact_id: contactId, deal_id: deal.id, body: firstNote.trim(), created_by: user.id,
-        });
-      }
+      // 4. Required follow-up context
+      const { error: noteErr } = await supabase.from('notes').insert({
+        contact_id: contactId, deal_id: deal.id, body: firstNote.trim(), created_by: user.id,
+      });
+      if (noteErr) throw new Error(noteErr.message);
 
       toast(`${contactFirst} added — follow-up scheduled`, 'success');
       // The caller's post-create refresh is the handoff to customer search.
@@ -258,11 +257,10 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             </div>
             <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
-          {/* Endowed progress: the follow-up step is genuinely pre-completed, so this never starts at 0% */}
           <div className="mt-3.5">
             <div className="flex justify-between items-baseline text-[10px] font-semibold mb-1.5">
               <span className="text-ink-400">{doneCount} of 5 complete</span>
-              {step5Done && doneCount < 5 && <span className="text-brand-400">Follow-up already set for you ✓</span>}
+              {step5Done && doneCount < 5 && <span className="text-brand-400">Follow-up details complete ✓</span>}
             </div>
             <div className="h-1.5 bg-ink-800 rounded-full overflow-hidden">
               <div className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${(doneCount / 5) * 100}%` }} />
@@ -392,8 +390,28 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             <StepHeader n={5} title="First follow-up (required)" done={step5Done} />
             <p className="text-xs text-ink-500 mb-3 -mt-1 ml-9">Every lead gets a follow-up — no customer falls through the cracks.</p>
             <div className="grid grid-cols-2 gap-3">
-              <input type="date" value={followupDate} onChange={e => setFollowupDate(e.target.value)} className={inputClass} />
-              <input placeholder="Quick note (optional)" value={firstNote} onChange={e => setFirstNote(e.target.value)} className={inputClass} />
+              <label className="block" htmlFor="new-customer-followup-date">
+                <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">Follow-up date</span>
+                <input
+                  id="new-customer-followup-date"
+                  type="date"
+                  value={followupDate}
+                  onChange={e => setFollowupDate(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </label>
+              <label className="block" htmlFor="new-customer-followup-note">
+                <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">Whats the follow up?</span>
+                <input
+                  id="new-customer-followup-note"
+                  placeholder="Add the follow-up details"
+                  value={firstNote}
+                  onChange={e => setFirstNote(e.target.value)}
+                  className={inputClass}
+                  required
+                />
+              </label>
             </div>
           </section>
         </div>

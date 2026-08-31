@@ -17,8 +17,9 @@ import {
   type OwnersReportOutcome,
   type OwnersReportPreset,
   type OwnersReportRange,
+  type OwnersReportRanges,
 } from '@/lib/ownersReport';
-import { viewOwnersReportPdf } from '@/lib/ownersReportPdf';
+import { salespersonGrossRanking, viewOwnersReportPdf, type OwnersReportPdfInput } from '@/lib/ownersReportPdf';
 
 const OWNER_DESTINATIONS = [
   {
@@ -143,13 +144,63 @@ function OwnersPerformanceReport() {
   const salespersonRates = useMemo(() => ranges ? closingRates(rateDeals, ranges.current, 'salesperson', salespersonNames) : [], [rateDeals, ranges, salespersonNames]);
   const storeRates = useMemo(() => ranges ? closingRates(rateDeals, ranges.current, 'store', storeNames) : [], [rateDeals, ranges, storeNames]);
 
-  const applyPeriod = () => {
+  const pdfInputFor = (pdfRanges: OwnersReportRanges, preset: OwnersReportPreset): OwnersReportPdfInput => {
+    const pdfCurrentDeals = closedDealsForRange(report.deals, pdfRanges.current, outcome, locationId || null, assignedTo || null);
+    const pdfPriorDeals = pdfRanges.prior ? closedDealsForRange(report.deals, pdfRanges.prior, outcome, locationId || null, assignedTo || null) : [];
+    const pdfCurrentTotals = reportTotals(pdfCurrentDeals);
+    const pdfPriorTotals = reportTotals(pdfPriorDeals);
+    const pdfRateDeals = report.deals.filter(deal =>
+      (!locationId || deal.location_id === locationId) && (!assignedTo || deal.assigned_to === assignedTo));
+    const wonDeals = closedDealsForRange(report.deals, pdfRanges.current, 'won', locationId || null, assignedTo || null);
+    return {
+      generatedAt: new Date(),
+      outcome,
+      store: locationId ? (storeNames.get(locationId) ?? 'Unknown store') : 'All Stores',
+      salesperson: assignedTo ? (salespersonNames.get(assignedTo) ?? 'Unknown salesperson') : 'All Salespeople',
+      dateSelection: OWNERS_REPORT_PRESET_LABELS[preset],
+      current: {
+        title: pdfRanges.prior ? 'First period' : 'Current period',
+        range: rangeLabel(pdfRanges.current),
+        deals: pdfCurrentDeals,
+        totalCount: pdfCurrentTotals.count,
+        totalAmount: pdfCurrentTotals.amount,
+      },
+      comparedTo: pdfRanges.prior ? {
+        title: 'Compared to',
+        range: rangeLabel(pdfRanges.prior),
+        deals: pdfPriorDeals,
+        totalCount: pdfPriorTotals.count,
+        totalAmount: pdfPriorTotals.amount,
+      } : undefined,
+      delta: pdfRanges.prior ? reportDelta(pdfCurrentTotals, pdfPriorTotals) : undefined,
+      salespersonRates: closingRates(pdfRateDeals, pdfRanges.current, 'salesperson', salespersonNames),
+      storeRates: closingRates(pdfRateDeals, pdfRanges.current, 'store', storeNames),
+      grossSalesRanking: salespersonGrossRanking(wonDeals, salespersonNames),
+      storeNames,
+      salespersonNames,
+    };
+  };
+
+  const openPrintablePdf = async (pdfRanges: OwnersReportRanges, preset: OwnersReportPreset) => {
+    setIsBuildingPdf(true);
+    setPdfError(null);
+    try {
+      await viewOwnersReportPdf(pdfInputFor(pdfRanges, preset));
+    } catch (error) {
+      setPdfError(error instanceof Error ? error.message : 'The printable PDF could not be prepared.');
+    } finally {
+      setIsBuildingPdf(false);
+    }
+  };
+
+  const applyPeriod = async () => {
+    const pendingSelection = selectedPreset === 'custom' ? custom : selectedPreset === 'compare_dates' ? comparison : null;
+    const nextRanges = ownersReportRanges(selectedPreset, pendingSelection);
+    if (!nextRanges || report.isLoading) return;
     if (selectedPreset === 'custom') {
-      if (!pendingCustomValid) return;
       setAppliedCustom(custom);
       setAppliedComparison(null);
     } else if (selectedPreset === 'compare_dates') {
-      if (!pendingComparisonValid) return;
       setAppliedComparison(comparison);
       setAppliedCustom(null);
     } else {
@@ -157,44 +208,12 @@ function OwnersPerformanceReport() {
       setAppliedComparison(null);
     }
     setAppliedPreset(selectedPreset);
+    await openPrintablePdf(nextRanges, selectedPreset);
   };
 
   const viewPrintablePdf = async () => {
     if (!ranges || report.isLoading) return;
-    setIsBuildingPdf(true);
-    setPdfError(null);
-    try {
-      await viewOwnersReportPdf({
-        generatedAt: new Date(),
-        outcome,
-        store: locationId ? (storeNames.get(locationId) ?? 'Unknown store') : 'All Stores',
-        salesperson: assignedTo ? (salespersonNames.get(assignedTo) ?? 'Unknown salesperson') : 'All Salespeople',
-        dateSelection: OWNERS_REPORT_PRESET_LABELS[appliedPreset],
-        current: {
-          title: ranges.prior ? 'First period' : 'Current period',
-          range: rangeLabel(ranges.current),
-          deals: currentDeals,
-          totalCount: currentTotals.count,
-          totalAmount: currentTotals.amount,
-        },
-        comparedTo: ranges.prior ? {
-          title: 'Compared to',
-          range: rangeLabel(ranges.prior),
-          deals: priorDeals,
-          totalCount: priorTotals.count,
-          totalAmount: priorTotals.amount,
-        } : undefined,
-        delta: ranges.prior ? delta : undefined,
-        salespersonRates,
-        storeRates,
-        storeNames,
-        salespersonNames,
-      });
-    } catch (error) {
-      setPdfError(error instanceof Error ? error.message : 'The printable PDF could not be prepared.');
-    } finally {
-      setIsBuildingPdf(false);
-    }
+    await openPrintablePdf(ranges, appliedPreset);
   };
 
   return (
@@ -251,7 +270,7 @@ function OwnersPerformanceReport() {
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={applyPeriod} disabled={(selectedPreset === 'custom' && !pendingCustomValid) || (selectedPreset === 'compare_dates' && !pendingComparisonValid)} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Apply dates</button>
+        <button type="button" onClick={applyPeriod} disabled={report.isLoading || isBuildingPdf || (selectedPreset === 'custom' && !pendingCustomValid) || (selectedPreset === 'compare_dates' && !pendingComparisonValid)} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Apply dates &amp; view PDF</button>
         <button type="button" onClick={viewPrintablePdf} disabled={report.isLoading || !ranges || isBuildingPdf} className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-950 px-4 py-2 text-sm font-bold text-ink-100 hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-50">
           {isBuildingPdf ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
           {isBuildingPdf ? 'Preparing PDF…' : 'View printable PDF'}

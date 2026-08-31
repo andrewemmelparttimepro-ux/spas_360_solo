@@ -10,7 +10,7 @@ import {
   reportTotals,
   type OwnersReportDeal,
 } from '../src/lib/ownersReport.ts';
-import { buildOwnersReportPdf } from '../src/lib/ownersReportPdf.ts';
+import { buildOwnersReportPdf, salespersonGrossRanking } from '../src/lib/ownersReportPdf.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -92,6 +92,22 @@ describe('Owners Corner sales reports', () => {
     ]);
   });
 
+  it('ranks salespeople by gross Closed-Won dollars and retains each individual sale', () => {
+    const p2SecondDeal: OwnersReportDeal = {
+      ...deals[2],
+      id: 'won-other-second',
+      title: 'Other second sale',
+      amount: 400,
+      closed_at: '2026-08-23T12:00:00Z',
+    };
+    const rows = salespersonGrossRanking([deals[0], deals[2], p2SecondDeal, deals[1]], new Map([['p1', 'Alex'], ['p2', 'Blair']]));
+    assert.deepEqual(rows.map(row => ({ id: row.id, wonCount: row.wonCount, totalAmount: row.totalAmount })), [
+      { id: 'p1', wonCount: 1, totalAmount: 1000 },
+      { id: 'p2', wonCount: 2, totalAmount: 900 },
+    ]);
+    assert.deepEqual(rows[1].deals.map(deal => deal.id), ['won-other', 'won-other-second']);
+  });
+
   it('wires all requested controls and keeps reads organization scoped', async () => {
     const [page, hook, pdf] = await Promise.all([
       read('src/pages/OwnersCorner.tsx'),
@@ -110,9 +126,12 @@ describe('Owners Corner sales reports', () => {
     assert.match(page, /By Salesperson/);
     assert.match(page, /By Store/);
     assert.match(page, /View printable PDF/);
+    assert.match(page, /Apply dates &amp; view PDF/);
     assert.match(page, /viewOwnersReportPdf/);
     assert.match(page, /rateDeals[\s\S]*locationId[\s\S]*assignedTo/);
+    assert.match(page, /nextRanges[\s\S]*openPrintablePdf\(nextRanges, selectedPreset\)/);
     assert.match(pdf, /window\.open\('', '_blank'\)[\s\S]*preview\.location\.replace\(url\)/);
+    assert.match(pdf, /fetch\('\/mchl-duck-dashboard\.png'/);
     assert.doesNotMatch(pdf, /\.save\(|\.download\s*=/);
     assert.match(hook, /\.from\('deals'\)[\s\S]*\.eq\('org_id', orgId\)/);
     assert.match(hook, /DEAL_PAGE_SIZE = 1000[\s\S]*\.range\(from, from \+ DEAL_PAGE_SIZE - 1\)/);
@@ -124,6 +143,7 @@ describe('Owners Corner sales reports', () => {
   it('builds a viewable PDF with applied filters, periods, deals, delta, and closing-rate tables', async () => {
     const currentDeals = [deals[0], deals[2]];
     const comparedDeals = [deals[3]];
+    const duckBytes = await readFile(new URL('../public/mchl-duck-dashboard.png', import.meta.url));
     const bytes = await buildOwnersReportPdf({
       generatedAt: new Date('2026-08-30T20:00:00-05:00'),
       outcome: 'won',
@@ -137,14 +157,20 @@ describe('Owners Corner sales reports', () => {
       storeRates: [{ id: 's1', name: 'North', assigned: 2, won: 1, rate: 0.5 }],
       storeNames: new Map([['s1', 'North'], ['s2', 'South']]),
       salespersonNames: new Map([['p1', 'Alex'], ['p2', 'Blair']]),
+      grossSalesRanking: salespersonGrossRanking(currentDeals, new Map([['p1', 'Alex'], ['p2', 'Blair']])),
+      duckLogoDataUrl: `data:image/png;base64,${duckBytes.toString('base64')}`,
     });
     assert.equal(Buffer.from(bytes.subarray(0, 5)).toString('ascii'), '%PDF-');
     const source = Buffer.from(bytes).toString('latin1');
-    assert.match(source, /Sales Outcome & Closing Rate/);
+    assert.match(source, /\(Sales Outcome\) Tj/);
+    assert.doesNotMatch(source, /Sales Outcome & Closing Rate/);
     assert.match(source, /Compare Dates/);
     assert.match(source, /Other store/);
     assert.match(source, /COMPARISON DELTA/i);
     assert.match(source, /By Salesperson/);
     assert.match(source, /By Store/);
+    assert.match(source, /Salesperson Gross Sales Ranking/);
+    assert.match(source, /Salesperson Total/);
+    assert.match(source, /\/Subtype \/Image/);
   });
 });

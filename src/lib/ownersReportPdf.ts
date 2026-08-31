@@ -21,6 +21,16 @@ export interface OwnersReportPdfInput {
   storeRates: ClosingRateRow[];
   storeNames: Map<string, string>;
   salespersonNames: Map<string, string>;
+  grossSalesRanking: SalespersonGrossRankingRow[];
+  duckLogoDataUrl?: string;
+}
+
+export interface SalespersonGrossRankingRow {
+  id: string;
+  name: string;
+  deals: OwnersReportDeal[];
+  wonCount: number;
+  totalAmount: number;
 }
 
 const COLORS = {
@@ -70,6 +80,32 @@ function signedNumber(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+export function salespersonGrossRanking(
+  deals: OwnersReportDeal[],
+  salespersonNames: Map<string, string>,
+): SalespersonGrossRankingRow[] {
+  const grouped = new Map<string, OwnersReportDeal[]>();
+  for (const deal of deals) {
+    if (!deal.stage?.is_won || !deal.assigned_to) continue;
+    const rows = grouped.get(deal.assigned_to) ?? [];
+    rows.push(deal);
+    grouped.set(deal.assigned_to, rows);
+  }
+  return [...grouped.entries()].map(([id, rows]) => {
+    const sortedDeals = [...rows].sort((a, b) =>
+      (Number(b.amount) || 0) - (Number(a.amount) || 0)
+      || String(b.closed_at ?? '').localeCompare(String(a.closed_at ?? ''))
+      || a.title.localeCompare(b.title));
+    return {
+      id,
+      name: salespersonNames.get(id) ?? 'Unknown salesperson',
+      deals: sortedDeals,
+      wonCount: sortedDeals.length,
+      totalAmount: sortedDeals.reduce((total, deal) => total + (Number(deal.amount) || 0), 0),
+    };
+  }).sort((a, b) => b.totalAmount - a.totalAmount || b.wonCount - a.wonCount || a.name.localeCompare(b.name));
+}
+
 export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise<Uint8Array> {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: false });
@@ -78,28 +114,19 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   const margin = 40;
   const contentWidth = pageWidth - margin * 2;
   const footerTop = pageHeight - 42;
-  let y = 112;
+  let y = 132;
 
   const drawPageFrame = (continued = false) => {
     doc.setFillColor(COLORS.background);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
     doc.setFillColor(COLORS.ink);
-    doc.rect(0, 0, pageWidth, 72, 'F');
-    doc.setFillColor(COLORS.blue);
-    doc.roundedRect(margin, 22, 28, 28, 7, 7, 'F');
-    doc.setTextColor(COLORS.white);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('360', margin + 5, 40);
-    doc.setFontSize(15);
-    doc.text('SPAS', margin + 40, 40);
-    doc.setTextColor(COLORS.blue);
-    doc.text('360', margin + 82, 40);
+    doc.rect(0, 0, pageWidth, 92, 'F');
+    if (input.duckLogoDataUrl) doc.addImage(input.duckLogoDataUrl, 'PNG', (pageWidth - 56) / 2, 8, 56, 70, undefined, 'FAST');
     doc.setTextColor('#becada');
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(continued ? 'OWNERS CORNER REPORT - CONTINUED' : 'OWNERS CORNER REPORT', pageWidth - margin, 39, { align: 'right' });
-    y = 98;
+    doc.text(continued ? 'OWNERS CORNER REPORT - CONTINUED' : 'OWNERS CORNER REPORT', pageWidth - margin, 76, { align: 'right' });
+    y = 118;
   };
 
   const addPage = () => {
@@ -243,11 +270,81 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     y += 16;
   };
 
+  const drawGrossSalesRanking = () => {
+    heading('Salesperson Gross Sales Ranking', 14);
+    doc.setTextColor(COLORS.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.text('Ranked highest to lowest by total Closed-Won sale dollars for the first/current period.', margin, y);
+    y += 16;
+    if (!input.grossSalesRanking.length) {
+      doc.setTextColor(COLORS.muted);
+      doc.text('No assigned Closed-Won deals match the applied store, salesperson, and date filters.', margin, y);
+      y += 26;
+      return;
+    }
+
+    input.grossSalesRanking.forEach((salesperson, rankIndex) => {
+      const drawSalespersonHeader = (continued = false) => {
+        ensureRoom(52);
+        doc.setFillColor(COLORS.paleBlue);
+        doc.roundedRect(margin, y, contentWidth, 34, 5, 5, 'F');
+        doc.setTextColor(COLORS.ink);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(`#${rankIndex + 1} ${cleanPdfText(salesperson.name)}${continued ? ' (continued)' : ''}`, margin + 9, y + 14);
+        doc.setFontSize(8.5);
+        doc.text(`${salesperson.wonCount} Closed-Won deals`, margin + 9, y + 27);
+        doc.setFontSize(12);
+        doc.text(cleanPdfText(money.format(salesperson.totalAmount)), pageWidth - margin - 9, y + 21, { align: 'right' });
+        y += 40;
+        doc.setFillColor('#e7ebf0');
+        doc.rect(margin, y, contentWidth, 20, 'F');
+        doc.setTextColor(COLORS.muted);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.text('Individual Closing Sale', margin + 6, y + 13);
+        doc.text('Closed', margin + 354, y + 13);
+        doc.text('Sale Price', pageWidth - margin - 6, y + 13, { align: 'right' });
+        y += 20;
+      };
+
+      drawSalespersonHeader();
+      for (const deal of salesperson.deals) {
+        const titleLines = doc.splitTextToSize(cleanPdfText(deal.title) || 'Untitled deal', 336) as string[];
+        const rowHeight = Math.max(23, titleLines.length * 10 + 9);
+        if (y + rowHeight + 28 > footerTop - 12) {
+          addPage();
+          drawSalespersonHeader(true);
+        }
+        doc.setDrawColor(COLORS.rule);
+        doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
+        doc.setTextColor('#263548');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.25);
+        doc.text(titleLines, margin + 6, y + 14);
+        doc.text(closedDate(deal.closed_at), margin + 354, y + 14);
+        doc.text(cleanPdfText(money.format(Number(deal.amount) || 0)), pageWidth - margin - 6, y + 14, { align: 'right' });
+        y += rowHeight;
+      }
+      ensureRoom(30);
+      doc.setFillColor('#ffffff');
+      doc.rect(margin, y, contentWidth, 24, 'F');
+      doc.setTextColor(COLORS.ink);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text(`${cleanPdfText(salesperson.name)} Salesperson Total`, margin + 6, y + 16);
+      doc.text(`${salesperson.wonCount} Closed-Won deals`, margin + 354, y + 16);
+      doc.text(cleanPdfText(money.format(salesperson.totalAmount)), pageWidth - margin - 6, y + 16, { align: 'right' });
+      y += 36;
+    });
+  };
+
   drawPageFrame();
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(COLORS.ink);
-  doc.text('Sales Outcome & Closing Rate', margin, y);
+  doc.text('Sales Outcome', margin, y);
   y += 18;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -287,6 +384,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   }
   y += 84;
 
+  drawGrossSalesRanking();
   drawDealTable(input.current);
   if (input.comparedTo) drawDealTable(input.comparedTo);
 
@@ -324,7 +422,16 @@ export async function viewOwnersReportPdf(input: OwnersReportPdfInput): Promise<
   preview.document.body.style.cssText = 'margin:0;display:grid;place-items:center;min-height:100vh;background:#111a2a;color:white;font:600 16px system-ui,sans-serif';
   preview.document.body.textContent = 'Preparing printable Owners Corner report...';
   try {
-    const bytes = await buildOwnersReportPdf(input);
+    const response = await fetch('/mchl-duck-dashboard.png', { cache: 'force-cache' });
+    if (!response.ok) throw new Error('The approved Owners Corner duck logo could not be loaded.');
+    const logoBlob = await response.blob();
+    const duckLogoDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('The approved duck logo could not be read.'));
+      reader.onerror = () => reject(new Error('The approved duck logo could not be read.'));
+      reader.readAsDataURL(logoBlob);
+    });
+    const bytes = await buildOwnersReportPdf({ ...input, duckLogoDataUrl });
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
     preview.location.replace(url);
     window.setTimeout(() => URL.revokeObjectURL(url), 300_000);

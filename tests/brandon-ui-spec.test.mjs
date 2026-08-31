@@ -199,7 +199,7 @@ describe('Brandon composite UI contract', () => {
 
     assert.match(dashboard, /Welcome back/);
     assert.match(dashboard, /dashboard-welcome/);
-    assert.match(dashboard, /src="\/mchl-duck\.png"/);
+    assert.match(dashboard, /src="\/mchl-duck-dashboard\.png"/);
     assert.match(dashboard, /alt="Magic City Home Leisure duck logo"/);
     assert.match(dashboard, /h-16 w-24[^\"]*sm:h-\[72px\] sm:w-28/);
   });

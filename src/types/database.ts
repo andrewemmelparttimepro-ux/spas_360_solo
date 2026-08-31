@@ -176,7 +176,7 @@ export interface Suggestion {
 }
 
 export interface PaidCommission {
-  id: string; org_id: string; commission_month: string;
+  id: string; org_id: string; commission_month: string; paid_on: string;
   salesperson_name: 'Alex' | 'Ben' | 'Grace' | 'Bryson' | 'David' | 'Bad';
   customer_name: string; sale_amount: number; commission_percentage: number;
   commission_amount: number; created_by: string;

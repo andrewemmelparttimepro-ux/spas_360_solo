@@ -20,6 +20,7 @@ import {
   type OwnersReportRanges,
 } from '@/lib/ownersReport';
 import { salespersonGrossRanking, viewOwnersReportPdf, type OwnersReportPdfInput } from '@/lib/ownersReportPdf';
+import { PaidCommissionsTracker } from '@/components/PaidCommissionsTracker';
 
 const OWNER_DESTINATIONS = [
   {
@@ -78,6 +79,7 @@ export default function OwnersCorner() {
               </NavLink>
             ))}
           </section>
+          <PaidCommissionsTracker />
           <OwnersPerformanceReport />
         </>
       ) : (

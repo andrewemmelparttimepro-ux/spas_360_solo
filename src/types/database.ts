@@ -175,6 +175,14 @@ export interface Suggestion {
   created_at: string; updated_at: string;
 }
 
+export interface PaidCommission {
+  id: string; org_id: string; commission_month: string;
+  salesperson_name: 'Alex' | 'Ben' | 'Grace' | 'Bryson' | 'David' | 'Bad';
+  customer_name: string; sale_amount: number; commission_percentage: number;
+  commission_amount: number; created_by: string;
+  created_at: string; updated_at: string;
+}
+
 // Simplified Database type for Supabase client generic
 // Using Record<string, unknown> for Insert/Update to avoid circular ref issues
 // The actual type safety comes from our Row interfaces above
@@ -187,7 +195,7 @@ export interface Database {
        'notes' | 'time_entries' | 'notifications' | 'audit_log' |
        'agent_threads' | 'agent_messages' | 'fix_it_posts' |
        'fix_it_comments' | 'fix_it_attachments' | 'app_invites' |
-       'push_subscriptions' | 'suggestions']: {
+       'push_subscriptions' | 'suggestions' | 'paid_commissions']: {
         Row: Record<string, unknown>;
         Insert: Record<string, unknown>;
         Update: Record<string, unknown>;

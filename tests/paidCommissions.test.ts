@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { describe, it } from 'node:test';
+import {
+  PAID_COMMISSION_SALESPEOPLE,
+  commissionAmount,
+  commissionMonthDate,
+  paidCommissionTotal,
+  paidCommissionValuesValid,
+  shiftCommissionMonth,
+} from '../src/lib/paidCommissions.ts';
+
+const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+
+describe('paid commissions tracker', () => {
+  it('keeps the exact requested salesperson order and month navigation', () => {
+    assert.deepEqual(PAID_COMMISSION_SALESPEOPLE, ['Alex', 'Ben', 'Grace', 'Bryson', 'David', 'Bad']);
+    assert.equal(commissionMonthDate('2026-08'), '2026-08-01');
+    assert.equal(commissionMonthDate('2026-13'), null);
+    assert.equal(shiftCommissionMonth('2026-01', -1), '2025-12');
+    assert.equal(shiftCommissionMonth('2026-12', 1), '2027-01');
+  });
+
+  it('calculates row amounts and salesperson totals to currency precision', () => {
+    assert.equal(commissionAmount(12_345.67, 4.25), 524.69);
+    assert.equal(commissionAmount(Number.NaN, 5), 0);
+    assert.equal(paidCommissionTotal([
+      { commission_amount: 524.69 },
+      { commission_amount: '100.10' },
+      { commission_amount: 0 },
+    ]), 624.79);
+  });
+
+  it('accepts complete business values and rejects unsafe input', () => {
+    assert.equal(paidCommissionValuesValid({ customerName: 'Jordan Smith', saleAmount: 15000, commissionPercentage: 3.5 }), true);
+    assert.equal(paidCommissionValuesValid({ customerName: ' ', saleAmount: 15000, commissionPercentage: 3.5 }), false);
+    assert.equal(paidCommissionValuesValid({ customerName: 'Jordan', saleAmount: 0, commissionPercentage: 3.5 }), false);
+    assert.equal(paidCommissionValuesValid({ customerName: 'Jordan', saleAmount: 15000, commissionPercentage: 101 }), false);
+  });
+
+  it('wires persistent owner-only CRUD and derives amounts in the database', async () => {
+    const [migration, hook, component, page] = await Promise.all([
+      read('supabase/migrations/20260831203735_add_paid_commissions_tracker.sql'),
+      read('src/hooks/usePaidCommissions.ts'),
+      read('src/components/PaidCommissionsTracker.tsx'),
+      read('src/pages/OwnersCorner.tsx'),
+    ]);
+    assert.match(migration, /create table public\.paid_commissions/i);
+    assert.match(migration, /commission_amount numeric\(12, 2\)[\s\S]*generated always as[\s\S]*sale_amount \* commission_percentage \/ 100/i);
+    assert.match(migration, /alter table public\.paid_commissions enable row level security/i);
+    assert.match(migration, /for select[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
+    assert.match(migration, /for insert[\s\S]*created_by = \(select auth\.uid\(\)\)[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
+    assert.match(migration, /for update[\s\S]*using[\s\S]*auth_role\(\)\) = 'owner_manager'[\s\S]*with check[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
+    assert.match(migration, /for delete[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
+    assert.match(migration, /revoke all on table public\.paid_commissions from anon, authenticated/i);
+    assert.match(migration, /grant select[\s\S]*grant insert[\s\S]*grant update[\s\S]*grant delete/i);
+    assert.match(hook, /\.from\('paid_commissions'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*\.eq\('commission_month', monthDate\)/);
+    assert.match(hook, /\.insert\([\s\S]*created_by: profile\.id/);
+    assert.match(hook, /\.update\(values\)\.eq\('id', id\)\.eq\('org_id', profile\.org_id\)/);
+    assert.match(hook, /\.delete\(\)[\s\S]*\.eq\('id', id\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
+    assert.match(component, /useState\(currentMonth\)/);
+    assert.match(component, /type="month"/);
+    assert.match(component, /Previous commission month[\s\S]*shiftCommissionMonth\(month, -1\)/);
+    assert.match(component, /Next commission month[\s\S]*shiftCommissionMonth\(month, 1\)/);
+    assert.match(component, /Customer name[\s\S]*Sale amount[\s\S]*Commission %[\s\S]*Commission amount/);
+    assert.match(component, /PAID_COMMISSION_SALESPEOPLE\.map/);
+    assert.match(component, /paidCommissionTotal\(entries\)/);
+    assert.match(page, /<PaidCommissionsTracker \/>/);
+  });
+});

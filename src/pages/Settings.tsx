@@ -17,7 +17,7 @@ interface AppInvite {
 
 const roleLabels: Record<string, string> = {
   owner_manager: 'Owner / Manager',
-  service_manager: 'Service Manager',
+  service_manager: 'Service / Store Manager',
   salesperson: 'Salesperson',
   technician: 'Technician',
 };

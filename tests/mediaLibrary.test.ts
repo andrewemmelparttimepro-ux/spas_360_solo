@@ -26,10 +26,10 @@ describe('Media library file handling', () => {
     assert.equal(mediaLibraryDisplayName('Brandon delivery photo.jpg', 'image'), 'Brandon delivery photo');
   });
 
-  it('scopes runtime reads to the exact human-created source post and report files', async () => {
+  it('scopes runtime reads to the exact report attachment set without opening the Fix-It post', async () => {
     assert.equal(MEDIA_LIBRARY_POST_ID, 'bb5d7e0d-8aca-4ac8-890a-108f8f6133e3');
     const hook = await read('src/hooks/useMediaLibrary.ts');
-    assert.match(hook, /\.eq\('id', MEDIA_LIBRARY_POST_ID\)/);
+    assert.doesNotMatch(hook, /from\('fix_it_posts'\)/);
     assert.match(hook, /\.eq\('post_id', MEDIA_LIBRARY_POST_ID\)/);
     assert.match(hook, /\.eq\('org_id', profile\.org_id\)/);
     assert.match(hook, /\.eq\('purpose', 'report'\)/);

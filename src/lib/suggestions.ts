@@ -9,7 +9,7 @@ export const SUGGESTION_STATUS: Record<SuggestionStatus, { label: string; tone: 
 };
 
 export function canReviewSuggestions(role: UserRole | null | undefined): boolean {
-  return role === 'owner_manager' || role === 'service_manager';
+  return role === 'owner_manager';
 }
 
 export function normalizeSuggestionBody(value: string): string {

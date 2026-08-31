@@ -1,6 +1,6 @@
 import { Bell, MapPin, UserCircle, LogOut, ChevronDown, CheckCheck, Menu, Settings, LayoutDashboard, Users, Wrench, Package, MessageSquare, BarChart3, Search, Handshake, Building2, MessageSquarePlus, BookOpen, PackageSearch, Images, Files, Crown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +15,7 @@ import SuggestionBox from '@/components/SuggestionBox';
 // Reports, Settings) lives in the drawer — one calm menu, on every screen size.
 export type NavTone = 'sales' | 'service' | 'customers' | null;
 
-export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard }[] }[] = [
+export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items: { name: string; path: string; icon: typeof LayoutDashboard; ownerOnly?: boolean }[] }[] = [
   { label: null, tone: null, items: [{ name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }] },
   { label: null, tone: 'customers', items: [{ name: 'Customers', path: '/customers', icon: Users }] },
   { label: null, tone: 'sales', items: [{ name: 'Deals', path: '/deals', icon: Handshake }] },
@@ -24,7 +24,7 @@ export const PRIMARY_NAV_SECTIONS: { label: string | null; tone: NavTone; items:
   { label: null, tone: 'service', items: [{ name: 'Parts', path: '/parts', icon: PackageSearch }] },
   { label: null, tone: null, items: [{ name: 'Media', path: '/media', icon: Images }] },
   { label: null, tone: null, items: [{ name: 'Documents', path: '/documents', icon: Files }] },
-  { label: null, tone: null, items: [{ name: 'Owners Corner', path: '/owners-corner', icon: Crown }] },
+  { label: null, tone: null, items: [{ name: 'Owners Corner', path: '/owners-corner', icon: Crown, ownerOnly: true }] },
 ];
 
 export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof LayoutDashboard }[] = [
@@ -72,6 +72,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { items: notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const { dragging, activeTarget } = useCustomerDrag();
   const navigate = useNavigate();
+  const location = useLocation();
   const [locOpen, setLocOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -88,7 +89,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const roleLabels: Record<string, string> = {
     owner_manager: 'Manager',
-    service_manager: 'Service Manager',
+    service_manager: 'Service / Store Manager',
     salesperson: 'Salesperson',
     technician: 'Technician',
   };
@@ -104,6 +105,11 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('suggestions') === 'open') setSuggestionOpen(true);
+  }, [location.search]);
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -147,7 +153,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   {section.label}
                 </span>
               )}
-              {section.items.map((item) => {
+              {section.items.filter(item => !item.ownerOnly || profile?.role === 'owner_manager').map((item) => {
                 const isDropNav = NAV_DROP_PATHS.has(item.path);
                 const isDropHover = activeTarget === `nav:${item.path}`;
                 return (

@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PRIMARY_NAV_SECTIONS, SECONDARY_NAV_ITEMS, NAV_TONE, type NavTone } from './Header';
+import { useAuth } from '@/contexts/AuthContext';
 
 const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
   const t = NAV_TONE[tone ?? 'neutral'];
@@ -17,6 +18,8 @@ const linkClass = (tone: NavTone) => ({ isActive }: { isActive: boolean }) => {
  * Reports, Settings) live so the top bar stays focused on floor operations.
  */
 export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { profile } = useAuth();
+
   return (
     <div>
       {/* Overlay */}
@@ -49,7 +52,7 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
             </div>
             <div className="space-y-1">
               {PRIMARY_NAV_SECTIONS.map((section) =>
-                section.items.map((item) => (
+                section.items.filter(item => !item.ownerOnly || profile?.role === 'owner_manager').map((item) => (
                   <NavLink key={item.path} to={item.path} onClick={onClose} className={linkClass(section.tone)}>
                     <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
                     {item.name}

@@ -7,6 +7,7 @@ import { useFixItFeed, useFixItActiveCount } from '@/hooks/useFixItFeed';
 import { useAuth } from '@/contexts/AuthContext';
 import NewCustomerWizard from '@/components/NewCustomerWizard';
 import FixItFeed from '@/components/FixItFeed';
+import { useFixItAccess } from '@/hooks/useFixItAccess';
 
 const typeColors: Record<string, string> = {
   Lead: 'bg-purple-500/15 text-purple-300',
@@ -21,18 +22,20 @@ const typeColors: Record<string, string> = {
  */
 export default function AdminRail() {
   const [open, setOpen] = useState(() => localStorage.getItem('spas360.adminRail') === 'open');
-  const [activePanel, setActivePanel] = useState<'contacts' | 'fixit'>(() => (
+  const [selectedPanel, setSelectedPanel] = useState<'contacts' | 'fixit'>(() => (
     localStorage.getItem('spas360.adminRailPanel') === 'fixit' ? 'fixit' : 'contacts'
   ));
   const [showWizard, setShowWizard] = useState(false);
   const { profile } = useAuth();
+  const { canUseFixIt } = useFixItAccess();
   const notTech = profile?.role !== 'technician';
+  const activePanel = canUseFixIt && selectedPanel === 'fixit' ? 'fixit' : 'contacts';
   // Collapsed rail = a 48px strip on every page. The heavy work (multi-page
   // contact fetch, feed posts + signed URLs + 3-table realtime) only runs
   // once the rail is actually open; the badge uses a head-count query.
   const { contacts, searchQuery, setSearchQuery, refresh } = useContacts(notTech && open);
-  const fixItFeed = useFixItFeed(notTech && open);
-  const fixItCount = useFixItActiveCount(notTech);
+  const fixItFeed = useFixItFeed(canUseFixIt && notTech && open && activePanel === 'fixit');
+  const fixItCount = useFixItActiveCount(canUseFixIt && notTech);
   const navigate = useNavigate();
 
   // Techs live in the schedule — no admin chrome for them
@@ -46,7 +49,7 @@ export default function AdminRail() {
   };
 
   const selectPanel = (panel: 'contacts' | 'fixit') => {
-    setActivePanel(panel);
+    setSelectedPanel(panel);
     localStorage.setItem('spas360.adminRailPanel', panel);
   };
 
@@ -73,7 +76,7 @@ export default function AdminRail() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-1 p-2 border-b border-ink-800 shrink-0 bg-ink-950/40">
+          <div className={cn('grid gap-1 p-2 border-b border-ink-800 shrink-0 bg-ink-950/40', canUseFixIt ? 'grid-cols-2' : 'grid-cols-1')}>
             <button
               type="button"
               onClick={() => selectPanel('contacts')}
@@ -84,21 +87,23 @@ export default function AdminRail() {
             >
               <Contact className="w-3.5 h-3.5" /> Contacts
             </button>
-            <button
-              type="button"
-              onClick={() => selectPanel('fixit')}
-              className={cn(
-                'flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition-colors',
-                activePanel === 'fixit' ? 'bg-brand-500 text-white' : 'text-ink-400 hover:text-ink-100 hover:bg-ink-800'
-              )}
-            >
-              <Wrench className="w-3.5 h-3.5" /> Feed
-              {fixItCount > 0 && (
-                <span className={cn('rounded px-1.5 py-0.5 text-[10px]', activePanel === 'fixit' ? 'bg-white/20 text-white' : 'bg-brand-500/15 text-brand-300')}>
-                  {fixItCount}
-                </span>
-              )}
-            </button>
+            {canUseFixIt && (
+              <button
+                type="button"
+                onClick={() => selectPanel('fixit')}
+                className={cn(
+                  'flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition-colors',
+                  activePanel === 'fixit' ? 'bg-brand-500 text-white' : 'text-ink-400 hover:text-ink-100 hover:bg-ink-800'
+                )}
+              >
+                <Wrench className="w-3.5 h-3.5" /> Feed
+                {fixItCount > 0 && (
+                  <span className={cn('rounded px-1.5 py-0.5 text-[10px]', activePanel === 'fixit' ? 'bg-white/20 text-white' : 'bg-brand-500/15 text-brand-300')}>
+                    {fixItCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           {activePanel === 'contacts' ? (
@@ -164,7 +169,7 @@ export default function AdminRail() {
         >
           <ChevronLeft className="w-4 h-4" />
           <Contact className="w-5 h-5" />
-          {fixItCount > 0 && (
+          {canUseFixIt && fixItCount > 0 && (
             <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-bold flex items-center justify-center">
               {fixItCount}
             </span>

@@ -70,23 +70,6 @@ export function useMediaLibrary(): UseMediaLibraryResult {
     setIsLoading(true);
     setError(null);
 
-    // Confirm the one authorized source post belongs to the signed-in user's
-    // organization before reading any attachment metadata.
-    const { data: sourcePost, error: postError } = await supabase
-      .from('fix_it_posts')
-      .select('id')
-      .eq('id', MEDIA_LIBRARY_POST_ID)
-      .eq('org_id', profile.org_id)
-      .maybeSingle();
-
-    if (postError || !sourcePost) {
-      setAssets([]);
-      setUnavailableCount(0);
-      setError('The saved media library is not available for this organization.');
-      setIsLoading(false);
-      return;
-    }
-
     const { data, error: attachmentError } = await supabase
       .from('fix_it_attachments')
       .select('id,name,mime_type,size,storage_path,created_at')

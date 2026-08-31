@@ -33,7 +33,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(header, /name: 'Parts', path: '\/parts', icon: PackageSearch/);
     assert.match(header, /name: 'Media', path: '\/media', icon: Images/);
     assert.match(header, /name: 'Documents', path: '\/documents', icon: Files/);
-    assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown/);
+    assert.match(header, /name: 'Owners Corner', path: '\/owners-corner', icon: Crown, ownerOnly: true/);
     assert.match(header, /<nav className="hidden min-w-0 flex-1 items-center justify-evenly lg:flex">/);
     assert.match(header, /gap-1\.5 sm:gap-4 lg:gap-2 2xl:gap-4/);
     assert.match(header, /px-1\.5[^"]*text-\[12px\][^"]*2xl:px-2\.5[^"]*2xl:text-\[13px\]/);

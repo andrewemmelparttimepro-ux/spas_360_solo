@@ -11,12 +11,25 @@ import {
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 describe('Suggestion Box access model', () => {
-  it('gives review controls only to manager roles', () => {
+  it('gives review controls only to owner accounts', () => {
     assert.equal(canReviewSuggestions('owner_manager'), true);
-    assert.equal(canReviewSuggestions('service_manager'), true);
+    assert.equal(canReviewSuggestions('service_manager'), false);
     assert.equal(canReviewSuggestions('salesperson'), false);
     assert.equal(canReviewSuggestions('technician'), false);
     assert.equal(canReviewSuggestions(null), false);
+  });
+
+  it('notifies Brandon through the in-app notification inbox after every submission', async () => {
+    const [migration, header] = await Promise.all([
+      read('supabase/migrations/20260831185000_limit_fix_it_and_route_suggestions.sql'),
+      read('src/components/layout/Header.tsx'),
+    ]);
+
+    assert.match(migration, /create trigger suggestions_notify_brandon/i);
+    assert.match(migration, /lower\(profile\.email\) = 'brandon_solem@hotmail\.com'/i);
+    assert.match(migration, /insert into public\.notifications/i);
+    assert.match(migration, /'\/dashboard\?suggestions=open'/);
+    assert.match(header, /params\.get\('suggestions'\) === 'open'/);
   });
 
   it('normalizes human input to the database length boundary', () => {

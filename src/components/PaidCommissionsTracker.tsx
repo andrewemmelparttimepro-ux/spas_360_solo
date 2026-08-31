@@ -127,7 +127,7 @@ function CommissionEditor({ entry, onCancel, onSave }: { entry: PaidCommission |
   const [commissionPercentage, setCommissionPercentage] = useState(entry ? String(entry.commission_percentage) : '');
   const [saving, setSaving] = useState(false);
   const values = { customerName, saleAmount: Number(saleAmount), commissionPercentage: Number(commissionPercentage) };
-  const valid = paidCommissionValuesValid(values);
+  const valid = commissionPercentage.trim() !== '' && paidCommissionValuesValid(values);
   return (
     <form className="space-y-3 border-t border-ink-700 bg-ink-900 p-4" onSubmit={async event => { event.preventDefault(); if (!valid) return; setSaving(true); const saved = await onSave(values); if (!saved) setSaving(false); }}>
       <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-ink-100">{entry ? 'Edit paid sale' : 'Add paid sale'}</h4><button type="button" aria-label="Close commission editor" onClick={onCancel} className="rounded p-1 text-ink-500 hover:text-ink-200"><X className="h-4 w-4" /></button></div>

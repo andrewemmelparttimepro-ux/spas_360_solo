@@ -50,12 +50,14 @@ describe('paid commissions tracker', () => {
     assert.match(migration, /alter table public\.paid_commissions enable row level security/i);
     assert.match(migration, /for select[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
     assert.match(migration, /for insert[\s\S]*created_by = \(select auth\.uid\(\)\)[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
+    assert.match(migration, /create index paid_commissions_created_by_idx[\s\S]*on public\.paid_commissions \(created_by\)/i);
     assert.match(migration, /for update[\s\S]*using[\s\S]*auth_role\(\)\) = 'owner_manager'[\s\S]*with check[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
     assert.match(migration, /for delete[\s\S]*auth_role\(\)\) = 'owner_manager'/i);
     assert.match(migration, /revoke all on table public\.paid_commissions from anon, authenticated/i);
     assert.match(migration, /grant select[\s\S]*grant insert[\s\S]*grant update[\s\S]*grant delete/i);
     assert.match(hook, /\.from\('paid_commissions'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*\.eq\('commission_month', monthDate\)/);
     assert.match(hook, /\.insert\([\s\S]*created_by: profile\.id/);
+    assert.match(component, /commissionPercentage\.trim\(\) !== ''/);
     assert.match(hook, /\.update\(values\)\.eq\('id', id\)\.eq\('org_id', profile\.org_id\)/);
     assert.match(hook, /\.delete\(\)[\s\S]*\.eq\('id', id\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
     assert.match(component, /useState\(currentMonth\)/);

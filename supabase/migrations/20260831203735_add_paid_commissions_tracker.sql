@@ -30,6 +30,9 @@ create table public.paid_commissions (
 create index paid_commissions_org_month_salesperson_idx
   on public.paid_commissions (org_id, commission_month desc, salesperson_name, created_at, id);
 
+create index paid_commissions_created_by_idx
+  on public.paid_commissions (created_by);
+
 create trigger paid_commissions_set_updated_at
   before update on public.paid_commissions
   for each row execute function public.update_updated_at();

@@ -46,10 +46,10 @@ describe('inventory age', () => {
     assert.equal(inventoryAgeLabelForItem('2026-02-30', '2026-08-20T18:00:00Z', today), '—');
   });
 
-  it('places Inventory Age before the split Customer, Stock, and Order Date columns', async () => {
+  it('places Inventory Age before the Customer, Status, Order Date, and Date Received columns', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
 
-    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Stock<\/th>[\s\S]*Order Date<\/th>[\s\S]*Date Received<\/th>/);
+    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Status<\/th>[\s\S]*Order Date<\/th>[\s\S]*Date Received<\/th>/);
     assert.match(inventory, /inventoryAgeLabelForItem\(item\.date_received, item\.created_at\)/);
     assert.match(inventory, /const columnCount = showStore \? 12 : 11;/);
   });

@@ -522,7 +522,7 @@ export default function Inventory() {
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Age</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Customer</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Stock</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Status</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Order Date</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Date Received</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>

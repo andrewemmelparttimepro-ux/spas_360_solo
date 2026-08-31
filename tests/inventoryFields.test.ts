@@ -104,6 +104,19 @@ describe('inventory customer or stock field', () => {
     );
   });
 
+  it('unassigns only the customer fields and preserves unrelated note segments', () => {
+    assert.deepEqual(
+      inventoryCustomerStockUpdate(
+        'Flooring: Wells Fargo · Customer: Brandon Solem · Ordered: 8/30/2026',
+        { kind: 'stationary', value: 'Stock' },
+      ),
+      {
+        customer_id: null,
+        notes: 'Flooring: Wells Fargo · Customer: STOCK · Ordered: 8/30/2026',
+      },
+    );
+  });
+
   it('renders the imported customer value and normalizes the Stock label', () => {
     assert.equal(inventoryCustomerOrStock('Import metadata · Customer: Jane Doe · Need to order: No', null), 'Jane Doe');
     assert.equal(inventoryCustomerOrStock('Import metadata · Customer: STOCK', null), 'Stock');

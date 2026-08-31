@@ -20,7 +20,7 @@ import {
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 import { inventoryAgeLabel } from '@/lib/inventoryAge';
-import { effectiveInventoryCustomer } from '@/lib/inventoryDealAssignment';
+import { effectiveInventoryCustomer, hasManagedInventoryAssignment } from '@/lib/inventoryDealAssignment';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
 const INVENTORY_GROUP_HEADER_CELL_CLASS = 'px-3 py-1 text-left';
@@ -219,6 +219,7 @@ function CustomerCell({
     ? `${effectiveCustomer.first_name} ${effectiveCustomer.last_name}`.trim()
     : null;
   const value = currentCustomerName || ((effectiveCustomer?.id ?? item.customer_id) ? 'Customer' : '-');
+  const managedAssignment = hasManagedInventoryAssignment(item);
 
   useEffect(() => {
     if (!editing) return;
@@ -271,17 +272,13 @@ function CustomerCell({
     return () => { cancelled = true; };
   }, [debouncedQuery, editing, profile]);
 
-  const saveChoice = async (customer: CustomerChoice) => {
+  const saveCustomerUpdate = async (updates: Partial<InventoryItem>) => {
     if (saving) return;
     setSaving(true);
     setSaveError(null);
     let saved = false;
     try {
-      saved = await onSave(item.id, inventoryCustomerStockUpdate(item.notes, {
-        kind: 'customer',
-        customerId: customer.id,
-        customerName: `${customer.first_name} ${customer.last_name}`.trim(),
-      }));
+      saved = await onSave(item.id, updates);
     } catch {
       saved = false;
     } finally {
@@ -294,12 +291,27 @@ function CustomerCell({
     setSaveError('Could not save. Try again.');
   };
 
+  const saveChoice = (customer: CustomerChoice) => saveCustomerUpdate(
+    inventoryCustomerStockUpdate(item.notes, {
+      kind: 'customer',
+      customerId: customer.id,
+      customerName: `${customer.first_name} ${customer.last_name}`.trim(),
+    }),
+  );
+
+  const saveUnassignment = () => saveCustomerUpdate(
+    inventoryCustomerStockUpdate(item.notes, {
+      kind: 'stationary',
+      value: 'Stock',
+    }),
+  );
+
   if (!editing) {
-    if (item.dealAssignment) {
+    if (managedAssignment) {
       return (
         <span
           className="inline-flex min-h-6 items-center rounded px-1.5 py-0.5 -mx-1.5"
-          title="Assigned from Deal Detail"
+          title="Managed by a linked deal or job"
         >
           {value}
         </span>
@@ -344,6 +356,14 @@ function CustomerCell({
         </button>
       </div>
       <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-ink-700 bg-ink-950 shadow-xl">
+        <button
+          type="button"
+          onClick={() => void saveUnassignment()}
+          disabled={saving}
+          className="block w-full border-b border-ink-800 px-3 py-2 text-left text-xs font-semibold text-ink-200 hover:bg-brand-500/10 disabled:opacity-50"
+        >
+          Unassign Customer
+        </button>
         <Link
           to="/customers"
           state={{ openWizard: true }}

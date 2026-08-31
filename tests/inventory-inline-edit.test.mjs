@@ -49,6 +49,20 @@ describe('inventory inline edit persistence contract', () => {
     assert.match(hook, /customer:customer_id\(id, first_name, last_name, phone, customer_type\)/);
   });
 
+  it('keeps a stationary Unassign Customer action outside customer search results', async () => {
+    const inventory = await read('src/pages/Inventory.tsx');
+    const customerCell = inventory.slice(
+      inventory.indexOf('function CustomerCell'),
+      inventory.indexOf('type CustomerChoice'),
+    );
+
+    assert.match(customerCell, /const saveUnassignment = \(\) => saveCustomerUpdate\([\s\S]*kind: 'stationary',[\s\S]*value: 'Stock'/);
+    assert.match(customerCell, /onClick=\{\(\) => void saveUnassignment\(\)\}[\s\S]*Unassign Customer/);
+    assert.ok(customerCell.indexOf('Unassign Customer') < customerCell.indexOf('{matches.map'));
+    assert.match(customerCell, /hasManagedInventoryAssignment\(item\)/);
+    assert.match(customerCell, /title="Managed by a linked deal or job"/);
+  });
+
   it('persists Stock and Order Date independently from operational assignment fields', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
 

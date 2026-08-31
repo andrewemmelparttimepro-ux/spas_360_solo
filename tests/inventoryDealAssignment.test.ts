@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   effectiveInventoryCustomer,
+  hasManagedInventoryAssignment,
   isAvailableInventoryStock,
   mergeInventoryDealAssignments,
 } from '../src/lib/inventoryDealAssignment.ts';
@@ -85,6 +86,29 @@ describe('inventory deal assignment display', () => {
       'Stock',
     );
     assert.equal(isAvailableInventoryStock(unassigned), true);
+  });
+
+  it('does not count direct customer, deal, or job assignments as available stock', () => {
+    const [directCustomer] = mergeInventoryDealAssignments(
+      [{
+        ...inventory('reserved-unit', '101049998'),
+        customer_id: 'customer-1',
+        customer: {
+          id: 'customer-1', first_name: 'Brandon', last_name: 'Solem',
+          phone: '555-0101', customer_type: 'Customer',
+        },
+      }],
+      [],
+    );
+    const [jobLinked] = mergeInventoryDealAssignments(
+      [{ ...inventory('job-unit', '101049997'), job_id: 'job-1' }],
+      [],
+    );
+
+    assert.equal(hasManagedInventoryAssignment(directCustomer), false);
+    assert.equal(isAvailableInventoryStock(directCustomer), false);
+    assert.equal(hasManagedInventoryAssignment(jobLinked), true);
+    assert.equal(isAvailableInventoryStock(jobLinked), false);
   });
 
   it('refreshes Inventory on deal changes and rejects a zero-row attachment update', async () => {

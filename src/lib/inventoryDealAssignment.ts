@@ -54,6 +54,15 @@ export function effectiveInventoryCustomer(item: InventoryWithDealAssignment) {
   return item.dealAssignment?.customer ?? item.customer;
 }
 
+export function hasManagedInventoryAssignment(item: Pick<
+  InventoryWithDealAssignment,
+  'dealAssignment' | 'deal_id' | 'job_id'
+>) {
+  return item.dealAssignment !== null || item.deal_id !== null || item.job_id !== null;
+}
+
 export function isAvailableInventoryStock(item: InventoryWithDealAssignment) {
-  return item.status === 'In Stock' && item.dealAssignment === null;
+  return item.status === 'In Stock'
+    && item.customer_id === null
+    && !hasManagedInventoryAssignment(item);
 }

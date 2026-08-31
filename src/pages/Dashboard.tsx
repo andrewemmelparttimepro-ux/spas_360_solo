@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Users, Wrench, Package, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,7 +18,6 @@ import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 
 const statMeta = [
   { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
@@ -37,7 +36,6 @@ export default function Dashboard() {
   const [appliedCustomRange, setAppliedCustomRange] = useState<DashboardCustomRange | null>(null);
   const [revenueFilters, setRevenueFilters] = useState(DEFAULT_DASHBOARD_REVENUE_FILTERS);
   const [showCreate, setShowCreate] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const {
     stats,
     upcomingTasks,
@@ -77,26 +75,6 @@ export default function Dashboard() {
     setAppliedCustomRange(customCandidate);
     setAppliedPeriod('custom');
   };
-
-  const loadLogo = useCallback(async () => {
-    if (!profile) return;
-    const { data } = await supabase
-      .from('business_profile')
-      .select('logo_storage_path')
-      .eq('org_id', profile.org_id)
-      .maybeSingle();
-    const path = data?.logo_storage_path as string | null | undefined;
-    if (!path) {
-      setLogoUrl(null);
-      return;
-    }
-    const { data: signed } = await supabase.storage.from('ari-assets').createSignedUrl(path, 3600);
-    setLogoUrl(signed?.signedUrl ?? null);
-  }, [profile]);
-
-  useEffect(() => {
-    void loadLogo();
-  }, [loadLogo]);
 
   if (isLoading) {
     return (
@@ -148,8 +126,8 @@ export default function Dashboard() {
             </h2>
             <p className="mt-0.5 text-[13px] text-ink-300 truncate">Your dealership pulse, personalized for the team.</p>
           </div>
-          <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
-            <img src={logoUrl ?? '/logo-mark.png'} alt="Spas 360 business logo" className="max-h-full max-w-full object-contain" />
+          <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm sm:h-[72px] sm:w-28">
+            <img src="/mchl-duck.png" alt="Magic City Home Leisure duck logo" className="max-h-full max-w-full object-contain" />
           </div>
         </div>
       </section>

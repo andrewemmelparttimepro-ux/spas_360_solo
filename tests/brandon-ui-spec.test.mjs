@@ -193,13 +193,13 @@ describe('Brandon composite UI contract', () => {
     assert.match(css, /\.app-main \.schedule-calendar \.text-purple-200\s*\{\s*color:\s*var\(--color-purple-200\) !important;/i);
   });
 
-  it('keeps the personalized dashboard welcome and approved-logo lookup', async () => {
+  it('keeps the personalized dashboard welcome with Brandon supplied duck artwork', async () => {
     const dashboard = await read('src/pages/Dashboard.tsx');
 
     assert.match(dashboard, /Welcome back/);
-    assert.match(dashboard, /from\('business_profile'\)/);
-    assert.match(dashboard, /select\('logo_storage_path'\)/);
     assert.match(dashboard, /dashboard-welcome/);
-    assert.match(dashboard, /alt="Spas 360 business logo"/);
+    assert.match(dashboard, /src="\/mchl-duck\.png"/);
+    assert.match(dashboard, /alt="Magic City Home Leisure duck logo"/);
+    assert.match(dashboard, /h-16 w-24[^\"]*sm:h-\[72px\] sm:w-28/);
   });
 });

@@ -13,7 +13,7 @@
     "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts",
     "test:deal-stage": "node --experimental-strip-types --test tests/dealStage.test.ts",
     "test:job-photos": "node --test tests/jobPhotoPolicy.test.mjs",
-    "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs tests/customerAddress.test.ts tests/customerMajorUnits.test.ts tests/dashboardPeriods.test.ts tests/dashboardRevenueFilters.test.ts tests/dealOwnerFilter.test.ts tests/fixItClosureFlow.test.ts tests/jobContactDetails.test.ts tests/upcomingTasks.test.ts",
+    "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs tests/customerAddress.test.ts tests/customerMajorUnits.test.ts tests/dashboardPeriods.test.ts tests/dashboardRevenueFilters.test.ts tests/dealOwnerFilter.test.ts tests/fixItClosureFlow.test.ts tests/jobContactDetails.test.ts tests/ownersReport.test.ts tests/upcomingTasks.test.ts",
     "test:dashboard-revenue": "node --experimental-strip-types --test tests/dashboardRevenueFilters.test.ts",
     "test:customer-notes": "node --experimental-strip-types --test tests/customerNotes.test.ts",
     "test:suggestions": "node --experimental-strip-types --test tests/suggestionBox.test.ts",

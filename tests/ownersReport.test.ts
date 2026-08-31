@@ -132,6 +132,7 @@ describe('Owners Corner sales reports', () => {
     assert.match(page, /nextRanges[\s\S]*openPrintablePdf\(nextRanges, selectedPreset\)/);
     assert.match(pdf, /window\.open\('', '_blank'\)[\s\S]*preview\.location\.replace\(url\)/);
     assert.match(pdf, /fetch\('\/mchl-duck-dashboard\.png'/);
+    assert.match(pdf, /createImageBitmap[\s\S]*getImageData[\s\S]*printableGray = Math\.round\(gray \* alpha \+ 255 \* \(1 - alpha\)\)[\s\S]*image\.data\[index\] = printableGray;[\s\S]*image\.data\[index \+ 1\] = printableGray;[\s\S]*image\.data\[index \+ 2\] = printableGray;[\s\S]*image\.data\[index \+ 3\] = 255;[\s\S]*duckLogoImage: image/);
     assert.doesNotMatch(pdf, /\.save\(|\.download\s*=/);
     assert.match(hook, /\.from\('deals'\)[\s\S]*\.eq\('org_id', orgId\)/);
     assert.match(hook, /DEAL_PAGE_SIZE = 1000[\s\S]*\.range\(from, from \+ DEAL_PAGE_SIZE - 1\)/);
@@ -140,11 +141,22 @@ describe('Owners Corner sales reports', () => {
     assert.match(hook, /\.neq\('id', THRAWN_PROFILE_ID\)/);
   });
 
+  it('keeps every explicit PDF and preview color in the monochrome palette', async () => {
+    const pdf = await read('src/lib/ownersReportPdf.ts');
+    const colors = [...pdf.matchAll(/#[0-9a-f]{6}/gi)].map(match => match[0].toLowerCase());
+    assert.ok(colors.length > 0);
+    for (const color of colors) {
+      assert.equal(color.slice(1, 3), color.slice(3, 5), `${color} has different red and green channels`);
+      assert.equal(color.slice(3, 5), color.slice(5, 7), `${color} has different green and blue channels`);
+    }
+    assert.match(pdf, /doc\.setFillColor\(COLORS\.white\);[\s\S]*doc\.rect\(0, 0, pageWidth, pageHeight, 'F'\)/);
+    assert.match(pdf, /assertMonochromeLogo\(input\.duckLogoImage\)[\s\S]*doc\.addImage\(input\.duckLogoImage, 'RGBA',[\s\S]*\(pageWidth - 56\) \/ 2/);
+  });
+
   it('builds a viewable PDF with applied filters, periods, deals, delta, and closing-rate tables', async () => {
     const currentDeals = [deals[0], deals[2]];
     const comparedDeals = [deals[3]];
-    const duckBytes = await readFile(new URL('../public/mchl-duck-dashboard.png', import.meta.url));
-    const bytes = await buildOwnersReportPdf({
+    const input: Parameters<typeof buildOwnersReportPdf>[0] = {
       generatedAt: new Date('2026-08-30T20:00:00-05:00'),
       outcome: 'won',
       store: 'All Stores',
@@ -158,8 +170,9 @@ describe('Owners Corner sales reports', () => {
       storeNames: new Map([['s1', 'North'], ['s2', 'South']]),
       salespersonNames: new Map([['p1', 'Alex'], ['p2', 'Blair']]),
       grossSalesRanking: salespersonGrossRanking(currentDeals, new Map([['p1', 'Alex'], ['p2', 'Blair']])),
-      duckLogoDataUrl: `data:image/png;base64,${duckBytes.toString('base64')}`,
-    });
+      duckLogoImage: { data: new Uint8ClampedArray([0, 0, 0, 255]), width: 1, height: 1 },
+    };
+    const bytes = await buildOwnersReportPdf(input);
     assert.equal(Buffer.from(bytes.subarray(0, 5)).toString('ascii'), '%PDF-');
     const source = Buffer.from(bytes).toString('latin1');
     assert.match(source, /\(Sales Outcome\) Tj/);
@@ -172,5 +185,19 @@ describe('Owners Corner sales reports', () => {
     assert.match(source, /Salesperson Gross Sales Ranking/);
     assert.match(source, /Salesperson Total/);
     assert.match(source, /\/Subtype \/Image/);
+    await assert.rejects(
+      buildOwnersReportPdf({
+        ...input,
+        duckLogoImage: { data: new Uint8ClampedArray([0, 1, 0, 255]), width: 1, height: 1 },
+      }),
+      /logo must be monochrome/,
+    );
+    await assert.rejects(
+      buildOwnersReportPdf({
+        ...input,
+        duckLogoImage: { data: new Uint8ClampedArray([0, 0, 0, 0]), width: 1, height: 1 },
+      }),
+      /logo must be opaque on white/,
+    );
   });
 });

@@ -22,7 +22,7 @@ export interface OwnersReportPdfInput {
   storeNames: Map<string, string>;
   salespersonNames: Map<string, string>;
   grossSalesRanking: SalespersonGrossRankingRow[];
-  duckLogoDataUrl?: string;
+  duckLogoImage?: { data: Uint8ClampedArray; width: number; height: number };
 }
 
 export interface SalespersonGrossRankingRow {
@@ -34,15 +34,12 @@ export interface SalespersonGrossRankingRow {
 }
 
 const COLORS = {
-  ink: '#111a2a',
-  muted: '#667085',
-  blue: '#168eea',
-  paleBlue: '#e8f3fc',
-  paleAmber: '#fff6df',
-  amber: '#a46100',
-  rule: '#d6dde7',
+  ink: '#000000',
+  muted: '#4d4d4d',
+  summary: '#f2f2f2',
+  tableHeader: '#e6e6e6',
+  rule: '#b8b8b8',
   white: '#ffffff',
-  background: '#f7f3eb',
 };
 
 const money = new Intl.NumberFormat('en-US', {
@@ -78,6 +75,17 @@ function signedMoney(value: number): string {
 
 function signedNumber(value: number): string {
   return value > 0 ? `+${value}` : String(value);
+}
+
+function assertMonochromeLogo(image: NonNullable<OwnersReportPdfInput['duckLogoImage']>): void {
+  for (let index = 0; index < image.data.length; index += 4) {
+    if (image.data[index] !== image.data[index + 1] || image.data[index + 1] !== image.data[index + 2]) {
+      throw new Error('Owners Corner PDF logo must be monochrome.');
+    }
+    if (image.data[index + 3] !== 255) {
+      throw new Error('Owners Corner PDF logo must be opaque on white.');
+    }
+  }
 }
 
 export function salespersonGrossRanking(
@@ -117,12 +125,15 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   let y = 132;
 
   const drawPageFrame = (continued = false) => {
-    doc.setFillColor(COLORS.background);
+    doc.setFillColor(COLORS.white);
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
-    doc.setFillColor(COLORS.ink);
-    doc.rect(0, 0, pageWidth, 92, 'F');
-    if (input.duckLogoDataUrl) doc.addImage(input.duckLogoDataUrl, 'PNG', (pageWidth - 56) / 2, 8, 56, 70, undefined, 'FAST');
-    doc.setTextColor('#becada');
+    if (input.duckLogoImage) {
+      assertMonochromeLogo(input.duckLogoImage);
+      doc.addImage(input.duckLogoImage, 'RGBA', (pageWidth - 56) / 2, 8, 56, 70, undefined, 'FAST');
+    }
+    doc.setDrawColor(COLORS.ink);
+    doc.line(margin, 92, pageWidth - margin, 92);
+    doc.setTextColor(COLORS.ink);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.text(continued ? 'OWNERS CORNER REPORT - CONTINUED' : 'OWNERS CORNER REPORT', pageWidth - margin, 76, { align: 'right' });
@@ -148,12 +159,11 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     y += size + 10;
   };
 
-  const summaryCard = (label: string, range: string, count: number, amount: number, x: number, width: number, tone: 'blue' | 'amber' = 'blue') => {
-    const fill = tone === 'amber' ? COLORS.paleAmber : COLORS.paleBlue;
-    const accent = tone === 'amber' ? COLORS.amber : COLORS.blue;
-    doc.setFillColor(fill);
-    doc.roundedRect(x, y, width, 68, 6, 6, 'F');
-    doc.setTextColor(accent);
+  const summaryCard = (label: string, range: string, count: number, amount: number, x: number, width: number, comparison = false) => {
+    doc.setFillColor(COLORS.summary);
+    doc.setDrawColor(COLORS.rule);
+    doc.roundedRect(x, y, width, 68, 6, 6, 'FD');
+    doc.setTextColor(COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.text(cleanPdfText(label).toUpperCase(), x + 10, y + 15);
@@ -164,8 +174,8 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     doc.setTextColor(COLORS.ink);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
-    doc.text(tone === 'amber' ? signedNumber(count) : String(count), x + 10, y + 53);
-    doc.text(cleanPdfText(tone === 'amber' ? signedMoney(amount) : money.format(amount)), x + width - 10, y + 53, { align: 'right' });
+    doc.text(comparison ? signedNumber(count) : String(count), x + 10, y + 53);
+    doc.text(cleanPdfText(comparison ? signedMoney(amount) : money.format(amount)), x + width - 10, y + 53, { align: 'right' });
   };
 
   const drawDealTable = (period: OwnersReportPdfPeriod) => {
@@ -179,7 +189,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     ];
     const drawHeader = () => {
       ensureRoom(28);
-      doc.setFillColor('#e7ebf0');
+      doc.setFillColor(COLORS.tableHeader);
       doc.rect(margin, y, contentWidth, 22, 'F');
       doc.setTextColor(COLORS.muted);
       doc.setFont('helvetica', 'bold');
@@ -211,7 +221,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
       }
       doc.setDrawColor(COLORS.rule);
       doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
-      doc.setTextColor('#263548');
+      doc.setTextColor(COLORS.ink);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.25);
       doc.text(dealLines, columns[0].x + 5, y + 14);
@@ -229,7 +239,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     const positions = [margin, margin + 270, margin + 360, margin + 446, pageWidth - margin];
     const drawHeader = () => {
       ensureRoom(25);
-      doc.setFillColor('#e7ebf0');
+      doc.setFillColor(COLORS.tableHeader);
       doc.rect(margin, y, contentWidth, 22, 'F');
       doc.setTextColor(COLORS.muted);
       doc.setFont('helvetica', 'bold');
@@ -257,7 +267,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
       }
       doc.setDrawColor(COLORS.rule);
       doc.line(margin, y + 23, pageWidth - margin, y + 23);
-      doc.setTextColor('#263548');
+      doc.setTextColor(COLORS.ink);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.text(cleanPdfText(row.name), positions[0] + 5, y + 15, { maxWidth: positions[1] - positions[0] - 10 });
@@ -287,8 +297,9 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
     input.grossSalesRanking.forEach((salesperson, rankIndex) => {
       const drawSalespersonHeader = (continued = false) => {
         ensureRoom(52);
-        doc.setFillColor(COLORS.paleBlue);
-        doc.roundedRect(margin, y, contentWidth, 34, 5, 5, 'F');
+        doc.setFillColor(COLORS.summary);
+        doc.setDrawColor(COLORS.rule);
+        doc.roundedRect(margin, y, contentWidth, 34, 5, 5, 'FD');
         doc.setTextColor(COLORS.ink);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -298,7 +309,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
         doc.setFontSize(12);
         doc.text(cleanPdfText(money.format(salesperson.totalAmount)), pageWidth - margin - 9, y + 21, { align: 'right' });
         y += 40;
-        doc.setFillColor('#e7ebf0');
+        doc.setFillColor(COLORS.tableHeader);
         doc.rect(margin, y, contentWidth, 20, 'F');
         doc.setTextColor(COLORS.muted);
         doc.setFont('helvetica', 'bold');
@@ -319,7 +330,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
         }
         doc.setDrawColor(COLORS.rule);
         doc.line(margin, y + rowHeight, pageWidth - margin, y + rowHeight);
-        doc.setTextColor('#263548');
+        doc.setTextColor(COLORS.ink);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.25);
         doc.text(titleLines, margin + 6, y + 14);
@@ -328,7 +339,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
         y += rowHeight;
       }
       ensureRoom(30);
-      doc.setFillColor('#ffffff');
+      doc.setFillColor(COLORS.white);
       doc.rect(margin, y, contentWidth, 24, 'F');
       doc.setTextColor(COLORS.ink);
       doc.setFont('helvetica', 'bold');
@@ -352,8 +363,9 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   doc.text(`Generated ${cleanPdfText(input.generatedAt.toLocaleString())}`, margin, y);
   y += 20;
 
-  doc.setFillColor('#ffffff');
-  doc.roundedRect(margin, y, contentWidth, 58, 6, 6, 'F');
+  doc.setFillColor(COLORS.white);
+  doc.setDrawColor(COLORS.rule);
+  doc.roundedRect(margin, y, contentWidth, 58, 6, 6, 'FD');
   doc.setFontSize(8.5);
   doc.setTextColor(COLORS.muted);
   const filters = [
@@ -380,7 +392,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   summaryCard(input.current.title, input.current.range, input.current.totalCount, input.current.totalAmount, margin, summaryWidth);
   if (input.comparedTo) {
     summaryCard(input.comparedTo.title, input.comparedTo.range, input.comparedTo.totalCount, input.comparedTo.totalAmount, margin + summaryWidth + summaryGap, summaryWidth);
-    summaryCard('Comparison delta', 'First period minus Compared to', input.delta?.count ?? 0, input.delta?.amount ?? 0, margin + (summaryWidth + summaryGap) * 2, summaryWidth, 'amber');
+    summaryCard('Comparison delta', 'First period minus Compared to', input.delta?.count ?? 0, input.delta?.amount ?? 0, margin + (summaryWidth + summaryGap) * 2, summaryWidth, true);
   }
   y += 84;
 
@@ -419,19 +431,35 @@ export async function viewOwnersReportPdf(input: OwnersReportPdfInput): Promise<
   if (!preview) throw new Error('Allow pop-ups for SPAS 360 to view this printable PDF.');
   preview.opener = null;
   preview.document.title = 'Preparing Owners Corner report';
-  preview.document.body.style.cssText = 'margin:0;display:grid;place-items:center;min-height:100vh;background:#111a2a;color:white;font:600 16px system-ui,sans-serif';
+  preview.document.body.style.cssText = 'margin:0;display:grid;place-items:center;min-height:100vh;background:#ffffff;color:#000000;font:600 16px system-ui,sans-serif';
   preview.document.body.textContent = 'Preparing printable Owners Corner report...';
   try {
     const response = await fetch('/mchl-duck-dashboard.png', { cache: 'force-cache' });
     if (!response.ok) throw new Error('The approved Owners Corner duck logo could not be loaded.');
-    const logoBlob = await response.blob();
-    const duckLogoDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('The approved duck logo could not be read.'));
-      reader.onerror = () => reject(new Error('The approved duck logo could not be read.'));
-      reader.readAsDataURL(logoBlob);
-    });
-    const bytes = await buildOwnersReportPdf({ ...input, duckLogoDataUrl });
+    const sourceLogo = await createImageBitmap(await response.blob());
+    const canvas = document.createElement('canvas');
+    canvas.width = sourceLogo.width;
+    canvas.height = sourceLogo.height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('The approved duck logo could not be prepared for printing.');
+    context.drawImage(sourceLogo, 0, 0);
+    sourceLogo.close();
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+    for (let index = 0; index < image.data.length; index += 4) {
+      const gray = Math.round(
+        image.data[index] * 0.299
+        + image.data[index + 1] * 0.587
+        + image.data[index + 2] * 0.114,
+      );
+      const alpha = image.data[index + 3] / 255;
+      const printableGray = Math.round(gray * alpha + 255 * (1 - alpha));
+      image.data[index] = printableGray;
+      image.data[index + 1] = printableGray;
+      image.data[index + 2] = printableGray;
+      image.data[index + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+    const bytes = await buildOwnersReportPdf({ ...input, duckLogoImage: image });
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
     preview.location.replace(url);
     window.setTimeout(() => URL.revokeObjectURL(url), 300_000);

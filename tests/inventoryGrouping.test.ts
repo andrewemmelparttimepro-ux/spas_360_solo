@@ -28,6 +28,17 @@ describe('inventory workbook grouping', () => {
     assert.equal(inventoryGroupKey(item({ id: 'manual' })), 'other');
   });
 
+  it('moves an explicitly updated need-to-order row back into its manufacturer group', () => {
+    const importedNeedToOrder = {
+      brand: 'Master Spas',
+      notes: '[FIXIT_IMPORT sheet="Minot Inventory" row=94 unit=1] · Group: Need to Order',
+    } as const;
+
+    assert.equal(inventoryGroupKey(item({ id: 'trainer-before', ...importedNeedToOrder, stock_state: 'Need To Order' })), 'need_to_order');
+    assert.equal(inventoryGroupKey(item({ id: 'trainer-stock', ...importedNeedToOrder, stock_state: 'Stock' })), 'master');
+    assert.equal(inventoryGroupKey(item({ id: 'trainer-on-order', ...importedNeedToOrder, stock_state: 'On Order' })), 'master');
+  });
+
   it('sorts groups in workbook order and rows by sheet, row, then unit without mutating input', () => {
     const input = [
       item({ id: 'manual-z', created_at: '2026-08-20T00:00:00Z' }),

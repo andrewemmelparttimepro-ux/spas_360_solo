@@ -58,7 +58,7 @@ export function inventorySourcePosition(notes?: string | null): InventorySourceP
 
 export function inventoryGroupKey(item: InventoryGroupingItem): InventoryGroupKey {
   if (item.stock_state === 'Need To Order') return 'need_to_order';
-  if (/(?:Need to order:\s*Yes|Group:\s*Need to Order)/i.test(item.notes ?? '')) return 'need_to_order';
+  if (!item.stock_state && /(?:Need to order:\s*Yes|Group:\s*Need to Order)/i.test(item.notes ?? '')) return 'need_to_order';
   if (item.category === 'Used Spas') return 'used';
   if (item.brand === 'Sundance Spas') return 'sundance';
   if (item.brand === 'Master Spas') return 'master';

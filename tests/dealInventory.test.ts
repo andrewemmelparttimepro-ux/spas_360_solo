@@ -135,6 +135,18 @@ describe('deal inventory close flow', () => {
     assert.match(sql, /language sql[\s\S]*security invoker[\s\S]*select private\.close_deal_sale/);
   });
 
+  it('allows only the close RPC exact sold-unit transition before the Won move', async () => {
+    const sql = await readFile(
+      new URL('../supabase/migrations/20260831020441_allow_close_sale_inventory_transition.sql', import.meta.url),
+      'utf8',
+    );
+
+    assert.match(sql, /v_inventory_status = 'In Stock'[\s\S]*v_inventory_customer_id is null[\s\S]*v_inventory_deal_id is null[\s\S]*v_inventory_job_id is null[\s\S]*lower\(v_inventory_customer_stock\) = 'stock'/);
+    assert.match(sql, /v_inventory_status = 'Sold'[\s\S]*v_inventory_customer_id = new\.contact_id[\s\S]*v_inventory_deal_id = new\.id[\s\S]*v_inventory_job_id is null/);
+    assert.match(sql, /elsif not \([\s\S]*raise exception 'That inventory unit is no longer available'/);
+    assert.match(sql, /from public\.inventory_items i[\s\S]*where i\.id = new\.inventory_item_id[\s\S]*for update/);
+  });
+
   it('opens the inventory table window from Deal Information before Won', async () => {
     const [dealDetail, selector, inventory, sql] = await Promise.all([
       readFile(new URL('../src/pages/DealDetail.tsx', import.meta.url), 'utf8'),

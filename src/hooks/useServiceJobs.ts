@@ -135,6 +135,7 @@ export function useServiceJobs() {
         p_description: job.description ?? null,
         p_scheduled_at: job.scheduled_at ?? null,
         p_scheduled_end_date: job.scheduled_end_date ?? null,
+        p_scheduled_all_day: job.scheduled_all_day ?? false,
         p_priority: job.priority ?? 'Medium',
         p_amount_to_collect: job.amount_to_collect ?? null,
         p_inventory_item_id: inventoryItemId || null,

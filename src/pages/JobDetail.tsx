@@ -6,14 +6,14 @@ import { useTasks } from '@/hooks/useTasks';
 import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
 import { useJobPhotos, PHOTO_TYPES, type JobPhoto } from '@/hooks/useJobPhotos';
 import { useState, useRef, useEffect } from 'react';
-import { cn, toLocalInputValue } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { JobStatus, JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useAuth } from '@/contexts/AuthContext';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
-import { scheduleDateRangeError } from '@/lib/jobSchedule';
+import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError } from '@/lib/jobSchedule';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -229,32 +229,31 @@ function ScheduleDateRangeEditor({
   job,
   onSave,
 }: {
-  job: Pick<Job, 'scheduled_at' | 'scheduled_end_date'>;
+  job: Pick<Job, 'scheduled_at' | 'scheduled_all_day' | 'scheduled_end_date'>;
   onSave: (updates: Partial<Job>) => Promise<boolean>;
 }) {
-  const storedStart = job.scheduled_at ? toLocalInputValue(job.scheduled_at) : '';
-  const storedEnd = job.scheduled_end_date ?? '';
-  const [start, setStart] = useState(storedStart);
-  const [end, setEnd] = useState(storedEnd);
+  const stored = jobScheduleDraft(job);
+  const [startDate, setStartDate] = useState(stored.startDate);
+  const [startTime, setStartTime] = useState(stored.startTime);
+  const [endDate, setEndDate] = useState(stored.endDate);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setStart(storedStart); }, [storedStart]);
-  useEffect(() => { setEnd(storedEnd); }, [storedEnd]);
+  useEffect(() => { setStartDate(stored.startDate); }, [stored.startDate]);
+  useEffect(() => { setStartTime(stored.startTime); }, [stored.startTime]);
+  useEffect(() => { setEndDate(stored.endDate); }, [stored.endDate]);
 
-  const validationError = scheduleDateRangeError(start, end);
-  const dirty = start !== storedStart || end !== storedEnd;
+  const validationError = scheduleDateRangeError(startDate, endDate, startTime);
+  const dirty = startDate !== stored.startDate || startTime !== stored.startTime || endDate !== stored.endDate;
 
   const save = async () => {
     if (!dirty || validationError || saving) return;
     setSaving(true);
-    const ok = await onSave({
-      scheduled_at: start ? new Date(start).toISOString() : null,
-      scheduled_end_date: start && end ? end : null,
-    });
+    const ok = await onSave(jobScheduleUpdatesFromDraft(startDate, startTime, endDate));
     setSaving(false);
     if (!ok) {
-      setStart(storedStart);
-      setEnd(storedEnd);
+      setStartDate(stored.startDate);
+      setStartTime(stored.startTime);
+      setEndDate(stored.endDate);
     }
   };
 
@@ -263,13 +262,24 @@ function ScheduleDateRangeEditor({
       <legend className="px-1 text-xs font-semibold text-ink-400">Schedule dates</legend>
       <div className="space-y-3">
         <div>
-          <label htmlFor="job-scheduled-at" className="mb-1 block text-xs font-semibold text-ink-400">Start date and time</label>
+          <label htmlFor="job-scheduled-date" className="mb-1 block text-xs font-semibold text-ink-400">Start date</label>
           <input
-            id="job-scheduled-at"
-            type="datetime-local"
-            value={start}
-            onChange={event => setStart(event.target.value)}
+            id="job-scheduled-date"
+            type="date"
+            value={startDate}
+            onChange={event => setStartDate(event.target.value)}
             className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm outline-none focus:border-brand-500"
+          />
+        </div>
+        <div>
+          <label htmlFor="job-scheduled-time" className="mb-1 block text-xs font-semibold text-ink-400">Time <span className="font-normal text-ink-500">(optional)</span></label>
+          <input
+            id="job-scheduled-time"
+            type="time"
+            disabled={!startDate}
+            value={startTime}
+            onChange={event => setStartTime(event.target.value)}
+            className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:opacity-50"
           />
         </div>
         <div>
@@ -277,9 +287,9 @@ function ScheduleDateRangeEditor({
           <input
             id="job-scheduled-end-date"
             type="date"
-            min={start.slice(0, 10) || undefined}
-            value={end}
-            onChange={event => setEnd(event.target.value)}
+            min={startDate || undefined}
+            value={endDate}
+            onChange={event => setEndDate(event.target.value)}
             className="w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm outline-none focus:border-brand-500"
           />
         </div>

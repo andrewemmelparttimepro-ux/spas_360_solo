@@ -10,8 +10,10 @@ describe('Schedule inventory delivery dates', () => {
     const modal = service.slice(service.indexOf('{/* Create Job Modal */}'), service.indexOf('<DragDropContext'));
 
     assert.match(modal, /<legend[^>]*>Select Dates<\/legend>/);
-    assert.match(modal, /<label htmlFor="new-job-scheduled-at"[^>]*>Start date and time<\/label>/);
-    assert.match(modal, /<input id="new-job-scheduled-at" type="datetime-local"/);
+    assert.match(modal, /<label htmlFor="new-job-scheduled-date"[^>]*>Start date<\/label>/);
+    assert.match(modal, /<input id="new-job-scheduled-date" type="date"/);
+    assert.match(modal, /<label htmlFor="new-job-scheduled-time"[^>]*>Time [^]*\(optional\)/);
+    assert.match(modal, /<input id="new-job-scheduled-time" type="time"/);
     assert.match(modal, /<label htmlFor="new-job-scheduled-end-date"[^>]*>End date/);
     assert.match(modal, /<input id="new-job-scheduled-end-date" type="date"/);
   });

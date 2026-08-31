@@ -9,7 +9,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
-import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, jobOccursOnCalendarDay, jobOverlapsCalendarRange, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
+import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, jobOccursOnCalendarDay, jobOverlapsCalendarRange, jobScheduleDraft, jobScheduleUpdatesFromDraft, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -23,7 +23,13 @@ type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; ma
 
 const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'];
 
-const jobTime = (j: ServiceJob) => j.scheduled_at ? format(new Date(j.scheduled_at), 'h:mm') : '';
+const jobTime = (job: ServiceJob, withPeriod = false) => {
+  const value = jobScheduleDraft(job).startTime;
+  if (!value) return '';
+  const [hour, minute] = value.split(':').map(Number);
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, '0')}${withPeriod ? ` ${hour < 12 ? 'AM' : 'PM'}` : ''}`;
+};
 const scheduledDraggableId = (jobId: string, day: Date) => `sch-${jobId}@${format(day, 'yyyy-MM-dd')}`;
 
 type ScheduleCustomer = Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone'>;
@@ -216,8 +222,8 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
     <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', jobTypeCardColors[scheduleJobType(job.job_type)] ?? 'bg-ink-950')}>
       <div className="flex items-center justify-between gap-2">
         <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
-        {job.scheduled_at && (
-          <span className="flex items-center text-xs opacity-80 shrink-0"><Clock className="w-3 h-3 mr-1" />{format(new Date(job.scheduled_at), 'h:mm a')}</span>
+        {job.scheduled_at && !job.scheduled_all_day && (
+          <span className="flex items-center text-xs opacity-80 shrink-0"><Clock className="w-3 h-3 mr-1" />{jobTime(job, true)}</span>
         )}
       </div>
       <Link to={`/service/${job.id}`} className="block mt-1">
@@ -264,7 +270,7 @@ export default function Service() {
 
     if (destination.droppableId === 'queue') {
       if (!draggableId.startsWith('sch-')) return;
-      const ok = await updateJob(jobId, { scheduled_at: null, scheduled_end_date: null });
+      const ok = await updateJob(jobId, { scheduled_at: null, scheduled_all_day: false, scheduled_end_date: null });
       toast(ok ? 'Moved to Unscheduled Queue' : 'Failed to move', ok ? 'success' : 'error');
       return;
     }
@@ -366,7 +372,7 @@ export default function Service() {
   const [newJob, setNewJob] = useState({
     title: '', contact_id: '', location_id: '',
     inventory_item_id: '', job_type: 'Service' as JobType,
-    description: '', scheduled_at: '', scheduled_end_date: '',
+    description: '', scheduled_date: '', scheduled_time: '', scheduled_end_date: '',
     priority: 'Medium' as 'High' | 'Medium' | 'Low', amount_to_collect: '',
   });
   const availableInventory = useMemo(
@@ -374,7 +380,7 @@ export default function Service() {
     [inventoryItems, newJob.location_id],
   );
   const selectedInventory = availableInventory.find(item => item.id === newJob.inventory_item_id) ?? null;
-  const newJobDateError = scheduleDateRangeError(newJob.scheduled_at, newJob.scheduled_end_date);
+  const newJobDateError = scheduleDateRangeError(newJob.scheduled_date, newJob.scheduled_end_date, newJob.scheduled_time);
 
   const handleCreate = async () => {
     if (creatingJob) return;
@@ -384,13 +390,17 @@ export default function Service() {
     }
     setCreatingJob(true);
     setCreateJobError(null);
+    const scheduleUpdates = jobScheduleUpdatesFromDraft(
+      newJob.scheduled_date,
+      newJob.scheduled_time,
+      newJob.scheduled_end_date,
+    );
     const result = await createJob({
       title: newJob.title, contact_id: newJob.contact_id,
       location_id: newJob.location_id || (locations[0]?.id ?? ''),
       job_type: newJob.job_type, status: 'In Progress',
       description: newJob.description || null,
-      scheduled_at: newJob.scheduled_at ? new Date(newJob.scheduled_at).toISOString() : null,
-      scheduled_end_date: newJob.scheduled_end_date || null,
+      ...scheduleUpdates,
       priority: newJob.priority,
       amount_to_collect: newJob.amount_to_collect ? parseFloat(newJob.amount_to_collect) : null,
     }, newJob.inventory_item_id || null);
@@ -405,7 +415,7 @@ export default function Service() {
     toast('Job created', 'success');
     setShowInventorySelector(false);
     setShowCreate(false);
-    setNewJob({ title: '', contact_id: '', location_id: '', inventory_item_id: '', job_type: 'Service', description: '', scheduled_at: '', scheduled_end_date: '', priority: 'Medium', amount_to_collect: '' });
+    setNewJob({ title: '', contact_id: '', location_id: '', inventory_item_id: '', job_type: 'Service', description: '', scheduled_date: '', scheduled_time: '', scheduled_end_date: '', priority: 'Medium', amount_to_collect: '' });
     setCreatingJob(false);
   };
 
@@ -525,12 +535,16 @@ export default function Service() {
                 <legend className="px-1 text-xs font-semibold text-ink-300">Select Dates</legend>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="new-job-scheduled-at" className="mb-1.5 block text-xs font-semibold text-ink-300">Start date and time</label>
-                    <input id="new-job-scheduled-at" type="datetime-local" value={newJob.scheduled_at} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_at: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+                    <label htmlFor="new-job-scheduled-date" className="mb-1.5 block text-xs font-semibold text-ink-300">Start date</label>
+                    <input id="new-job-scheduled-date" type="date" value={newJob.scheduled_date} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_date: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+                  </div>
+                  <div>
+                    <label htmlFor="new-job-scheduled-time" className="mb-1.5 block text-xs font-semibold text-ink-300">Time <span className="font-normal text-ink-500">(optional)</span></label>
+                    <input id="new-job-scheduled-time" type="time" disabled={!newJob.scheduled_date} value={newJob.scheduled_time} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_time: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 disabled:opacity-50" />
                   </div>
                   <div>
                     <label htmlFor="new-job-scheduled-end-date" className="mb-1.5 block text-xs font-semibold text-ink-300">End date <span className="font-normal text-ink-500">(optional)</span></label>
-                    <input id="new-job-scheduled-end-date" type="date" min={newJob.scheduled_at.slice(0, 10) || undefined} value={newJob.scheduled_end_date} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_end_date: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
+                    <input id="new-job-scheduled-end-date" type="date" min={newJob.scheduled_date || undefined} value={newJob.scheduled_end_date} onChange={e => { setCreateJobError(null); setNewJob({...newJob, scheduled_end_date: e.target.value}); }} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
                   </div>
                 </div>
                 {newJobDateError && <p role="alert" className="mt-2 text-xs font-medium text-red-300">{newJobDateError}</p>}
@@ -700,7 +714,7 @@ export default function Service() {
                                         <Link
                                           to={`/service/${job.id}`}
                                           onClick={e => e.stopPropagation()}
-                                          title={`${job.title}${job.scheduled_at ? ` — ${format(new Date(job.scheduled_at), 'h:mm a')}` : ''}`}
+                                          title={`${job.title}${jobTime(job, true) ? ` — ${jobTime(job, true)}` : ''}`}
                                           className={cn(
                                             'block text-[10px] leading-[15px] px-1.5 py-[3px] rounded-[4px] truncate font-semibold shadow-sm',
                                             jobTypeChipColors[scheduleJobType(job.job_type)] ?? 'bg-ink-800 text-ink-300',

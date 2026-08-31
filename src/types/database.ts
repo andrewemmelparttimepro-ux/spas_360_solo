@@ -62,6 +62,7 @@ export interface Job {
   id: string; org_id: string; contact_id: string; property_id: string | null;
   location_id: string; title: string; job_type: JobType; status: JobStatus;
   description: string | null; scheduled_at: string | null;
+  scheduled_all_day: boolean;
   scheduled_end_date: string | null;
   estimated_duration: number | null; priority: DealPriority | null;
   amount_to_collect: number | null;

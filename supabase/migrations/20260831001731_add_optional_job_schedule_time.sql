@@ -3,11 +3,7 @@
 -- new date-only rows carry an explicit flag so noon appointments never collide
 -- with the internal date marker stored in scheduled_at.
 alter table public.jobs
-  add column if not exists scheduled_all_day boolean;
-
-update public.jobs
-set scheduled_all_day = false
-where scheduled_all_day is null;
+  add column if not exists scheduled_all_day boolean default false;
 
 alter table public.jobs
   alter column scheduled_all_day set default false,

@@ -127,8 +127,8 @@ describe('job schedule date ranges', () => {
 
   it('adds an explicit all-day flag and an RPC overload without rewriting existing timed rows', async () => {
     const migration = await read('supabase/migrations/20260831001731_add_optional_job_schedule_time.sql');
-    assert.match(migration, /add column if not exists scheduled_all_day boolean/i);
-    assert.match(migration, /set scheduled_all_day = false[\s\S]*where scheduled_all_day is null/i);
+    assert.match(migration, /add column if not exists scheduled_all_day boolean default false/i);
+    assert.doesNotMatch(migration, /update public\.jobs\s+set scheduled_all_day = false\s+where/i);
     assert.match(migration, /alter column scheduled_all_day set not null/i);
     assert.match(migration, /private\.create_job_with_inventory\([\s\S]*p_scheduled_all_day boolean/i);
     assert.match(migration, /set scheduled_all_day = coalesce\(p_scheduled_all_day, false\)/i);

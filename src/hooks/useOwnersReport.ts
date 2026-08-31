@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { OwnersReportDeal } from '@/lib/ownersReport';
+import { THRAWN_PROFILE_ID } from '@/lib/upcomingTasks';
 
 export interface OwnersReportOption { id: string; name: string }
 
@@ -37,7 +38,9 @@ export function useOwnersReport() {
       fetchAllDeals(profile.org_id),
       supabase.from('locations').select('id,name').eq('org_id', profile.org_id).order('name'),
       supabase.from('profiles').select('id,first_name,last_name').eq('org_id', profile.org_id)
-        .in('role', ['owner_manager', 'service_manager', 'salesperson']).order('first_name'),
+        .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .neq('id', THRAWN_PROFILE_ID)
+        .order('first_name'),
     ]);
     const firstError = dealsResult.error ?? storesResult.error ?? peopleResult.error;
     if (firstError) console.error('Error loading Owners Corner reports:', firstError);

@@ -84,5 +84,6 @@ describe('Owners Corner sales reports', () => {
     assert.match(hook, /DEAL_PAGE_SIZE = 1000[\s\S]*\.range\(from, from \+ DEAL_PAGE_SIZE - 1\)/);
     assert.match(hook, /\.from\('locations'\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
     assert.match(hook, /\.from\('profiles'\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
+    assert.match(hook, /\.neq\('id', THRAWN_PROFILE_ID\)/);
   });
 });

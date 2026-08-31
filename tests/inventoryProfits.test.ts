@@ -13,14 +13,16 @@ import {
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url));
 
 describe('Owners Corner Inventory Profits workbook', () => {
-  it('keeps exact source bytes private and includes them only with the owner endpoint', async () => {
-    const [pageBytes, endpointBytes, vercelBytes, workbook] = await Promise.all([
+  it('keeps exact source bytes private and exposes them only to the owner import flow', async () => {
+    const [pageBytes, libraryBytes, endpointBytes, vercelBytes, workbook] = await Promise.all([
       read('src/pages/OwnersCorner.tsx'),
+      read('src/components/OwnerWorkbookLibrary.tsx'),
       read('api/owners/inventory-profits.ts'),
       read('vercel.json'),
       read('api/_assets/Inventory Profits.xlsx'),
     ]);
     const page = pageBytes.toString('utf8');
+    const library = libraryBytes.toString('utf8');
     const endpoint = endpointBytes.toString('utf8');
     const vercel = JSON.parse(vercelBytes.toString('utf8')) as { functions: Record<string, { includeFiles?: string }> };
 
@@ -36,15 +38,15 @@ describe('Owners Corner Inventory Profits workbook', () => {
     assert.match(endpoint, /caller\.auth\.getUser\(accessToken\)/);
     assert.match(endpoint, /\.from\('profiles'\)[\s\S]*\.select\('id,org_id,role'\)[\s\S]*\.eq\('id', userId\)/);
     assert.ok(endpoint.indexOf('authorizeInventoryProfits(token') < endpoint.indexOf('readFile(WORKBOOK_PATH)'));
-    assert.match(page, /id="inventory-profits-heading"[^>]*>Inventory Profits</);
+    assert.match(page, /<OwnerWorkbookLibrary \/>/);
     assert.doesNotMatch(page, /href="\/Inventory%20Profits\.xlsx"/);
-    assert.match(page, /fetch\('\/api\/owners\/inventory-profits'/);
-    assert.match(page, /Authorization: `Bearer \$\{accessToken\}`/);
-    assert.match(page, /link\.download = 'Inventory Profits\.xlsx'/);
-    assert.match(page, /response\.ok[\s\S]*response\.blob\(\)/);
-    assert.match(page, /original format, including every built-in cell formula/);
+    assert.match(library, /fetch\('\/api\/owners\/inventory-profits'/);
+    assert.match(library, /Authorization: `Bearer \$\{session\.access_token\}`/);
+    assert.match(library, /await response\.arrayBuffer\(\)/);
+    assert.match(library, /INVENTORY_PROFITS_SOURCE_SHA/);
+    assert.doesNotMatch(library, /link\.download/);
     const accessBanner = page.indexOf('Owner access is active');
-    const profitsCard = page.indexOf('<InventoryProfitsCard');
+    const profitsCard = page.indexOf('<OwnerWorkbookLibrary');
     const destinations = page.indexOf('aria-label="Owner destinations"');
     assert.ok(accessBanner < profitsCard && profitsCard < destinations);
   });

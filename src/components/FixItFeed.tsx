@@ -586,9 +586,14 @@ export default function FixItFeed({ feed }: { feed: UseFixItFeedResult }) {
                 )}
 
                 {['open', 'in_progress'].includes(post.status) && canClose && (
-                  <button type="button" onClick={() => markFixed(post)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white">
-                    <Check className="w-3.5 h-3.5" /> Mark fixed
-                  </button>
+                  <>
+                    <button type="button" onClick={() => setValidationPostId(post.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/25 bg-brand-500/10 px-2 py-1.5 text-[11px] font-semibold text-brand-300 hover:bg-brand-500/20">
+                      <Camera className="w-3.5 h-3.5" /> {post.validationProof ? 'View proof' : 'Add proof'}
+                    </button>
+                    <button type="button" onClick={() => markFixed(post)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 px-2 py-1.5 text-[11px] font-semibold text-white">
+                      <Check className="w-3.5 h-3.5" /> Mark fixed
+                    </button>
+                  </>
                 )}
                 {['fixed', 'agent_done'].includes(post.status) && canModerate && (
                   <button type="button" onClick={() => archive(post)} className="inline-flex items-center gap-1.5 rounded-lg bg-ink-800 hover:bg-ink-700 px-2 py-1.5 text-[11px] font-semibold text-ink-300">

@@ -9,7 +9,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
-import { availableInventoryForJob, calendarJobTitleClass, customerCityFromAddress, jobOccursOnCalendarDay, jobOverlapsCalendarRange, jobScheduleDraft, jobScheduleUpdatesFromDraft, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
+import { availableInventoryForJob, calendarJobTitleClass, jobOccursOnCalendarDay, jobOverlapsCalendarRange, jobScheduleDraft, jobScheduleUpdatesFromDraft, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
@@ -17,9 +17,10 @@ import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import type { Contact } from '@/types/database';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
+import JobContactDetails from '@/components/JobContactDetails';
 
 type ViewMode = 'day' | 'week' | 'month';
-type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; mailing_address: string | null } | null };
+type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | null };
 
 const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'];
 
@@ -217,7 +218,6 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
 // --------------- Day/week job card ---------------
 function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
   const contact = job.contacts;
-  const city = customerCityFromAddress(contact?.mailing_address);
   return (
     <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', jobTypeCardColors[scheduleJobType(job.job_type)] ?? 'bg-ink-950')}>
       <div className="flex items-center justify-between gap-2">
@@ -229,9 +229,10 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
       <Link to={`/service/${job.id}`} className="block mt-1">
         <h3 className={cn('font-semibold text-sm leading-snug hover:underline underline-offset-2', calendarJobTitleClass(job.status))}>{job.title}</h3>
         <p className="text-xs opacity-70 mt-0.5">
-          {job.job_type}{contact ? ` · ${contact.first_name} ${contact.last_name}` : ''}{city ? ` · ${city}` : ''}
+          {job.job_type}{contact ? ` · ${contact.first_name} ${contact.last_name}` : ''}
         </p>
       </Link>
+      {contact && <JobContactDetails contact={contact} compact />}
     </div>
   );
 }
@@ -775,10 +776,12 @@ export default function Service() {
                             {job.title}
                           </Link>
                           {job.contacts && (
-                            <p className="mt-1 text-[10px] font-semibold opacity-90">
-                              {job.contacts.first_name} {job.contacts.last_name}
-                              {customerCityFromAddress(job.contacts.mailing_address) ? ` · ${customerCityFromAddress(job.contacts.mailing_address)}` : ''}
-                            </p>
+                            <>
+                              <p className="mt-1 text-[10px] font-semibold opacity-90">
+                                {job.contacts.first_name} {job.contacts.last_name}
+                              </p>
+                              <JobContactDetails contact={job.contacts} compact />
+                            </>
                           )}
                           <p className="mt-1 text-[10px] font-medium opacity-80">
                             Created {format(new Date(job.created_at), 'MMM d, yyyy')}

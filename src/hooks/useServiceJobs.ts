@@ -91,7 +91,7 @@ export function useServiceJobs() {
 
     let query = supabase
       .from('jobs')
-      .select('*, contacts:contact_id(first_name, last_name, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
+      .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
       .eq('org_id', profile.org_id)
       .order('scheduled_at', { ascending: true, nullsFirst: true });
 
@@ -180,7 +180,7 @@ export function useJob(id: string | undefined) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, contacts:contact_id(first_name, last_name, phone), properties:property_id(address), locations:location_id(name)')
+      .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), properties:property_id(address), locations:location_id(name)')
       .eq('id', id)
       .single();
     if (error) console.error('Error fetching job:', error);

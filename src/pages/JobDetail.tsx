@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError } from '@/lib/jobSchedule';
+import JobContactDetails from '@/components/JobContactDetails';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -377,7 +378,7 @@ export default function JobDetail() {
     return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Job not found</p><Link to="/service" className="text-brand-400 text-sm mt-2 hover:underline">Back to Service</Link></div>;
   }
 
-  const contact = (job as unknown as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string } | undefined;
+  const contact = (job as unknown as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | undefined;
   const property = (job as unknown as Record<string, unknown>).properties as { address: string } | undefined;
   const location = (job as unknown as Record<string, unknown>).locations as { name: string } | undefined;
 
@@ -429,7 +430,12 @@ export default function JobDetail() {
           <div role="heading" aria-level={1} className="text-ink-100">
             <EditableField label="job heading" value={job.title} field="title" onSave={saveJob} bold heading />
           </div>
-          {contact && <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
+          {contact && (
+            <>
+              <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>
+              <JobContactDetails contact={contact} className="text-ink-300" />
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {canDelete && (

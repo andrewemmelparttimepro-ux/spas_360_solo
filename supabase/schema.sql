@@ -242,6 +242,9 @@ CREATE TABLE inventory_items (
   color_finish TEXT,
   status TEXT NOT NULL DEFAULT 'In Stock'
     CHECK (status IN ('On Order', 'In Stock', 'Sold', 'In Transit', 'Delivered', 'Returned')),
+  stock_state TEXT
+    CHECK (stock_state IN ('Need To Order', 'On Order', 'Stock')),
+  order_date DATE,
   cost DECIMAL(10,2),
   msrp DECIMAL(10,2),
   sale_price DECIMAL(10,2),

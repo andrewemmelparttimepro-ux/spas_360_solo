@@ -20,6 +20,8 @@ const inventory = (id: string, sku: string): InventoryItem & { customer: null } 
   model: 'Nova 7',
   color_finish: 'Brown/Platinum',
   status: 'In Stock',
+  stock_state: null,
+  order_date: null,
   cost: null,
   msrp: null,
   sale_price: null,

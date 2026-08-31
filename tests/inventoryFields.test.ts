@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   INVENTORY_STATIONARY_CHOICES,
+  INVENTORY_STOCK_STATES,
   inventoryCustomerStockUpdate,
   inventoryCustomerOrStock,
+  inventoryStockState,
   joinSerialAndFlooring,
+  operationalStatusForNewStockState,
   serialNumberForDisplay,
   splitSerialAndFlooring,
   updateInventoryCustomerOrStock,
@@ -138,5 +141,25 @@ describe('inventory customer or stock field', () => {
       updateInventoryCustomerOrStock('Customer:  · Manual inventory note', ''),
       'Customer:  STOCK · Manual inventory note',
     );
+  });
+});
+
+describe('inventory stock state', () => {
+  it('uses the exact requested choices and prefers the additive stored field', () => {
+    assert.deepEqual(INVENTORY_STOCK_STATES, ['Need To Order', 'On Order', 'Stock']);
+    assert.equal(inventoryStockState('On Order', 'Customer: STOCK', 'In Stock'), 'On Order');
+  });
+
+  it('uses legacy notes and operational status only as a no-rewrite fallback', () => {
+    assert.equal(inventoryStockState(null, 'Customer: Need To Order', 'In Stock'), 'Need To Order');
+    assert.equal(inventoryStockState(null, 'Group: Need to Order', 'In Stock'), 'Need To Order');
+    assert.equal(inventoryStockState(null, 'Customer: Jane Doe', 'On Order'), 'On Order');
+    assert.equal(inventoryStockState(null, 'Customer: Jane Doe', 'Sold'), 'Stock');
+  });
+
+  it('maps new procurement choices to safe operational availability defaults', () => {
+    assert.equal(operationalStatusForNewStockState('Stock'), 'In Stock');
+    assert.equal(operationalStatusForNewStockState('On Order'), 'On Order');
+    assert.equal(operationalStatusForNewStockState('Need To Order'), 'On Order');
   });
 });

@@ -5,6 +5,7 @@ import { groupInventoryItems, inventoryGroupKey, inventorySourcePosition, type I
 const item = (overrides: Partial<InventoryGroupingItem> & Pick<InventoryGroupingItem, 'id'>): InventoryGroupingItem => ({
   brand: null,
   category: 'Hot Tubs',
+  stock_state: null,
   notes: null,
   created_at: '2026-08-19T00:00:00Z',
   ...overrides,
@@ -21,6 +22,7 @@ describe('inventory workbook grouping', () => {
   it('keeps need-to-order and used rows in their workbook sections before brand grouping', () => {
     assert.equal(inventoryGroupKey(item({ id: 'need', brand: 'Master Spas', notes: '· Need to order: Yes' })), 'need_to_order');
     assert.equal(inventoryGroupKey(item({ id: 'need-live', brand: 'Master Spas', notes: '· Group: Need to Order' })), 'need_to_order');
+    assert.equal(inventoryGroupKey(item({ id: 'need-explicit', brand: 'Master Spas', stock_state: 'Need To Order' })), 'need_to_order');
     assert.equal(inventoryGroupKey(item({ id: 'used', brand: 'Sundance Spas', category: 'Used Spas' })), 'used');
     assert.equal(inventoryGroupKey(item({ id: 'brand', brand: 'Eco Spas' })), 'eco');
     assert.equal(inventoryGroupKey(item({ id: 'manual' })), 'other');

@@ -34,6 +34,30 @@ const CUSTOMER_SEGMENT = /((?:^|·)\s*Customer:\s*)(.*?)(?=\s*·|$)/i;
 export const INVENTORY_STATIONARY_CHOICES = ['Stock', 'Need To Order', 'On Order'] as const;
 export type InventoryStationaryChoice = typeof INVENTORY_STATIONARY_CHOICES[number];
 
+export const INVENTORY_STOCK_STATES = ['Need To Order', 'On Order', 'Stock'] as const;
+export type InventoryStockState = typeof INVENTORY_STOCK_STATES[number];
+
+export const inventoryStockState = (
+  storedState: string | null | undefined,
+  notes: string | null | undefined,
+  operationalStatus: string,
+): InventoryStockState => {
+  if (INVENTORY_STOCK_STATES.includes(storedState as InventoryStockState)) {
+    return storedState as InventoryStockState;
+  }
+
+  const legacyCustomerValue = notes?.match(CUSTOMER_SEGMENT)?.[2]?.trim().toLowerCase();
+  if (legacyCustomerValue === 'need to order') return 'Need To Order';
+  if (legacyCustomerValue === 'on order') return 'On Order';
+  if (legacyCustomerValue === 'stock') return 'Stock';
+  if (/(?:Need to order:\s*Yes|Group:\s*Need to Order)/i.test(notes ?? '')) return 'Need To Order';
+  if (operationalStatus === 'On Order') return 'On Order';
+  return 'Stock';
+};
+
+export const operationalStatusForNewStockState = (stockState: InventoryStockState) =>
+  stockState === 'Stock' ? 'In Stock' as const : 'On Order' as const;
+
 export type InventoryCustomerStockSelection =
   | { kind: 'customer'; customerId: string; customerName: string }
   | { kind: 'stationary'; value: InventoryStationaryChoice };

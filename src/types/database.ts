@@ -12,6 +12,7 @@ export type JobType = ScheduleJobType | LegacyJobType;
 export type JobStatus = 'Pending Confirm' | 'Delivery' | 'Parts on Order' | 'Warranty' | 'Ready for Pickup' | 'In Progress' | 'Completed' | 'Cancelled';
 export type PartStatus = 'Not Ordered' | 'Ordered' | 'Shipped' | 'Backordered' | 'Received';
 export type InventoryStatus = 'On Order' | 'In Stock' | 'Sold' | 'In Transit' | 'Delivered' | 'Returned';
+export type InventoryStockState = 'Need To Order' | 'On Order' | 'Stock';
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 export type MessageSender = 'system' | 'customer' | 'agent';
 export type FixItStatus = 'open' | 'in_progress' | 'fixed' | 'agent_done' | 'archived';
@@ -85,6 +86,7 @@ export interface InventoryItem {
   product: string; brand: string | null; category: string;
   model: string | null; color_finish: string | null;
   status: InventoryStatus; cost: number | null; msrp: number | null;
+  stock_state: InventoryStockState | null; order_date: string | null;
   sale_price: number | null; customer_id: string | null;
   deal_id: string | null; job_id: string | null;
   date_received: string | null; date_sold: string | null;

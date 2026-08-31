@@ -4,7 +4,7 @@ import type { DealInventoryOption } from '@/lib/dealInventory';
 import { ALL_INVENTORY_BRANDS, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { inventoryAgeLabel } from '@/lib/inventoryAge';
-import { inventoryCustomerOrStock, serialNumberForDisplay, splitSerialAndFlooring } from '@/lib/inventoryFields';
+import { inventoryStockState, serialNumberForDisplay, splitSerialAndFlooring } from '@/lib/inventoryFields';
 import { cn } from '@/lib/utils';
 
 const HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
@@ -89,7 +89,7 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
     ));
   }, [brandFilter, items, searchQuery]);
   const groupedItems = useMemo(() => groupInventoryItems(visibleItems), [visibleItems]);
-  const columnCount = showStore ? 9 : 8;
+  const columnCount = showStore ? 11 : 10;
 
   const toggleSelection = (inventoryItemId: string) => {
     setSelectedInventoryIds(current => {
@@ -165,7 +165,7 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <table data-density="compact" className="w-full min-w-[1220px] border-collapse text-left">
+          <table data-density="compact" className="w-full min-w-[1460px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-ink-900">
               <tr className="border-b border-ink-700">
                 <th className={HEADER_CELL_CLASS}>Model</th>
@@ -174,7 +174,9 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
                 <th className={HEADER_CELL_CLASS}>Serial Number</th>
                 <th className={HEADER_CELL_CLASS}>Inventory Flooring Status</th>
                 <th className={HEADER_CELL_CLASS}>Inventory Age</th>
-                <th className={HEADER_CELL_CLASS}>Customer/Stock</th>
+                <th className={HEADER_CELL_CLASS}>Customer</th>
+                <th className={HEADER_CELL_CLASS}>Stock</th>
+                <th className={HEADER_CELL_CLASS}>Order Date</th>
                 <th className={HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
@@ -234,7 +236,9 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialNumberForDisplay(serialAndFlooring.serial) || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialAndFlooring.flooring || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>{inventoryAgeLabel(item.created_at ?? '')}</td>
-                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{inventoryCustomerOrStock(item.notes ?? null, item.customer_id ?? null, currentCustomerName)}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{currentCustomerName || (item.customer_id ? 'Customer' : '-')}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{inventoryStockState(item.stock_state, item.notes, item.status ?? '')}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.order_date || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.date_delivered || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'font-semibold text-ink-200')}>{item.status === 'In Stock' || item.status === 'Sold' ? 'Yes' : 'No'}</td>
                       </tr>

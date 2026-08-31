@@ -122,10 +122,11 @@ describe('Brandon composite UI contract', () => {
     assert.match(inventory, />Model</);
     assert.match(inventory, />Serial Number</);
     assert.match(inventory, /const effectiveCustomer = effectiveInventoryCustomer\(item\)/);
-    assert.match(inventory, /inventoryCustomerOrStock\([\s\S]*effectiveCustomer\?\.id \?\? item\.customer_id,[\s\S]*currentCustomerName/);
-    assert.match(inventory, /inventoryCustomerStockUpdate\(item\.notes, selection\)/);
-    assert.match(inventory, /INVENTORY_STATIONARY_CHOICES\.map\(choice =>/);
-    assert.match(inventory, /<CustomerStockCell item=\{item\} onSave=\{updateItem\} \/>/);
+    assert.match(inventory, /currentCustomerName \|\| \(\(effectiveCustomer\?\.id \?\? item\.customer_id\) \? 'Customer' : '-'\)/);
+    assert.match(inventory, /inventoryCustomerStockUpdate\(item\.notes, \{/);
+    assert.match(inventory, /<CustomerCell item=\{item\} onSave=\{updateItem\} \/>/);
+    assert.match(inventory, /<StockStateCell item=\{item\} onSave=\{updateItem\} \/>/);
+    assert.match(inventory, /field="order_date"/);
     assert.doesNotMatch(inventory, /â/);
     assert.doesNotMatch(inventoryEditor, />SKU</);
     assert.match(inventoryEditor, />Serial Number \*</);

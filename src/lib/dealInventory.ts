@@ -11,6 +11,8 @@ export type DealInventoryOption = Pick<
   notes?: InventoryItem['notes'];
   created_at?: InventoryItem['created_at'];
   customer_id?: InventoryItem['customer_id'];
+  stock_state?: InventoryItem['stock_state'];
+  order_date?: InventoryItem['order_date'];
   date_delivered?: InventoryItem['date_delivered'];
   customer?: { first_name: string; last_name: string } | null;
   locations?: { name: string } | null;

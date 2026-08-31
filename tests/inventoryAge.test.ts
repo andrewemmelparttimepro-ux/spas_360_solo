@@ -36,11 +36,11 @@ describe('inventory age', () => {
     assert.equal(inventoryAgeLabel('not-a-date', today), '—');
   });
 
-  it('places Inventory Age between flooring status and Customer/Stock in the live table', async () => {
+  it('places Inventory Age before the split Customer, Stock, and Order Date columns', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
 
-    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer\/Stock<\/th>/);
+    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Stock<\/th>[\s\S]*Order Date<\/th>/);
     assert.match(inventory, /inventoryAgeLabel\(item\.created_at\)/);
-    assert.match(inventory, /const columnCount = showStore \? 9 : 8;/);
+    assert.match(inventory, /const columnCount = showStore \? 11 : 10;/);
   });
 });

@@ -170,13 +170,16 @@ describe('deal inventory close flow', () => {
       'Serial Number',
       'Inventory Flooring Status',
       'Inventory Age',
-      'Customer/Stock',
+      'Customer',
+      'Stock',
+      'Order Date',
       'Delivery Date',
       'On Hand Y/N',
     ]);
     assert.match(selector, /splitSerialAndFlooring\(item\.sku\)[\s\S]*serialNumberForDisplay\(serialAndFlooring\.serial\)/);
     assert.match(selector, /inventoryAgeLabel\(item\.created_at \?\? ''\)/);
-    assert.match(selector, /inventoryCustomerOrStock\(item\.notes \?\? null, item\.customer_id \?\? null, currentCustomerName\)/);
+    assert.match(selector, /currentCustomerName \|\| \(item\.customer_id \? 'Customer' : '-'\)/);
+    assert.match(selector, /inventoryStockState\(item\.stock_state, item\.notes, item\.status \?\? ''\)/);
     assert.match(selector, /showStore[\s\S]*title=\{item\.locations\?\.name \?\? undefined\}[\s\S]*\.split\(' \('\)\[0\]/);
     assert.match(dealDetail, /setInventorySelectorContext\('won'\)[\s\S]*Open inventory window/);
 

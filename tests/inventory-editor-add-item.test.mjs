@@ -50,4 +50,12 @@ describe('Add Item editor contract', () => {
     assert.match(source, /model: v\.model\.trim\(\) \|\| null/);
     assert.match(source, /warranty_info: v\.warranty_info\.trim\(\) \|\| null/);
   });
+
+  it('offers only the requested Stock choices when adding and persists the independent field', () => {
+    assert.match(source, /const ADD_ITEM_STOCK_STATES: InventoryStockState\[\] = \['Stock', 'On Order', 'Need To Order'\]/);
+    assert.match(source, /\{isEdit \? 'Status' : 'Stock'\}/);
+    assert.match(source, /ADD_ITEM_STOCK_STATES\.map\(stockState =>/);
+    assert.match(source, /stock_state: isEdit \? \(item\?\.stock_state \?\? null\) : v\.stock_state/);
+    assert.match(source, /operationalStatusForNewStockState\(v\.stock_state\)/);
+  });
 });

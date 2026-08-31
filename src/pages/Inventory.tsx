@@ -10,13 +10,12 @@ import { cn, sanitizeSearchTerm } from '@/lib/utils';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import { supabase } from '@/lib/supabase';
 import {
-  INVENTORY_STATIONARY_CHOICES,
+  INVENTORY_STOCK_STATES,
   inventoryCustomerStockUpdate,
-  inventoryCustomerOrStock,
+  inventoryStockState,
   joinSerialAndFlooring,
   serialNumberForDisplay,
   splitSerialAndFlooring,
-  type InventoryCustomerStockSelection,
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
@@ -37,6 +36,7 @@ function EditableCell({
   options,
   prefix,
   className,
+  commitWhenUnchanged = false,
 }: {
   value: string | number | null;
   field: string;
@@ -46,6 +46,7 @@ function EditableCell({
   options?: string[];
   prefix?: string;
   className?: string;
+  commitWhenUnchanged?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ''));
@@ -64,10 +65,14 @@ function EditableCell({
   const commit = async () => {
     const submittedValue = inputRef.current?.value ?? draft;
     setDraft(submittedValue);
-    if (submittedValue === String(value ?? '')) { setEditing(false); return; }
+    if (!commitWhenUnchanged && submittedValue === String(value ?? '')) { setEditing(false); return; }
     setSaving(true);
     setSaveError(null);
-    const parsed = type === 'number' ? (submittedValue ? parseFloat(submittedValue) : null) : submittedValue;
+    const parsed = type === 'number'
+      ? (submittedValue ? parseFloat(submittedValue) : null)
+      : type === 'date'
+        ? (submittedValue || null)
+        : submittedValue;
     try {
       const saved = await onSave(itemId, { [field]: parsed } as Partial<InventoryItem>);
       if (saved) {
@@ -193,7 +198,7 @@ function InventoryTextCell({
   return <EditableCell value={displayValue} field={part} itemId={item.id} onSave={handleSave} />;
 }
 
-function CustomerStockCell({
+function CustomerCell({
   item,
   onSave,
 }: {
@@ -213,11 +218,7 @@ function CustomerStockCell({
   const currentCustomerName = effectiveCustomer
     ? `${effectiveCustomer.first_name} ${effectiveCustomer.last_name}`.trim()
     : null;
-  const value = inventoryCustomerOrStock(
-    item.notes,
-    effectiveCustomer?.id ?? item.customer_id,
-    currentCustomerName,
-  );
+  const value = currentCustomerName || ((effectiveCustomer?.id ?? item.customer_id) ? 'Customer' : '-');
 
   useEffect(() => {
     if (!editing) return;
@@ -270,13 +271,17 @@ function CustomerStockCell({
     return () => { cancelled = true; };
   }, [debouncedQuery, editing, profile]);
 
-  const saveChoice = async (selection: InventoryCustomerStockSelection) => {
+  const saveChoice = async (customer: CustomerChoice) => {
     if (saving) return;
     setSaving(true);
     setSaveError(null);
     let saved = false;
     try {
-      saved = await onSave(item.id, inventoryCustomerStockUpdate(item.notes, selection));
+      saved = await onSave(item.id, inventoryCustomerStockUpdate(item.notes, {
+        kind: 'customer',
+        customerId: customer.id,
+        customerName: `${customer.first_name} ${customer.last_name}`.trim(),
+      }));
     } catch {
       saved = false;
     } finally {
@@ -306,8 +311,8 @@ function CustomerStockCell({
         type="button"
         onClick={() => setEditing(true)}
         className="group inline-flex min-h-6 cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 -mx-1.5 text-left transition-colors hover:bg-brand-500/10 hover:ring-1 hover:ring-brand-500/30"
-        title="Choose a customer or Stock"
-        aria-label={`Edit Customer or Stock for ${item.model || item.product}`}
+        title="Choose a customer"
+        aria-label={`Edit Customer for ${item.model || item.product}`}
       >
         <span>{value}</span>
         <Pencil className="h-3 w-3 shrink-0 text-ink-300 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -316,7 +321,6 @@ function CustomerStockCell({
   }
 
   const normalizedQuery = sanitizeSearchTerm(query);
-  const canChooseStationary = item.status !== 'Sold';
   return (
     <div className="relative min-w-[240px]" onKeyDown={event => { if (event.key === 'Escape') setEditing(false); }}>
       <div className="flex items-center gap-1">
@@ -340,30 +344,21 @@ function CustomerStockCell({
         </button>
       </div>
       <div className="absolute left-0 top-full z-30 mt-1 w-full overflow-hidden rounded-lg border border-ink-700 bg-ink-950 shadow-xl">
-        {INVENTORY_STATIONARY_CHOICES.map(choice => (
-          <button
-            key={choice}
-            type="button"
-            onClick={() => void saveChoice({ kind: 'stationary', value: choice })}
-            disabled={!canChooseStationary || saving}
-            className="flex w-full items-center justify-between border-b border-ink-800 px-3 py-2 text-left text-xs font-semibold text-ink-200 hover:bg-ink-800 disabled:cursor-not-allowed disabled:text-ink-600"
-          >
-            <span>{choice}</span>
-            {!canChooseStationary && <span className="font-normal">Sold unit</span>}
-          </button>
-        ))}
-        {searching && <div className="flex items-center gap-2 border-t border-ink-800 px-3 py-2 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Searching customers…</div>}
-        {!searching && normalizedQuery.length < 2 && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">Type at least 2 characters.</p>}
-        {!searching && normalizedQuery.length >= 2 && matches.length === 0 && !saveError && <p className="border-t border-ink-800 px-3 py-2 text-xs text-ink-500">No matching customers.</p>}
+        <Link
+          to="/customers"
+          state={{ openWizard: true }}
+          className="flex w-full items-center gap-2 border-b border-ink-800 px-3 py-2 text-left text-xs font-semibold text-brand-300 hover:bg-brand-500/10"
+        >
+          <Plus className="h-3.5 w-3.5" />Add New Customer
+        </Link>
+        {searching && <div className="flex items-center gap-2 px-3 py-2 text-xs text-ink-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Searching customers…</div>}
+        {!searching && normalizedQuery.length < 2 && <p className="px-3 py-2 text-xs text-ink-500">Type at least 2 characters.</p>}
+        {!searching && normalizedQuery.length >= 2 && matches.length === 0 && !saveError && <p className="px-3 py-2 text-xs text-ink-500">No matching customers.</p>}
         {matches.map(customer => (
           <button
             key={customer.id}
             type="button"
-            onClick={() => void saveChoice({
-              kind: 'customer',
-              customerId: customer.id,
-              customerName: `${customer.first_name} ${customer.last_name}`.trim(),
-            })}
+            onClick={() => void saveChoice(customer)}
             disabled={saving}
             className="block w-full border-t border-ink-800 px-3 py-2 text-left hover:bg-brand-500/10 disabled:opacity-50"
           >
@@ -378,6 +373,27 @@ function CustomerStockCell({
 }
 
 type CustomerChoice = Pick<Contact, 'id' | 'first_name' | 'last_name' | 'phone' | 'customer_type'>;
+
+function StockStateCell({
+  item,
+  onSave,
+}: {
+  item: InventoryItem;
+  onSave: (id: string, updates: Partial<InventoryItem>) => Promise<boolean>;
+}) {
+  const value = inventoryStockState(item.stock_state, item.notes, item.status);
+  return (
+    <EditableCell
+      value={value}
+      field="stock_state"
+      itemId={item.id}
+      onSave={onSave}
+      type="select"
+      options={[...INVENTORY_STOCK_STATES]}
+      commitWhenUnchanged={item.stock_state === null}
+    />
+  );
+}
 
 function OnHandCell({
   item,
@@ -421,7 +437,7 @@ export default function Inventory() {
   const brandOptions = inventoryBrandOptions(items);
   const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
   const groupedItems = groupInventoryItems(visibleItems);
-  const columnCount = showStore ? 9 : 8;
+  const columnCount = showStore ? 11 : 10;
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -476,7 +492,7 @@ export default function Inventory() {
         </div>
         {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
         <div className="overflow-x-auto">
-          <table data-density="compact" className="w-full min-w-[1220px] text-left border-collapse">
+          <table data-density="compact" className="w-full min-w-[1460px] text-left border-collapse">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Model</th>
@@ -485,7 +501,9 @@ export default function Inventory() {
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Serial Number</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Age</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Customer/Stock</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Customer</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Stock</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Order Date</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
@@ -534,7 +552,13 @@ export default function Inventory() {
                     {inventoryAgeLabel(item.created_at)}
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
-                    <CustomerStockCell item={item} onSave={updateItem} />
+                    <CustomerCell item={item} onSave={updateItem} />
+                  </td>
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                    <StockStateCell item={item} onSave={updateItem} />
+                  </td>
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                    <EditableCell value={item.order_date} field="order_date" itemId={item.id} onSave={updateItem} type="date" />
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />

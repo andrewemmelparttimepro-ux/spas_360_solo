@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useToast } from '@/components/ui/Toast';
 import type { InventoryItem } from '@/types/database';
+import { operationalStatusForNewStockState, type InventoryStockState } from '@/lib/inventoryFields';
 import { supabase } from '@/lib/supabase';
 import { useModal } from '@/hooks/useModal';
 
@@ -30,6 +31,7 @@ const BRANDS = [
   'Visscher',
 ] as const;
 const STATUSES = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'] as const;
+const ADD_ITEM_STOCK_STATES: InventoryStockState[] = ['Stock', 'On Order', 'Need To Order'];
 
 function locationLabel(name: string) {
   if (/^Minot(?:\s*\(MCHL\))?$/i.test(name.trim())) return 'Minot - MCHL';
@@ -37,6 +39,8 @@ function locationLabel(name: string) {
 }
 
 const statusChip: Record<string, string> = {
+  'Stock': 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300',
+  'Need To Order': 'bg-yellow-500/15 border-yellow-500/50 text-yellow-300',
   'In Stock': 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300',
   'On Order': 'bg-purple-500/15 border-purple-500/50 text-purple-300',
   'In Transit': 'bg-brand-500/15 border-brand-500/50 text-brand-300',
@@ -89,6 +93,7 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
     model: item?.model ?? '',
     color_finish: item?.color_finish ?? '',
     status: item?.status ?? 'In Stock',
+    stock_state: item?.stock_state ?? 'Stock' as InventoryStockState,
     // Smart defaults: the store you're in, received today
     location_id: item?.location_id ?? activeLocationId ?? profile?.location_id ?? locations[0]?.id ?? '',
     cost: item?.cost != null ? String(item.cost) : '',
@@ -142,7 +147,10 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
       category: v.category,
       model: v.model.trim() || null,
       color_finish: v.color_finish.trim() || null,
-      status: v.status as InventoryItem['status'],
+      status: isEdit
+        ? v.status as InventoryItem['status']
+        : operationalStatusForNewStockState(v.stock_state),
+      stock_state: isEdit ? (item?.stock_state ?? null) : v.stock_state,
       location_id: v.location_id,
       cost: v.cost ? parseFloat(v.cost) : null,
       msrp: v.msrp ? parseFloat(v.msrp) : null,
@@ -237,13 +245,17 @@ export default function InventoryEditor({ item, onClose, onSave, onDelete }: Pro
             </div>
           </div>
 
-          {/* Status chips (colored like the floor) */}
+          {/* Creation captures procurement state without exposing lifecycle statuses. */}
           <div>
-            <label className={labelClass}>Status</label>
+            <label className={labelClass}>{isEdit ? 'Status' : 'Stock'}</label>
             <div className="flex flex-wrap gap-1.5">
-              {STATUSES.map(st => (
-                <Chip key={st} active={v.status === st} onClick={() => set({ status: st })} tone={statusChip[st]}>{st}</Chip>
-              ))}
+              {isEdit
+                ? STATUSES.map(st => (
+                    <Chip key={st} active={v.status === st} onClick={() => set({ status: st })} tone={statusChip[st]}>{st}</Chip>
+                  ))
+                : ADD_ITEM_STOCK_STATES.map(stockState => (
+                    <Chip key={stockState} active={v.stock_state === stockState} onClick={() => set({ stock_state: stockState })} tone={statusChip[stockState]}>{stockState}</Chip>
+                  ))}
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { BarChart3, Building2, Crown, LockKeyhole, Settings, ShieldCheck } from 'lucide-react';
+import { BarChart3, Building2, Crown, FileText, LoaderCircle, LockKeyhole, Settings, ShieldCheck } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOwnersReport } from '@/hooks/useOwnersReport';
@@ -18,6 +18,7 @@ import {
   type OwnersReportPreset,
   type OwnersReportRange,
 } from '@/lib/ownersReport';
+import { viewOwnersReportPdf } from '@/lib/ownersReportPdf';
 
 const OWNER_DESTINATIONS = [
   {
@@ -118,6 +119,8 @@ function OwnersPerformanceReport() {
   const [appliedCustom, setAppliedCustom] = useState<OwnersReportCustomRange | null>(null);
   const [comparison, setComparison] = useState<OwnersReportComparison>(initialComparison);
   const [appliedComparison, setAppliedComparison] = useState<OwnersReportComparison | null>(null);
+  const [isBuildingPdf, setIsBuildingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const appliedSelection = appliedPreset === 'compare_dates' ? appliedComparison : appliedCustom;
   const ranges = ownersReportRanges(appliedPreset, appliedSelection);
@@ -134,8 +137,11 @@ function OwnersPerformanceReport() {
   const delta = reportDelta(currentTotals, priorTotals);
   const salespersonNames = useMemo(() => new Map(report.salespeople.map(option => [option.id, option.name])), [report.salespeople]);
   const storeNames = useMemo(() => new Map(report.stores.map(option => [option.id, option.name])), [report.stores]);
-  const salespersonRates = useMemo(() => ranges ? closingRates(report.deals, ranges.current, 'salesperson', salespersonNames) : [], [report.deals, ranges, salespersonNames]);
-  const storeRates = useMemo(() => ranges ? closingRates(report.deals, ranges.current, 'store', storeNames) : [], [report.deals, ranges, storeNames]);
+  const rateDeals = useMemo(() => report.deals.filter(deal =>
+    (!locationId || deal.location_id === locationId) && (!assignedTo || deal.assigned_to === assignedTo),
+  ), [report.deals, locationId, assignedTo]);
+  const salespersonRates = useMemo(() => ranges ? closingRates(rateDeals, ranges.current, 'salesperson', salespersonNames) : [], [rateDeals, ranges, salespersonNames]);
+  const storeRates = useMemo(() => ranges ? closingRates(rateDeals, ranges.current, 'store', storeNames) : [], [rateDeals, ranges, storeNames]);
 
   const applyPeriod = () => {
     if (selectedPreset === 'custom') {
@@ -151,6 +157,44 @@ function OwnersPerformanceReport() {
       setAppliedComparison(null);
     }
     setAppliedPreset(selectedPreset);
+  };
+
+  const viewPrintablePdf = async () => {
+    if (!ranges || report.isLoading) return;
+    setIsBuildingPdf(true);
+    setPdfError(null);
+    try {
+      await viewOwnersReportPdf({
+        generatedAt: new Date(),
+        outcome,
+        store: locationId ? (storeNames.get(locationId) ?? 'Unknown store') : 'All Stores',
+        salesperson: assignedTo ? (salespersonNames.get(assignedTo) ?? 'Unknown salesperson') : 'All Salespeople',
+        dateSelection: OWNERS_REPORT_PRESET_LABELS[appliedPreset],
+        current: {
+          title: ranges.prior ? 'First period' : 'Current period',
+          range: rangeLabel(ranges.current),
+          deals: currentDeals,
+          totalCount: currentTotals.count,
+          totalAmount: currentTotals.amount,
+        },
+        comparedTo: ranges.prior ? {
+          title: 'Compared to',
+          range: rangeLabel(ranges.prior),
+          deals: priorDeals,
+          totalCount: priorTotals.count,
+          totalAmount: priorTotals.amount,
+        } : undefined,
+        delta: ranges.prior ? delta : undefined,
+        salespersonRates,
+        storeRates,
+        storeNames,
+        salespersonNames,
+      });
+    } catch (error) {
+      setPdfError(error instanceof Error ? error.message : 'The printable PDF could not be prepared.');
+    } finally {
+      setIsBuildingPdf(false);
+    }
   };
 
   return (
@@ -206,7 +250,14 @@ function OwnersPerformanceReport() {
           {!pendingComparisonValid && <p role="alert" className="text-xs text-red-400">Each period needs a valid start date on or before its end date, and both dates must be within the selected year.</p>}
         </div>
       )}
-      <button type="button" onClick={applyPeriod} disabled={(selectedPreset === 'custom' && !pendingCustomValid) || (selectedPreset === 'compare_dates' && !pendingComparisonValid)} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Apply dates</button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={applyPeriod} disabled={(selectedPreset === 'custom' && !pendingCustomValid) || (selectedPreset === 'compare_dates' && !pendingComparisonValid)} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">Apply dates</button>
+        <button type="button" onClick={viewPrintablePdf} disabled={report.isLoading || !ranges || isBuildingPdf} className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-950 px-4 py-2 text-sm font-bold text-ink-100 hover:border-brand-500 disabled:cursor-not-allowed disabled:opacity-50">
+          {isBuildingPdf ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+          {isBuildingPdf ? 'Preparing PDF…' : 'View printable PDF'}
+        </button>
+      </div>
+      {pdfError && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{pdfError}</p>}
 
       {report.error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">Report data could not load. ({report.error})</p>}
       {report.isLoading || !ranges ? <p className="py-8 text-center text-sm text-ink-500">Loading report…</p> : (

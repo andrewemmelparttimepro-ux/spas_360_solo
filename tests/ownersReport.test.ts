@@ -10,6 +10,7 @@ import {
   reportTotals,
   type OwnersReportDeal,
 } from '../src/lib/ownersReport.ts';
+import { buildOwnersReportPdf } from '../src/lib/ownersReportPdf.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -92,7 +93,11 @@ describe('Owners Corner sales reports', () => {
   });
 
   it('wires all requested controls and keeps reads organization scoped', async () => {
-    const [page, hook] = await Promise.all([read('src/pages/OwnersCorner.tsx'), read('src/hooks/useOwnersReport.ts')]);
+    const [page, hook, pdf] = await Promise.all([
+      read('src/pages/OwnersCorner.tsx'),
+      read('src/hooks/useOwnersReport.ts'),
+      read('src/lib/ownersReportPdf.ts'),
+    ]);
     assert.match(page, /Closed-Won/);
     assert.match(page, /Closed-Lost/);
     assert.match(page, /All Stores/);
@@ -104,10 +109,42 @@ describe('Owners Corner sales reports', () => {
     assert.match(page, /Assigned Leads[\s\S]*Closed-Won[\s\S]*Rate/);
     assert.match(page, /By Salesperson/);
     assert.match(page, /By Store/);
+    assert.match(page, /View printable PDF/);
+    assert.match(page, /viewOwnersReportPdf/);
+    assert.match(page, /rateDeals[\s\S]*locationId[\s\S]*assignedTo/);
+    assert.match(pdf, /window\.open\('', '_blank'\)[\s\S]*preview\.location\.replace\(url\)/);
+    assert.doesNotMatch(pdf, /\.save\(|\.download\s*=/);
     assert.match(hook, /\.from\('deals'\)[\s\S]*\.eq\('org_id', orgId\)/);
     assert.match(hook, /DEAL_PAGE_SIZE = 1000[\s\S]*\.range\(from, from \+ DEAL_PAGE_SIZE - 1\)/);
     assert.match(hook, /\.from\('locations'\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
     assert.match(hook, /\.from\('profiles'\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
     assert.match(hook, /\.neq\('id', THRAWN_PROFILE_ID\)/);
+  });
+
+  it('builds a viewable PDF with applied filters, periods, deals, delta, and closing-rate tables', async () => {
+    const currentDeals = [deals[0], deals[2]];
+    const comparedDeals = [deals[3]];
+    const bytes = await buildOwnersReportPdf({
+      generatedAt: new Date('2026-08-30T20:00:00-05:00'),
+      outcome: 'won',
+      store: 'All Stores',
+      salesperson: 'All Salespeople',
+      dateSelection: 'Compare Dates',
+      current: { title: 'First period', range: 'Aug 1, 2026 - Aug 31, 2026', deals: currentDeals, totalCount: 2, totalAmount: 1500 },
+      comparedTo: { title: 'Compared to', range: 'Aug 1, 2025 - Aug 31, 2025', deals: comparedDeals, totalCount: 1, totalAmount: 800 },
+      delta: { count: 1, amount: 700 },
+      salespersonRates: [{ id: 'p1', name: 'Alex', assigned: 2, won: 1, rate: 0.5 }],
+      storeRates: [{ id: 's1', name: 'North', assigned: 2, won: 1, rate: 0.5 }],
+      storeNames: new Map([['s1', 'North'], ['s2', 'South']]),
+      salespersonNames: new Map([['p1', 'Alex'], ['p2', 'Blair']]),
+    });
+    assert.equal(Buffer.from(bytes.subarray(0, 5)).toString('ascii'), '%PDF-');
+    const source = Buffer.from(bytes).toString('latin1');
+    assert.match(source, /Sales Outcome & Closing Rate/);
+    assert.match(source, /Compare Dates/);
+    assert.match(source, /Other store/);
+    assert.match(source, /COMPARISON DELTA/i);
+    assert.match(source, /By Salesperson/);
+    assert.match(source, /By Store/);
   });
 });

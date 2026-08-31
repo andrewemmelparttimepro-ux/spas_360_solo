@@ -21,11 +21,14 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 // Dev-only UI preview: stubs auth so page chrome can be reviewed without signing in.
 // Guarded by import.meta.env.DEV — dead-code-eliminated from production builds.
 const UI_PREVIEW = import.meta.env.DEV && import.meta.env.VITE_UI_PREVIEW === '1';
+const UI_PREVIEW_ROLE = import.meta.env.DEV && import.meta.env.VITE_UI_PREVIEW_ROLE === 'technician'
+  ? 'technician'
+  : 'owner_manager';
 const PREVIEW_PROFILE = {
   id: '00000000-0000-0000-0000-00000000dead',
   org_id: '00000000-0000-0000-0000-000000000001',
   location_id: null,
-  role: 'owner_manager',
+  role: UI_PREVIEW_ROLE,
   first_name: 'Preview',
   last_name: 'User',
   email: 'preview@spas360.dev',

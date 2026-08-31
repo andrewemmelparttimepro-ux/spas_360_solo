@@ -18,6 +18,8 @@ import type { Contact } from '@/types/database';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
 import JobContactDetails from '@/components/JobContactDetails';
+import StoreSwitcher from '@/components/StoreSwitcher';
+import { canManageServiceSchedule, isServiceTechnician } from '@/lib/serviceTechAccess';
 
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | null };
@@ -216,12 +218,16 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
 }
 
 // --------------- Day/week job card ---------------
-function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean> }) {
+function JobCard({ job, saveJobStatus, technician }: { job: ServiceJob; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean>; technician?: boolean }) {
   const contact = job.contacts;
   return (
     <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', jobTypeCardColors[scheduleJobType(job.job_type)] ?? 'bg-ink-950')}>
       <div className="flex items-center justify-between gap-2">
-        <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
+        {technician ? (
+          <span className="text-[11px] font-bold uppercase tracking-wide opacity-80">{job.status}</span>
+        ) : (
+          <EditableJobStatus value={job.status as JobStatus} jobId={job.id} onSave={saveJobStatus} />
+        )}
         {job.scheduled_at && !job.scheduled_all_day && (
           <span className="flex items-center text-xs opacity-80 shrink-0"><Clock className="w-3 h-3 mr-1" />{jobTime(job, true)}</span>
         )}
@@ -239,9 +245,11 @@ function JobCard({ job, saveJobStatus }: { job: ServiceJob; saveJobStatus: (id: 
 
 export default function Service() {
   const { jobs, unscheduledJobs, scheduledJobs, isLoading, createJob, updateJob } = useServiceJobs();
-  const { contacts } = useContacts();
-  const { items: inventoryItems, isLoading: inventoryLoading, refresh: refreshInventory } = useInventory();
   const { locations, profile, activeLocationId } = useAuth();
+  const technician = isServiceTechnician(profile?.role);
+  const canManageSchedule = canManageServiceSchedule(profile?.role);
+  const { contacts } = useContacts(canManageSchedule);
+  const { items: inventoryItems, isLoading: inventoryLoading, refresh: refreshInventory } = useInventory(canManageSchedule);
   const { toast } = useToast();
 
   const location = useLocation();
@@ -265,6 +273,7 @@ export default function Service() {
 
   // ─── Drag-to-schedule: queue → day, day → day, chip → queue ───
   const onDragEnd = async (result: DropResult) => {
+    if (!canManageSchedule) return;
     const { destination, source, draggableId } = result;
     if (!destination || destination.droppableId === source.droppableId) return;
     const jobId = draggableId.replace(/^(un|sch)-/, '').split('@')[0];
@@ -430,9 +439,11 @@ export default function Service() {
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Service</p>
           <h1 className="mt-0.5 text-[22px] sm:text-[26px] leading-tight font-bold text-ink-100 tracking-tight">Schedule</h1>
-          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">Drag jobs from the queue onto a day — drag back to unschedule</p>
+          <p className="hidden sm:block text-[13px] text-ink-400 mt-0.5">
+            {technician ? 'Choose a store and tap a day to see its scheduled jobs' : 'Drag jobs from the queue onto a day — drag back to unschedule'}
+          </p>
         </div>
-        <button
+        {canManageSchedule && <button
           onClick={() => {
             // Smart default: pre-pick the store you're already working in
             setNewJob(j => ({ ...j, location_id: j.location_id || activeLocationId || profile?.location_id || locations[0]?.id || '' }));
@@ -442,7 +453,11 @@ export default function Service() {
           className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
         >
           <Plus className="w-4 h-4 mr-2" />New Job
-        </button>
+        </button>}
+      </div>
+
+      <div className="mb-4 shrink-0 overflow-x-auto" aria-label="Schedule store selector">
+        <StoreSwitcher countSource="scheduledJobs" />
       </div>
 
       {/* Color legend = working filter (Brandon's color language) */}
@@ -608,20 +623,20 @@ export default function Service() {
             <div className="flex-1 overflow-y-auto bg-ink-950/50">
               {/* ─── DAY ─── */}
               {viewMode === 'day' && (
-                <Droppable droppableId={`day-${format(currentDate, 'yyyy-MM-dd')}`}>
+                <Droppable droppableId={`day-${format(currentDate, 'yyyy-MM-dd')}`} isDropDisabled={!canManageSchedule}>
                   {(provided, snapshot) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className={cn('p-4 sm:p-6 space-y-3 min-h-full transition-colors', snapshot.isDraggingOver && 'bg-brand-500/10')}>
                       {filteredJobs.length === 0 ? (
                         <div className="text-center py-16">
                           <CalendarIcon className="w-10 h-10 text-ink-600 mx-auto mb-3" />
                           <p className="text-sm text-ink-500">No jobs scheduled for {format(currentDate, 'MMMM d')}</p>
-                          <p className="text-xs text-ink-600 mt-1">Drag one over from the queue</p>
+                          <p className="text-xs text-ink-600 mt-1">{technician ? 'Choose another day or store' : 'Drag one over from the queue'}</p>
                         </div>
                       ) : filteredJobs.map((job, i) => (
-                        <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, currentDate)} index={i}>
+                        <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, currentDate)} index={i} isDragDisabled={!canManageSchedule}>
                           {(p) => (
                             <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
-                              <JobCard job={job} saveJobStatus={saveJobStatus} />
+                              <JobCard job={job} saveJobStatus={saveJobStatus} technician={technician} />
                             </div>
                           )}
                         </Draggable>
@@ -639,7 +654,7 @@ export default function Service() {
                     const isToday = isSameDay(date, new Date());
                     const dayJobs = filteredJobs.filter(j => jobOccursOnCalendarDay(j, date));
                     return (
-                      <Droppable key={date.toISOString()} droppableId={`day-${format(date, 'yyyy-MM-dd')}`}>
+                      <Droppable key={date.toISOString()} droppableId={`day-${format(date, 'yyyy-MM-dd')}`} isDropDisabled={!canManageSchedule}>
                         {(provided, snapshot) => (
                           <div ref={provided.innerRef} {...provided.droppableProps} className={cn('p-3 sm:p-4 transition-colors', isToday && 'bg-brand-500/5', snapshot.isDraggingOver && 'bg-brand-500/10')}>
                             <div className="flex items-center gap-3 mb-2">
@@ -651,10 +666,10 @@ export default function Service() {
                             </div>
                             <div className="ml-[52px] space-y-2">
                               {dayJobs.map((job, i) => (
-                                <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, date)} index={i}>
+                                <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, date)} index={i} isDragDisabled={!canManageSchedule}>
                                   {(p) => (
                                     <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
-                                      <JobCard job={job} saveJobStatus={saveJobStatus} />
+                                      <JobCard job={job} saveJobStatus={saveJobStatus} technician={technician} />
                                     </div>
                                   )}
                                 </Draggable>
@@ -686,7 +701,7 @@ export default function Service() {
                       const isToday = isSameDay(day, new Date());
                       const dayJobs = filteredJobs.filter(j => jobOccursOnCalendarDay(j, day));
                       return (
-                        <Droppable key={day.toISOString()} droppableId={`day-${format(day, 'yyyy-MM-dd')}`}>
+                        <Droppable key={day.toISOString()} droppableId={`day-${format(day, 'yyyy-MM-dd')}`} isDropDisabled={!canManageSchedule}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
@@ -709,7 +724,7 @@ export default function Service() {
                               </div>
                               <div className="space-y-[3px]">
                                 {dayJobs.slice(0, 3).map((job, i) => (
-                                  <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, day)} index={i}>
+                                  <Draggable key={job.id} draggableId={scheduledDraggableId(job.id, day)} index={i} isDragDisabled={!canManageSchedule}>
                                     {(p, snap) => (
                                       <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps}>
                                         <Link
@@ -746,7 +761,7 @@ export default function Service() {
           </div>
 
           {/* ─── Unscheduled queue (right, like Jobber) ─── */}
-          <div className="w-full lg:w-72 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden shrink-0 max-h-72 lg:max-h-none">
+          {canManageSchedule && <div className="w-full lg:w-72 flex flex-col bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden shrink-0 max-h-72 lg:max-h-none">
             <div className="p-3.5 border-b border-ink-700 bg-ink-950 flex justify-between items-center shrink-0">
               <h2 className="text-sm font-semibold text-ink-100">Unscheduled</h2>
               <span className="bg-ink-700 text-ink-300 text-xs font-bold px-2 py-0.5 rounded-full">{unscheduledJobs.length}</span>
@@ -794,7 +809,7 @@ export default function Service() {
                 </div>
               )}
             </Droppable>
-          </div>
+          </div>}
         </div>
       </DragDropContext>
     </div>

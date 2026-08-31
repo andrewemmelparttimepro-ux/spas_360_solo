@@ -49,7 +49,7 @@ describe('Schedule job contact details', () => {
 
     assert.match(jobCard, /contact && <JobContactDetails contact=\{contact\} compact \/>/);
     assert.match(queue, /<JobContactDetails contact=\{job\.contacts\} compact \/>/);
-    assert.match(detail, /<JobContactDetails contact=\{contact\} className="text-ink-300" \/>/);
+    assert.match(detail, /<JobContactDetails contact=\{\{ \.\.\.contact, mailing_address: property\?\.address \?\? contact\.mailing_address \}\} className="text-ink-300" \/>/);
     assert.match(component, /target="_blank"/);
     assert.match(component, /rel="noopener noreferrer"/);
     assert.match(component, /href=\{googleMapsSearchUrl\(address\)\}/);

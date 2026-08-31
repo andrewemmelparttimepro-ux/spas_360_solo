@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes } from 'lucide-react';
+import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes, CheckCircle2, CalendarDays, Clock3 } from 'lucide-react';
 import { useJob, useJobInventory, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
@@ -15,6 +15,7 @@ import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError } from '@/lib/jobSchedule';
 import JobContactDetails from '@/components/JobContactDetails';
+import { canEditServiceJob, isServiceTechnician } from '@/lib/serviceTechAccess';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
 function TimeClockCard({ jobId }: { jobId: string }) {
@@ -70,7 +71,7 @@ function TimeClockCard({ jobId }: { jobId: string }) {
 }
 
 // ─── Photos: camera-first capture with type tags ───
-function PhotoCard({ jobId }: { jobId: string }) {
+function PhotoCard({ jobId, allowDelete = true }: { jobId: string; allowDelete?: boolean }) {
   const { photos, isUploading, uploadPhoto, deletePhoto } = useJobPhotos(jobId);
   const { toast } = useToast();
   const [photoType, setPhotoType] = useState<string>('General');
@@ -137,12 +138,14 @@ function PhotoCard({ jobId }: { jobId: string }) {
           <img src={viewer.url} alt={viewer.photo_type} className="max-w-full max-h-[80vh] rounded-lg object-contain" />
           <div className="flex items-center gap-4 mt-4" onClick={e => e.stopPropagation()}>
             <span className="text-sm text-ink-300">{viewer.photo_type} · {new Date(viewer.created_at).toLocaleString()}</span>
-            <button
-              onClick={async () => { const { error } = await deletePhoto(viewer); if (error) toast(error, 'error'); else { toast('Photo deleted', 'success'); setViewer(null); } }}
-              className="flex items-center gap-1 text-sm text-red-400 hover:text-red-300"
-            >
-              <Trash2 className="w-4 h-4" />Delete
-            </button>
+            {allowDelete && (
+              <button
+                onClick={async () => { const { error } = await deletePhoto(viewer); if (error) toast(error, 'error'); else { toast('Photo deleted', 'success'); setViewer(null); } }}
+                className="flex items-center gap-1 text-sm text-red-400 hover:text-red-300"
+              >
+                <Trash2 className="w-4 h-4" />Delete
+              </button>
+            )}
             <button onClick={() => setViewer(null)} className="text-sm text-ink-400 hover:text-ink-100">Close</button>
           </div>
         </div>
@@ -310,6 +313,33 @@ function ScheduleDateRangeEditor({
   );
 }
 
+function ScheduleSummary({ job }: { job: Pick<Job, 'scheduled_at' | 'scheduled_all_day' | 'scheduled_end_date'> }) {
+  const draft = jobScheduleDraft(job);
+  if (!draft.startDate) return null;
+
+  const formatDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+  const formatTime = (value: string) => new Date(`2000-01-01T${value}:00`).toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit',
+  });
+
+  return (
+    <div className="rounded-lg border border-ink-700 bg-ink-950 p-3 text-sm text-ink-200">
+      <div className="flex items-center gap-2">
+        <CalendarDays className="h-4 w-4 text-ink-500" />
+        <span>{formatDate(draft.startDate)}{draft.endDate && draft.endDate !== draft.startDate ? ` – ${formatDate(draft.endDate)}` : ''}</span>
+      </div>
+      {draft.startTime && (
+        <div className="mt-2 flex items-center gap-2 text-ink-300">
+          <Clock3 className="h-4 w-4 text-ink-500" />
+          <span>{formatTime(draft.startTime)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --------------- Editable status badge ---------------
 function EditableStatusBadge({ value, onSave }: { value: JobStatus; onSave: (u: Partial<Job>) => Promise<boolean> }) {
   const [editing, setEditing] = useState(false);
@@ -345,16 +375,18 @@ export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { job, isLoading, updateJob, deleteJob } = useJob(id);
+  const technician = isServiceTechnician(profile?.role);
+  const canEditJob = canEditServiceJob(profile?.role);
+  const { job, isLoading, updateJob, deleteJob, completeJob } = useJob(id);
   const {
     choices: inventoryChoices,
     selectedItems: attachedInventory,
     isLoading: inventoryLoading,
     isSaving: inventorySaving,
     replaceInventory,
-  } = useJobInventory(id, job?.location_id);
+  } = useJobInventory(id, job?.location_id, canEditJob);
   const { notes, createNote } = useNotes({ jobId: id });
-  const { tasks, createTask, completeTask } = useTasks({ jobId: id });
+  const { tasks, createTask, completeTask } = useTasks({ jobId: id }, !technician);
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -363,6 +395,7 @@ export default function JobDetail() {
   const [deletingJob, setDeletingJob] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showInventoryEditor, setShowInventoryEditor] = useState(false);
+  const [completingJob, setCompletingJob] = useState(false);
 
   const saveJob = async (updates: Partial<Job>) => {
     const ok = await updateJob(updates);
@@ -419,6 +452,14 @@ export default function JobDetail() {
     setShowInventoryEditor(false);
   };
 
+  const handleCompleteJob = async () => {
+    if (completingJob || job.status === 'Completed') return;
+    setCompletingJob(true);
+    const result = await completeJob();
+    setCompletingJob(false);
+    toast(result.ok ? 'Job marked completed' : result.error, result.ok ? 'success' : 'error');
+  };
+
   const canDelete = !job.scheduled_at
     && (profile?.role === 'owner_manager' || profile?.role === 'service_manager');
 
@@ -428,12 +469,16 @@ export default function JobDetail() {
         <Link to="/service" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="min-w-0 flex-1">
           <div role="heading" aria-level={1} className="text-ink-100">
-            <EditableField label="job heading" value={job.title} field="title" onSave={saveJob} bold heading />
+            {canEditJob
+              ? <EditableField label="job heading" value={job.title} field="title" onSave={saveJob} bold heading />
+              : <h1 className="text-xl font-bold sm:text-2xl">{job.title}</h1>}
           </div>
           {contact && (
             <>
-              <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>
-              <JobContactDetails contact={contact} className="text-ink-300" />
+              {technician
+                ? <p className="text-sm font-semibold text-brand-400">{contact.first_name} {contact.last_name}</p>
+                : <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
+              <JobContactDetails contact={{ ...contact, mailing_address: property?.address ?? contact.mailing_address }} className="text-ink-300" />
             </>
           )}
         </div>
@@ -447,7 +492,28 @@ export default function JobDetail() {
               <Trash2 className="h-4 w-4" />Delete
             </button>
           )}
-          <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
+          {canEditJob ? (
+            <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
+          ) : technician ? (
+            job.status === 'Completed' ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-2 text-sm font-bold text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" />Completed
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleCompleteJob()}
+                disabled={completingJob || job.status === 'Cancelled'}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
+              </button>
+            )
+          ) : (
+            <span className={cn('inline-flex rounded-lg border-l-4 px-3 py-1 text-sm font-bold', statusColors[job.status] ?? 'bg-ink-950')}>
+              {job.status}
+            </span>
+          )}
         </div>
       </div>
 
@@ -492,18 +558,22 @@ export default function JobDetail() {
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6 space-y-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Job Details</h2>
-            <span className="text-[10px] text-ink-500">Click any value to edit</span>
+            {canEditJob && <span className="text-[10px] text-ink-500">Click any value to edit</span>}
           </div>
           <div className="space-y-4">
-            <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS.some(option => option === job.job_type) ? JOB_TYPE_OPTIONS : [job.job_type, ...JOB_TYPE_OPTIONS]} />
+            {canEditJob
+              ? <EditableField label="Job Type" value={job.job_type} field="job_type" onSave={saveJob} icon={Wrench} type="select" options={JOB_TYPE_OPTIONS.some(option => option === job.job_type) ? JOB_TYPE_OPTIONS : [job.job_type, ...JOB_TYPE_OPTIONS]} />
+              : <div className="flex items-center text-sm text-ink-200"><Wrench className="mr-2 h-4 w-4 text-ink-500" />{job.job_type}</div>}
             {location && <div className="flex items-center text-sm"><MapPin className="w-4 h-4 mr-2 text-ink-500" />{location.name}</div>}
-            {property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
-            <ScheduleDateRangeEditor job={job} onSave={saveJob} />
+            {canEditJob && property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
+            {canEditJob ? <ScheduleDateRangeEditor job={job} onSave={saveJob} /> : <ScheduleSummary job={job} />}
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
             {job.description && <div className="text-sm text-ink-300 bg-ink-950 p-3 rounded-lg">{job.description}</div>}
-            <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
+            {canEditJob
+              ? <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
+              : job.amount_to_collect != null && <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />Collect ${Number(job.amount_to_collect).toLocaleString()}</div>}
             {/* When the invoice can't be estimated yet, the level (1=routine, 3=expensive) carries "in play" on the customer card */}
-            {!job.amount_to_collect && (
+            {canEditJob && !job.amount_to_collect && (
               <EditableField label="Service Level (1–3)" value={job.service_level ?? null} field="service_level" onSave={saveJob} icon={Wrench} type="select" options={['1', '2', '3']} numeric color="text-amber-300" />
             )}
           </div>
@@ -518,14 +588,14 @@ export default function JobDetail() {
                 </h2>
                 <p className="mt-1 text-xs text-ink-500">Units attached to this job</p>
               </div>
-              <button
+              {canEditJob && <button
                 type="button"
                 onClick={() => setShowInventoryEditor(true)}
                 disabled={inventoryLoading}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/40 px-3 py-2 text-sm font-semibold text-brand-300 hover:bg-brand-500/10 disabled:opacity-50"
               >
                 <Pencil className="h-3.5 w-3.5" />Edit inventory
-              </button>
+              </button>}
             </div>
             {inventoryLoading ? (
               <p className="mt-4 text-sm text-ink-500">Loading attached inventory…</p>
@@ -543,7 +613,7 @@ export default function JobDetail() {
           </div>
 
           {/* Photos: proof of delivery, damage, serials */}
-          <PhotoCard jobId={job.id} />
+          <PhotoCard jobId={job.id} allowDelete={!technician} />
 
           {/* Notes */}
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
@@ -560,7 +630,7 @@ export default function JobDetail() {
           </div>
 
           {/* Tasks */}
-          <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+          {!technician && <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2>
               <button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
@@ -580,7 +650,7 @@ export default function JobDetail() {
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

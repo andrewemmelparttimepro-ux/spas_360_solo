@@ -8,12 +8,16 @@ import ChatWidget from '../ChatWidget';
 import WidgetBoundary from '../ui/WidgetBoundary';
 import { CustomerDragProvider } from '@/contexts/CustomerDragContext';
 import ActivityTracker from '../ActivityTracker';
+import { useAuth } from '@/contexts/AuthContext';
+import { isServiceTechnician } from '@/lib/serviceTechAccess';
 
 /** OMP-style shell: dark operational frame, light working canvas, admin rail on the right; mobile gets a drawer.
  *  CustomerDragProvider wraps the whole shell so a customer card can be dragged
  *  from any page onto the Deals/Schedule pills in the topbar. */
 export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { profile } = useAuth();
+  const technician = isServiceTechnician(profile?.role);
 
   // Keep this device's push subscription fresh + owned by the signed-in user
   useEffect(() => { resyncPush(); }, []);
@@ -24,8 +28,8 @@ export default function AppLayout() {
       {/* 100dvh (not vh): the shell tracks the real visible viewport on mobile, so
           bottom-anchored composers aren't stranded when browser chrome/keyboard moves */}
       <div className="flex flex-col h-[100dvh] bg-[var(--color-app-canvas)] text-ink-100 font-sans">
-        <Header onMenuClick={() => setDrawerOpen(true)} />
-        <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+        <Header onMenuClick={technician ? undefined : () => setDrawerOpen(true)} />
+        {!technician && <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
         <div className="flex flex-1 overflow-hidden">
           <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
@@ -34,9 +38,11 @@ export default function AppLayout() {
             <AdminRail />
           </WidgetBoundary>
         </div>
-        <WidgetBoundary>
-          <ChatWidget />
-        </WidgetBoundary>
+        {!technician && (
+          <WidgetBoundary>
+            <ChatWidget />
+          </WidgetBoundary>
+        )}
       </div>
     </CustomerDragProvider>
   );

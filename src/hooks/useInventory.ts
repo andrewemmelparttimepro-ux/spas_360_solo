@@ -12,7 +12,7 @@ import {
 
 export type InventoryListItem = InventoryWithDealAssignment;
 
-export function useInventory() {
+export function useInventory(enabled = true) {
   const { profile, activeLocationId } = useAuth();
   const [items, setItems] = useState<InventoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +20,11 @@ export function useInventory() {
   const latestFetchId = useRef(0);
 
   const fetchItems = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || !enabled) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
     const fetchId = ++latestFetchId.current;
 
     let query = supabase
@@ -65,13 +69,13 @@ export function useInventory() {
       (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
     ));
     setIsLoading(false);
-  }, [profile, activeLocationId, searchQuery]);
+  }, [profile, activeLocationId, searchQuery, enabled]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
   // Inventory fields and Deal Detail reservations both feed this table.
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !enabled) return;
     const orgFilter = `org_id=eq.${profile.org_id}`;
     const channel = supabase
       .channel(`inventory-realtime-${Math.random().toString(36).slice(2)}`)
@@ -89,7 +93,7 @@ export function useInventory() {
       }, fetchItems)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile, fetchItems]);
+  }, [profile, fetchItems, enabled]);
 
   const totalInStock = items.filter(isAvailableInventoryStock).length;
   const awaitingDelivery = items.filter(i => i.status === 'Sold').length;

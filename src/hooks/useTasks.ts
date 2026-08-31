@@ -3,13 +3,17 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Task } from '@/types/database';
 
-export function useTasks(filters?: { dealId?: string; contactId?: string; jobId?: string }) {
+export function useTasks(filters?: { dealId?: string; contactId?: string; jobId?: string }, enabled = true) {
   const { profile } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTasks = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || !enabled) {
+      setTasks([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
 
     let query = supabase
@@ -25,7 +29,7 @@ export function useTasks(filters?: { dealId?: string; contactId?: string; jobId?
     if (error) console.error('Error fetching tasks:', error);
     setTasks(data ?? []);
     setIsLoading(false);
-  }, [profile, filters?.dealId, filters?.contactId, filters?.jobId]);
+  }, [profile, filters?.dealId, filters?.contactId, filters?.jobId, enabled]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 

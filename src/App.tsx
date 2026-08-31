@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
 import AppLayout from './components/layout/AppLayout';
+import { isServiceTechnician, technicianCanAccessPath } from './lib/serviceTechAccess';
 
 const Login = lazy(() => import('./pages/Login'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -58,6 +59,17 @@ function RoleLanding() {
   return <Navigate to={home} replace />;
 }
 
+function RoleRouteGuard() {
+  const { profile } = useAuth();
+  const location = useLocation();
+
+  if (isServiceTechnician(profile?.role) && !technicianCanAccessPath(location.pathname)) {
+    return <Navigate to="/service" replace />;
+  }
+
+  return <Outlet />;
+}
+
 function AuthGate() {
   const { session, isLoading } = useAuth();
 
@@ -92,33 +104,35 @@ function AuthGate() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<RoleLanding />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="customers/:id" element={<ContactDetail />} />
-          {/* Legacy paths — old links and notifications keep working */}
-          <Route path="contacts" element={<Navigate to="/customers" replace />} />
-          <Route path="contacts/:id" element={<ContactDetail />} />
-          <Route path="deals" element={<Deals />} />
-          <Route path="deals/:id" element={<DealDetail />} />
-          <Route path="crm" element={<Navigate to="/deals" replace />} />
-          <Route path="crm/:id" element={<DealDetail />} />
-          <Route path="service" element={<Service />} />
-          <Route path="service/:id" element={<JobDetail />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="inventory/:id" element={<InventoryDetail />} />
-          <Route path="communication" element={<Communication />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="citadel" element={<Citadel />} />
-          <Route path="knowledge" element={<Knowledge />} />
-          <Route path="parts" element={<Knowledge key="parts" defaultType="parts_catalog" />} />
-          <Route path="media" element={<Media />} />
-          <Route path="documents" element={<Knowledge key="documents" pageTitle="Documents" />} />
-          <Route path="owners-corner" element={<OwnersCorner />} />
-          <Route path="settings" element={<Settings />} />
+        <Route element={<RoleRouteGuard />}>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<RoleLanding />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="customers" element={<Customers />} />
+            <Route path="customers/:id" element={<ContactDetail />} />
+            {/* Legacy paths — old links and notifications keep working */}
+            <Route path="contacts" element={<Navigate to="/customers" replace />} />
+            <Route path="contacts/:id" element={<ContactDetail />} />
+            <Route path="deals" element={<Deals />} />
+            <Route path="deals/:id" element={<DealDetail />} />
+            <Route path="crm" element={<Navigate to="/deals" replace />} />
+            <Route path="crm/:id" element={<DealDetail />} />
+            <Route path="service" element={<Service />} />
+            <Route path="service/:id" element={<JobDetail />} />
+            <Route path="inventory" element={<Inventory />} />
+            <Route path="inventory/:id" element={<InventoryDetail />} />
+            <Route path="communication" element={<Communication />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="citadel" element={<Citadel />} />
+            <Route path="knowledge" element={<Knowledge />} />
+            <Route path="parts" element={<Knowledge key="parts" defaultType="parts_catalog" />} />
+            <Route path="media" element={<Media />} />
+            <Route path="documents" element={<Knowledge key="documents" pageTitle="Documents" />} />
+            <Route path="owners-corner" element={<OwnersCorner />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
   );

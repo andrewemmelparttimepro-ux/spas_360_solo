@@ -9,6 +9,7 @@ import { useCustomerDrag } from '@/contexts/CustomerDragContext';
 import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 import SuggestionBox from '@/components/SuggestionBox';
+import { isServiceTechnician } from '@/lib/serviceTechAccess';
 
 // Hierarchy: the top bar carries the floor-operations destinations a
 // salesperson or tech touches every hour. Everything else (Inbox, Citadel,
@@ -93,6 +94,10 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     salesperson: 'Salesperson',
     technician: 'Technician',
   };
+  const technician = isServiceTechnician(profile?.role);
+  const visiblePrimaryNav = technician
+    ? PRIMARY_NAV_SECTIONS.filter(section => section.items.some(item => item.path === '/service'))
+    : PRIMARY_NAV_SECTIONS;
 
   // Global ⌘K / Ctrl+K
   useEffect(() => {
@@ -125,17 +130,19 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-1.5 sm:gap-4 lg:gap-2 2xl:gap-4 shrink-0 z-40">
       {/* Menu — on desktop it holds Inbox, Citadel, Reports, Settings */}
-      <button
-        onClick={onMenuClick}
-        className="p-2 -ml-1 text-ink-400 hover:text-ink-100 rounded-lg hover:bg-ink-800"
-        aria-label="Open menu"
-        title="Menu — Inbox, Citadel, Reports, Settings"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      {!technician && (
+        <button
+          onClick={onMenuClick}
+          className="p-2 -ml-1 text-ink-400 hover:text-ink-100 rounded-lg hover:bg-ink-800"
+          aria-label="Open menu"
+          title="Menu — Inbox, Citadel, Reports, Settings"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Brand */}
-      <NavLink to="/dashboard" className="flex items-center gap-2 shrink-0" aria-label="Go to Dashboard">
+      <NavLink to={technician ? '/service' : '/dashboard'} className="flex items-center gap-2 shrink-0" aria-label={technician ? 'Go to Schedule' : 'Go to Dashboard'}>
         <img src="/logo-mark.png" alt="SPAS 360" className="h-7 w-auto object-contain" />
         <span className="text-[15px] font-bold text-ink-100 tracking-tight hidden 2xl:block">
           SPAS <span className="text-brand-400">360</span>
@@ -144,7 +151,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Nav (desktop) — the floor-operations destinations only. */}
       <nav className="hidden min-w-0 flex-1 items-center justify-evenly lg:flex">
-        {PRIMARY_NAV_SECTIONS.map((section, i) => {
+        {visiblePrimaryNav.map((section, i) => {
           const tone = NAV_TONE[section.tone ?? 'neutral'];
           return (
             <div key={section.label ?? `sec-${i}`} className={cn('flex items-center gap-0.5 rounded-[10px] p-[3px]', tone.container)}>
@@ -185,27 +192,35 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="flex-1 lg:hidden" />
 
       {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. */}
-      <button
-        onClick={() => setSuggestionOpen(true)}
-        className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors hidden sm:block"
-        aria-label="Open Suggestion Box"
-        title="Suggestion Box"
-      >
-        <MessageSquarePlus className="h-5 w-5" />
-      </button>
-      <SuggestionBox open={suggestionOpen} onClose={() => setSuggestionOpen(false)} />
+      {!technician && (
+        <>
+          <button
+            onClick={() => setSuggestionOpen(true)}
+            className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors hidden sm:block"
+            aria-label="Open Suggestion Box"
+            title="Suggestion Box"
+          >
+            <MessageSquarePlus className="h-5 w-5" />
+          </button>
+          <SuggestionBox open={suggestionOpen} onClose={() => setSuggestionOpen(false)} />
+        </>
+      )}
 
       {/* Global search */}
-      <button
-        onClick={() => setSearchOpen(true)}
-        className="flex items-center gap-2 text-[13px] text-ink-400 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-2.5 sm:px-3 py-1.5 rounded-full transition-colors shrink-0"
-        aria-label="Search everything"
-      >
-        <Search className="w-3.5 h-3.5" />
-        <span className="hidden 2xl:inline">Search</span>
-        <kbd className="hidden 2xl:inline text-[10px] font-mono bg-ink-800 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
-      </button>
-      {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
+      {!technician && (
+        <>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 text-[13px] text-ink-400 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-2.5 sm:px-3 py-1.5 rounded-full transition-colors shrink-0"
+            aria-label="Search everything"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="hidden 2xl:inline">Search</span>
+            <kbd className="hidden 2xl:inline text-[10px] font-mono bg-ink-800 border border-ink-700 rounded px-1 py-px">⌘K</kbd>
+          </button>
+          {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
+        </>
+      )}
 
       {/* Location Selector */}
       <div className="relative shrink-0" ref={locRef}>
@@ -239,7 +254,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </div>
 
       {/* Notifications */}
-      <div className="relative shrink-0" ref={notifRef}>
+      {!technician && <div className="relative shrink-0" ref={notifRef}>
         <button
           onClick={() => setNotifOpen(o => !o)}
           className="relative p-2 text-ink-500 hover:text-ink-300 transition-colors rounded-full hover:bg-ink-800"
@@ -296,7 +311,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* User Menu */}
       <div className="relative shrink-0" ref={userRef}>
@@ -320,13 +335,15 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               <p className="text-sm font-medium text-ink-100 truncate">{profile?.email}</p>
               <p className="text-xs text-ink-400">{profile ? roleLabels[profile.role] : ''}</p>
             </div>
-            <button
-              onClick={() => { navigate('/settings'); setUserOpen(false); }}
-              className="w-full text-left px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 flex items-center"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </button>
+            {!technician && (
+              <button
+                onClick={() => { navigate('/settings'); setUserOpen(false); }}
+                className="w-full text-left px-4 py-2 text-sm text-ink-300 hover:bg-ink-800 flex items-center"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </button>
+            )}
             <button
               onClick={() => { signOut(); setUserOpen(false); }}
               className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 flex items-center"

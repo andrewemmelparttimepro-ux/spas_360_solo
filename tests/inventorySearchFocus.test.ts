@@ -7,7 +7,7 @@ const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, im
 describe('Inventory search focus contract', () => {
   it('keeps the mounted search input while query requests are in flight', async () => {
     const hook = await read('src/hooks/useInventory.ts');
-    const fetchBody = hook.match(/const fetchItems = useCallback\(async \(\) => \{([\s\S]*?)\n  \}, \[profile, activeLocationId, searchQuery\]\);/)?.[1];
+    const fetchBody = hook.match(/const fetchItems = useCallback\(async \(\) => \{([\s\S]*?)\n  \}, \[profile, activeLocationId, searchQuery, enabled\]\);/)?.[1];
 
     assert.ok(fetchBody, 'inventory fetch callback should remain identifiable');
     assert.doesNotMatch(fetchBody, /setIsLoading\(true\)/);

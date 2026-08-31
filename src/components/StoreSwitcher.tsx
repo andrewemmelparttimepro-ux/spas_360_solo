@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
  * Drives the same global location filter as the header pill, so
  * Deals / Schedule / Reports follow along.
  */
-export default function StoreSwitcher() {
+export default function StoreSwitcher({ countSource = 'inventory' }: { countSource?: 'inventory' | 'scheduledJobs' }) {
   const { profile, locations, activeLocationId, setActiveLocation } = useAuth();
   const [counts, setCounts] = useState<Record<string, number>>({});
 
@@ -17,17 +17,17 @@ export default function StoreSwitcher() {
     if (!profile) return;
     let alive = true;
     (async () => {
-      const { data } = await supabase
-        .from('inventory_items')
-        .select('location_id')
-        .eq('org_id', profile.org_id);
+      const baseQuery = countSource === 'scheduledJobs'
+        ? supabase.from('jobs').select('location_id').eq('org_id', profile.org_id).not('scheduled_at', 'is', null)
+        : supabase.from('inventory_items').select('location_id').eq('org_id', profile.org_id);
+      const { data } = await baseQuery;
       if (!alive || !data) return;
       const c: Record<string, number> = {};
       for (const row of data) c[row.location_id] = (c[row.location_id] ?? 0) + 1;
       setCounts(c);
     })();
     return () => { alive = false; };
-  }, [profile]);
+  }, [profile, countSource]);
 
   const total = Object.values(counts).reduce((s, n) => s + n, 0);
 

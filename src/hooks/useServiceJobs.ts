@@ -223,10 +223,21 @@ export function useJob(id: string | undefined) {
     return { ok: true, error: null };
   }, [id]);
 
-  return { job, isLoading, updateJob, deleteJob };
+  const completeJob = useCallback(async () => {
+    if (!id) return { ok: false, error: 'Job not found.' };
+    const { error } = await supabase.rpc('complete_service_job', { p_job_id: id });
+    if (error) {
+      console.error('Error completing service job:', error);
+      return { ok: false, error: error.message || 'The job could not be completed.' };
+    }
+    await fetchJob();
+    return { ok: true, error: null };
+  }, [id, fetchJob]);
+
+  return { job, isLoading, updateJob, deleteJob, completeJob };
 }
 
-export function useJobInventory(jobId: string | undefined, locationId: string | undefined) {
+export function useJobInventory(jobId: string | undefined, locationId: string | undefined, canManageInventory = true) {
   const { profile } = useAuth();
   const [items, setItems] = useState<InventoryWithDealAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -241,6 +252,26 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
 
     setIsLoading(true);
     const inventorySelect = '*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)';
+    if (!canManageInventory) {
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .select(inventorySelect)
+        .eq('org_id', profile.org_id)
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching attached job inventory:', error);
+        setItems([]);
+      } else {
+        setItems(mergeInventoryDealAssignments(
+          (data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
+          [],
+        ));
+      }
+      setIsLoading(false);
+      return;
+    }
+
     const locationInventoryPromise = locationId
       ? supabase
         .from('inventory_items')
@@ -288,7 +319,7 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
       (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
     ));
     setIsLoading(false);
-  }, [jobId, locationId, profile]);
+  }, [jobId, locationId, profile, canManageInventory]);
 
   useEffect(() => { void fetchInventory(); }, [fetchInventory]);
 
@@ -312,12 +343,13 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
     [items, jobId],
   );
   const choices = useMemo(
-    () => jobId && locationId ? inventoryChoicesForJob(items, jobId, locationId) : [],
-    [items, jobId, locationId],
+    () => canManageInventory && jobId && locationId ? inventoryChoicesForJob(items, jobId, locationId) : [],
+    [items, jobId, locationId, canManageInventory],
   );
 
   const replaceInventory = useCallback(async (inventoryItemIds: string[]) => {
     if (!jobId) return { ok: false, error: 'Job not found.' };
+    if (!canManageInventory) return { ok: false, error: 'You do not have permission to edit job inventory.' };
     setIsSaving(true);
     const { error } = await supabase.rpc('replace_job_inventory', {
       p_job_id: jobId,
@@ -331,7 +363,7 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
     await fetchInventory();
     setIsSaving(false);
     return { ok: true, error: null };
-  }, [fetchInventory, jobId]);
+  }, [fetchInventory, jobId, canManageInventory]);
 
   return { items, choices, selectedItems, isLoading, isSaving, replaceInventory, refresh: fetchInventory };
 }

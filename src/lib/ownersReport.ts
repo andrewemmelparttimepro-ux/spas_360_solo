@@ -1,19 +1,24 @@
-import { endOfDay, endOfMonth, endOfYear, startOfMonth, startOfYear } from 'date-fns';
+import { endOfMonth, endOfYear, startOfMonth, startOfYear } from 'date-fns';
 
 export type OwnersReportOutcome = 'won' | 'lost';
-export type OwnersReportPreset = 'this_month' | 'this_year' | 'month_vs_last_year' | 'ytd_vs_prior_ytd' | 'custom';
+export type OwnersReportPreset = 'this_month' | 'this_year' | 'compare_dates' | 'custom';
 
 export const OWNERS_REPORT_PRESET_LABELS: Record<OwnersReportPreset, string> = {
   this_month: 'This Month',
   this_year: 'This Year',
-  month_vs_last_year: 'This Month vs Same Month Last Year',
-  ytd_vs_prior_ytd: 'This Year To Date vs Prior Year To Date',
+  compare_dates: 'Compare Dates',
   custom: 'Custom Dates',
 };
 
 export interface OwnersReportRange { start: Date; end: Date }
 export interface OwnersReportRanges { current: OwnersReportRange; prior: OwnersReportRange | null }
 export interface OwnersReportCustomRange { startDate: string; endDate: string }
+export interface OwnersReportComparisonPeriod extends OwnersReportCustomRange { year: string }
+export interface OwnersReportComparison {
+  firstPeriod: OwnersReportComparisonPeriod;
+  comparedTo: OwnersReportComparisonPeriod;
+}
+export type OwnersReportDateSelection = OwnersReportCustomRange | OwnersReportComparison;
 
 export interface OwnersReportDeal {
   id: string;
@@ -36,39 +41,35 @@ function dateInput(value: string, end = false): Date | null {
   return date;
 }
 
-function priorYear(date: Date): Date {
-  const result = new Date(date);
-  const month = result.getMonth();
-  result.setFullYear(result.getFullYear() - 1);
-  if (result.getMonth() !== month) result.setDate(0); // February 29 -> February 28
-  return result;
+function comparisonPeriodRange(period: OwnersReportComparisonPeriod): OwnersReportRange | null {
+  if (!/^\d{4}$/.test(period.year)) return null;
+  const year = Number(period.year);
+  const start = dateInput(period.startDate);
+  const end = dateInput(period.endDate, true);
+  if (!start || !end || start > end || start.getFullYear() !== year || end.getFullYear() !== year) return null;
+  return { start, end };
 }
 
 export function ownersReportRanges(
   preset: OwnersReportPreset,
-  custom?: OwnersReportCustomRange | null,
+  selection?: OwnersReportDateSelection | null,
   now = new Date(),
 ): OwnersReportRanges | null {
   if (preset === 'custom') {
+    const custom = selection && 'startDate' in selection ? selection : null;
     const start = custom ? dateInput(custom.startDate) : null;
     const end = custom ? dateInput(custom.endDate, true) : null;
     return start && end && start <= end ? { current: { start, end }, prior: null } : null;
   }
-  if (preset === 'this_month') return { current: { start: startOfMonth(now), end: endOfMonth(now) }, prior: null };
-  if (preset === 'this_year') return { current: { start: startOfYear(now), end: endOfYear(now) }, prior: null };
-  if (preset === 'month_vs_last_year') {
-    const prior = priorYear(now);
-    return {
-      current: { start: startOfMonth(now), end: endOfMonth(now) },
-      prior: { start: startOfMonth(prior), end: endOfMonth(prior) },
-    };
+  if (preset === 'compare_dates') {
+    const comparison = selection && 'firstPeriod' in selection ? selection : null;
+    if (!comparison) return null;
+    const current = comparisonPeriodRange(comparison.firstPeriod);
+    const prior = comparisonPeriodRange(comparison.comparedTo);
+    return current && prior ? { current, prior } : null;
   }
-  const currentEnd = endOfDay(now);
-  const priorEnd = endOfDay(priorYear(now));
-  return {
-    current: { start: startOfYear(now), end: currentEnd },
-    prior: { start: startOfYear(priorEnd), end: priorEnd },
-  };
+  if (preset === 'this_month') return { current: { start: startOfMonth(now), end: endOfMonth(now) }, prior: null };
+  return { current: { start: startOfYear(now), end: endOfYear(now) }, prior: null };
 }
 
 export function dealInRange(value: string | null, range: OwnersReportRange): boolean {
@@ -93,6 +94,10 @@ export function closedDealsForRange(
 
 export function reportTotals(deals: OwnersReportDeal[]) {
   return { count: deals.length, amount: deals.reduce((total, deal) => total + (Number(deal.amount) || 0), 0) };
+}
+
+export function reportDelta(current: ReturnType<typeof reportTotals>, comparison: ReturnType<typeof reportTotals>) {
+  return { count: current.count - comparison.count, amount: current.amount - comparison.amount };
 }
 
 export interface ClosingRateRow { id: string; name: string; assigned: number; won: number; rate: number }

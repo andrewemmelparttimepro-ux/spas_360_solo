@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
+  OWNERS_REPORT_PRESET_LABELS,
   closedDealsForRange,
   closingRates,
   ownersReportRanges,
+  reportDelta,
   reportTotals,
   type OwnersReportDeal,
 } from '../src/lib/ownersReport.ts';
@@ -26,27 +28,45 @@ const deals: OwnersReportDeal[] = [
 describe('Owners Corner sales reports', () => {
   const now = new Date(2026, 7, 25, 10, 30);
 
-  it('builds the exact standard and comparison periods', () => {
+  it('builds the exact standard periods and only exposes the requested presets', async () => {
     const month = ownersReportRanges('this_month', null, now)!;
     const year = ownersReportRanges('this_year', null, now)!;
-    const monthComparison = ownersReportRanges('month_vs_last_year', null, now)!;
-    const ytdComparison = ownersReportRanges('ytd_vs_prior_ytd', null, now)!;
     assert.deepEqual(localParts(month.current.start), [2026, 8, 1, 0, 0]);
     assert.deepEqual(localParts(month.current.end), [2026, 8, 31, 23, 59]);
     assert.deepEqual(localParts(year.current.start), [2026, 1, 1, 0, 0]);
     assert.deepEqual(localParts(year.current.end), [2026, 12, 31, 23, 59]);
-    assert.deepEqual(localParts(monthComparison.prior!.start), [2025, 8, 1, 0, 0]);
-    assert.deepEqual(localParts(monthComparison.prior!.end), [2025, 8, 31, 23, 59]);
-    assert.deepEqual(localParts(ytdComparison.prior!.end), [2025, 8, 25, 23, 59]);
+    assert.deepEqual(OWNERS_REPORT_PRESET_LABELS, {
+      this_month: 'This Month',
+      this_year: 'This Year',
+      compare_dates: 'Compare Dates',
+      custom: 'Custom Dates',
+    });
   });
 
-  it('clamps leap-day prior YTD and rejects invalid custom dates', () => {
-    const leap = ownersReportRanges('ytd_vs_prior_ytd', null, new Date(2024, 1, 29, 9, 0))!;
-    assert.deepEqual(localParts(leap.prior!.end), [2023, 2, 28, 23, 59]);
+  it('rejects invalid custom dates', () => {
     assert.equal(ownersReportRanges('custom', { startDate: '2026-02-30', endDate: '2026-03-01' }), null);
     assert.equal(ownersReportRanges('custom', { startDate: '2026-03-02', endDate: '2026-03-01' }), null);
     const custom = ownersReportRanges('custom', { startDate: '2026-03-01', endDate: '2026-03-02' })!;
     assert.deepEqual(localParts(custom.current.end), [2026, 3, 2, 23, 59]);
+  });
+
+  it('builds two independently chosen comparison periods and enforces each selected year', () => {
+    const comparison = ownersReportRanges('compare_dates', {
+      firstPeriod: { year: '2026', startDate: '2026-03-02', endDate: '2026-06-30' },
+      comparedTo: { year: '2024', startDate: '2024-01-15', endDate: '2024-02-29' },
+    })!;
+    assert.deepEqual(localParts(comparison.current.start), [2026, 3, 2, 0, 0]);
+    assert.deepEqual(localParts(comparison.current.end), [2026, 6, 30, 23, 59]);
+    assert.deepEqual(localParts(comparison.prior!.start), [2024, 1, 15, 0, 0]);
+    assert.deepEqual(localParts(comparison.prior!.end), [2024, 2, 29, 23, 59]);
+    assert.equal(ownersReportRanges('compare_dates', {
+      firstPeriod: { year: '2026', startDate: '2025-12-31', endDate: '2026-01-31' },
+      comparedTo: { year: '2025', startDate: '2025-01-01', endDate: '2025-12-31' },
+    }), null);
+    assert.equal(ownersReportRanges('compare_dates', {
+      firstPeriod: { year: '2026', startDate: '2026-03-02', endDate: '2026-03-01' },
+      comparedTo: { year: '2025', startDate: '2025-01-01', endDate: '2025-12-31' },
+    }), null);
   });
 
   it('independently filters outcome, store, salesperson, and closed date then totals the cohort', () => {
@@ -54,6 +74,7 @@ describe('Owners Corner sales reports', () => {
     assert.deepEqual(closedDealsForRange(deals, range, 'won', null, null).map(deal => deal.id), ['won-current', 'won-other']);
     assert.deepEqual(closedDealsForRange(deals, range, 'lost', 's1', 'p1').map(deal => deal.id), ['lost-current']);
     assert.deepEqual(reportTotals(closedDealsForRange(deals, range, 'won', 's1', null)), { count: 1, amount: 1000 });
+    assert.deepEqual(reportDelta({ count: 3, amount: 2400 }, { count: 5, amount: 1900 }), { count: -2, amount: 500 });
   });
 
   it('calculates assigned-lead and Closed-Won rates by salesperson and store from created-date cohorts', () => {
@@ -77,6 +98,9 @@ describe('Owners Corner sales reports', () => {
     assert.match(page, /All Stores/);
     assert.match(page, /All Salespeople/);
     assert.match(page, /Owner report start date[\s\S]*type="date"/);
+    assert.match(page, /First comparison period[\s\S]*Compared to[\s\S]*Year[\s\S]*Start Date[\s\S]*End Date/);
+    assert.match(page, /Comparison delta[\s\S]*First period minus Compared to/);
+    assert.match(page, /First period deals[\s\S]*Compared to deals/);
     assert.match(page, /Assigned Leads[\s\S]*Closed-Won[\s\S]*Rate/);
     assert.match(page, /By Salesperson/);
     assert.match(page, /By Store/);

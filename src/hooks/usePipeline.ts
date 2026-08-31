@@ -11,6 +11,8 @@ import {
   type DealFollowUp,
   type FollowUpTaskLike,
 } from '@/lib/followUp';
+import { filterDealOwnerOptions } from '@/lib/dealOwnerFilter';
+import { THRAWN_PROFILE_ID } from '@/lib/upcomingTasks';
 
 export interface PipelineView {
   stages: PipelineStage[];
@@ -66,11 +68,12 @@ export function usePipeline() {
         .select('id, first_name, last_name, role')
         .eq('org_id', profile.org_id)
         .in('role', ['owner_manager', 'service_manager', 'salesperson'])
+        .neq('id', THRAWN_PROFILE_ID)
         .order('first_name'),
     ]);
 
     if (stageRes.data) setStages(stageRes.data);
-    if (peopleRes.data) setSalespeople(peopleRes.data as SalespersonOption[]);
+    if (peopleRes.data) setSalespeople(filterDealOwnerOptions(peopleRes.data as SalespersonOption[]));
     // Only repaint follow-up chips from a clean read — a transient error must not
     // flip every deal to "No next activity" and lie on the accountability board
     if (!taskRes.error) {

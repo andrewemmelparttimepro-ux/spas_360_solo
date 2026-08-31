@@ -14,6 +14,12 @@ import QuickDealModal from '@/components/QuickDealModal';
 import { Skeleton, StatsSkeleton, BoardSkeleton } from '@/components/ui/Skeleton';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { activePipelineStages, isActiveDeal, outcomeStage } from '@/lib/dealStage';
+import {
+  ALL_DEAL_OWNERS,
+  matchesDealOwnerFilter,
+  UNASSIGNED_DEAL_OWNER,
+  type DealOwnerFilter,
+} from '@/lib/dealOwnerFilter';
 import type { DealPriority } from '@/types/database';
 
 export default function Deals() {
@@ -26,7 +32,7 @@ export default function Deals() {
   const [quickDeal, setQuickDeal] = useState<{ contactId?: string; stageId?: string } | null>(null);
   // IKEA effect: spotlight the customer card the salesperson just built
   const [highlightId, setHighlightId] = useState<string | null>(null);
-  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [ownerFilter, setOwnerFilter] = useState<DealOwnerFilter>(ALL_DEAL_OWNERS);
   const [priorityFilter, setPriorityFilter] = useState<DealPriority | 'all'>('all');
   const [dealSearch, setDealSearch] = useState('');
   const [followUpFilter, setFollowUpFilter] = useState<FollowUpFilter>('all');
@@ -111,7 +117,7 @@ export default function Deals() {
   const attachDeal = attach ? deals.find(d => d.id === attach.dealId) : null;
   const searchNeedle = dealSearch.trim().toLowerCase();
   const matchesDealFilters = (deal: PipelineDeal) => {
-    if (ownerFilter !== 'all' && deal.assigned_to !== ownerFilter) return false;
+    if (!matchesDealOwnerFilter(deal, stages, ownerFilter)) return false;
     if (priorityFilter !== 'all' && deal.priority !== priorityFilter) return false;
     if (!searchNeedle) return true;
     const contactName = deal.contacts ? `${deal.contacts.first_name} ${deal.contacts.last_name}` : '';
@@ -173,7 +179,8 @@ export default function Deals() {
             aria-label="Filter by salesperson"
             className="appearance-none rounded-lg border border-ink-700 bg-ink-900 py-2 pl-9 pr-8 text-sm text-ink-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           >
-            <option value="all">All salespeople</option>
+            <option value={ALL_DEAL_OWNERS}>All Salespeople</option>
+            <option value={UNASSIGNED_DEAL_OWNER}>Unassigned</option>
             {salespeople.map(person => (
               <option key={person.id} value={person.id}>{person.first_name} {person.last_name}</option>
             ))}

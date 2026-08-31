@@ -49,15 +49,30 @@ describe('New Job inventory assignment', () => {
       item('available'),
       item('current-job-sold', { status: 'Sold', customer_id: 'customer-1', job_id: 'job-1' }),
       item('current-job-deal', { status: 'Sold', customer_id: 'customer-1', deal_id: 'deal-1', job_id: 'job-1' }),
+      item('current-job-other-store', { status: 'Sold', customer_id: 'customer-1', job_id: 'job-1', location_id: 'store-2' }),
       item('other-job', { status: 'Sold', customer_id: 'customer-2', job_id: 'job-2' }),
-      item('other-store', { location_id: 'store-2' }),
+      item('available-other-store', { location_id: 'store-2' }),
     ], 'job-1', 'store-1');
 
     assert.deepEqual(choices.map(candidate => candidate.id), [
       'available',
       'current-job-sold',
       'current-job-deal',
+      'current-job-other-store',
     ]);
+  });
+
+  it('loads exact linked rows separately from location-scoped inventory choices', async () => {
+    const hook = await read('src/hooks/useServiceJobs.ts');
+    const inventoryHook = hook.slice(hook.indexOf('export function useJobInventory'));
+
+    assert.match(inventoryHook, /const locationInventoryPromise = locationId[\s\S]*\.eq\('location_id', locationId\)/);
+    assert.match(inventoryHook, /linkedInventoryResult[\s\S]*\.eq\('job_id', jobId\)/);
+    assert.doesNotMatch(
+      inventoryHook.slice(inventoryHook.indexOf('linkedInventoryResult'), inventoryHook.indexOf(".from('deals')")),
+      /\.eq\('location_id', locationId\)/,
+    );
+    assert.match(inventoryHook, /new Map<string, Record<string, unknown>>\(\)[\s\S]*locationInventoryResult\.data[\s\S]*linkedInventoryResult\.data/);
   });
 
   it('removes the ordinary status selector but keeps the internal default', async () => {

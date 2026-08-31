@@ -233,19 +233,30 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchInventory = useCallback(async () => {
-    if (!profile || !jobId || !locationId) {
+    if (!profile || !jobId) {
       setItems([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    const [inventoryResult, assignmentResult] = await Promise.all([
-      supabase
+    const inventorySelect = '*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)';
+    const locationInventoryPromise = locationId
+      ? supabase
         .from('inventory_items')
-        .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type)')
+        .select(inventorySelect)
         .eq('org_id', profile.org_id)
         .eq('location_id', locationId)
+        .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null });
+
+    const [locationInventoryResult, linkedInventoryResult, assignmentResult] = await Promise.all([
+      locationInventoryPromise,
+      supabase
+        .from('inventory_items')
+        .select(inventorySelect)
+        .eq('org_id', profile.org_id)
+        .eq('job_id', jobId)
         .order('created_at', { ascending: false }),
       supabase
         .from('deals')
@@ -254,14 +265,26 @@ export function useJobInventory(jobId: string | undefined, locationId: string | 
         .not('inventory_item_id', 'is', null),
     ]);
 
-    if (inventoryResult.error || assignmentResult.error) {
-      console.error('Error fetching job inventory:', inventoryResult.error ?? assignmentResult.error);
+    if (locationInventoryResult.error || linkedInventoryResult.error || assignmentResult.error) {
+      console.error(
+        'Error fetching job inventory:',
+        locationInventoryResult.error ?? linkedInventoryResult.error ?? assignmentResult.error,
+      );
       setIsLoading(false);
       return;
     }
 
+    // The attached unit is authoritative by job_id even when a fulfillment job
+    // and its sold inventory belong to different dealership locations. Keep the
+    // broader read limited to this exact job; all other choices still come only
+    // from the job location query above.
+    const inventoryById = new Map<string, Record<string, unknown>>();
+    for (const item of [...(locationInventoryResult.data ?? []), ...(linkedInventoryResult.data ?? [])]) {
+      inventoryById.set(item.id as string, item as Record<string, unknown>);
+    }
+
     setItems(mergeInventoryDealAssignments(
-      (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
+      [...inventoryById.values()] as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
       (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
     ));
     setIsLoading(false);

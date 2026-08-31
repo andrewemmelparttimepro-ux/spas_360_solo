@@ -185,15 +185,17 @@ describe('deal inventory close flow', () => {
       'Customer',
       'Stock',
       'Order Date',
+      'Date Received',
       'Delivery Date',
       'On Hand Y/N',
     ]);
     assert.match(selector, /splitSerialAndFlooring\(item\.sku\)[\s\S]*serialNumberForDisplay\(serialAndFlooring\.serial\)/);
-    assert.match(selector, /inventoryAgeLabel\(item\.created_at \?\? ''\)/);
+    assert.match(selector, /inventoryAgeLabelForItem\(item\.date_received, item\.created_at \?\? ''\)/);
     assert.match(selector, /currentCustomerName \|\| \(item\.customer_id \? 'Customer' : '-'\)/);
     assert.match(selector, /inventoryStockState\(item\.stock_state, item\.notes, item\.status \?\? ''\)/);
     assert.match(selector, /showStore[\s\S]*title=\{item\.locations\?\.name \?\? undefined\}[\s\S]*\.split\(' \('\)\[0\]/);
     assert.match(dealDetail, /setInventorySelectorContext\('won'\)[\s\S]*Open inventory window/);
+    assert.match(dealDetail, /\.select\('[^']*order_date,date_received,[^']*'\)/);
 
     assert.match(sql, /v_current_stage_is_won and v_existing_type is not null/);
     assert.match(sql, /i\.status = 'In Stock' and i\.customer_id is null and i\.deal_id is null/);

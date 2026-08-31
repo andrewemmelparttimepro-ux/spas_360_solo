@@ -73,6 +73,13 @@ describe('inventory inline edit persistence contract', () => {
     assert.doesNotMatch(stockCell, /(status|customer_id|deal_id|job_id)\s*:/);
   });
 
+  it('persists Date Received through the inline calendar editor', async () => {
+    const inventory = await read('src/pages/Inventory.tsx');
+
+    assert.match(inventory, /Order Date<\/th>[\s\S]*Date Received<\/th>/);
+    assert.match(inventory, /<EditableCell value=\{item\.date_received\} field="date_received"[^>]*type="date" \/>/);
+  });
+
   it('adds nullable constrained columns without rewriting existing inventory rows', async () => {
     const migration = await read('supabase/migrations/20260831004457_add_inventory_stock_state_order_date.sql');
 

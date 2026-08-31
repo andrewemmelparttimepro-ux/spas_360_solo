@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { inventoryAgeInDays, inventoryAgeLabel } from '../src/lib/inventoryAge.ts';
+import { inventoryAgeInDays, inventoryAgeLabel, inventoryAgeLabelForItem } from '../src/lib/inventoryAge.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
@@ -36,11 +36,21 @@ describe('inventory age', () => {
     assert.equal(inventoryAgeLabel('not-a-date', today), '—');
   });
 
+  it('prefers Date Received and falls back to the inventory-entered date', () => {
+    const today = new Date('2026-08-29T18:00:00Z');
+    assert.equal(inventoryAgeLabelForItem('2026-08-28', '2026-08-20T18:00:00Z', today), '1 day');
+    assert.equal(inventoryAgeLabelForItem(null, '2026-08-26T18:00:00Z', today), '3 days');
+    assert.equal(inventoryAgeLabelForItem('', '2026-08-26T18:00:00Z', today), '3 days');
+    assert.equal(inventoryAgeLabelForItem('2026-08-30', '2026-08-20T18:00:00Z', today), '0 days');
+    assert.equal(inventoryAgeLabelForItem('not-a-date', '2026-08-20T18:00:00Z', today), '—');
+    assert.equal(inventoryAgeLabelForItem('2026-02-30', '2026-08-20T18:00:00Z', today), '—');
+  });
+
   it('places Inventory Age before the split Customer, Stock, and Order Date columns', async () => {
     const inventory = await read('src/pages/Inventory.tsx');
 
-    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Stock<\/th>[\s\S]*Order Date<\/th>/);
-    assert.match(inventory, /inventoryAgeLabel\(item\.created_at\)/);
-    assert.match(inventory, /const columnCount = showStore \? 11 : 10;/);
+    assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Stock<\/th>[\s\S]*Order Date<\/th>[\s\S]*Date Received<\/th>/);
+    assert.match(inventory, /inventoryAgeLabelForItem\(item\.date_received, item\.created_at\)/);
+    assert.match(inventory, /const columnCount = showStore \? 12 : 11;/);
   });
 });

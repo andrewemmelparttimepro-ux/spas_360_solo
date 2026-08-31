@@ -3,7 +3,7 @@ import { Loader2, Search, X } from 'lucide-react';
 import type { DealInventoryOption } from '@/lib/dealInventory';
 import { ALL_INVENTORY_BRANDS, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
-import { inventoryAgeLabel } from '@/lib/inventoryAge';
+import { inventoryAgeLabelForItem } from '@/lib/inventoryAge';
 import { inventoryStockState, serialNumberForDisplay, splitSerialAndFlooring } from '@/lib/inventoryFields';
 import { cn } from '@/lib/utils';
 
@@ -89,7 +89,7 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
     ));
   }, [brandFilter, items, searchQuery]);
   const groupedItems = useMemo(() => groupInventoryItems(visibleItems), [visibleItems]);
-  const columnCount = showStore ? 11 : 10;
+  const columnCount = showStore ? 12 : 11;
 
   const toggleSelection = (inventoryItemId: string) => {
     setSelectedInventoryIds(current => {
@@ -177,6 +177,7 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
                 <th className={HEADER_CELL_CLASS}>Customer</th>
                 <th className={HEADER_CELL_CLASS}>Stock</th>
                 <th className={HEADER_CELL_CLASS}>Order Date</th>
+                <th className={HEADER_CELL_CLASS}>Date Received</th>
                 <th className={HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
@@ -235,10 +236,11 @@ export default function DealInventorySelector(props: DealInventorySelectorProps)
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-400')}>{item.color_finish || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialNumberForDisplay(serialAndFlooring.serial) || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{serialAndFlooring.flooring || '—'}</td>
-                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>{inventoryAgeLabel(item.created_at ?? '')}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>{inventoryAgeLabelForItem(item.date_received, item.created_at ?? '')}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{currentCustomerName || (item.customer_id ? 'Customer' : '-')}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{inventoryStockState(item.stock_state, item.notes, item.status ?? '')}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.order_date || '—'}</td>
+                        <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.date_received || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'text-ink-300')}>{item.date_delivered || '—'}</td>
                         <td className={cn(ROW_CELL_CLASS, 'font-semibold text-ink-200')}>{item.status === 'In Stock' || item.status === 'Sold' ? 'Yes' : 'No'}</td>
                       </tr>

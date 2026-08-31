@@ -138,7 +138,7 @@ export default function DealDetail() {
       const [inventoryResult, reservationsResult] = await Promise.all([
         supabase
           .from('inventory_items')
-          .select('id,sku,product,brand,category,model,color_finish,status,stock_state,order_date,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name)')
+          .select('id,sku,product,brand,category,model,color_finish,status,stock_state,order_date,date_received,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name)')
           .eq('org_id', profile.org_id)
           .eq('status', 'In Stock')
           .is('customer_id', null)

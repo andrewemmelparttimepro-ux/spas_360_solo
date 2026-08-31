@@ -19,7 +19,7 @@ import {
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
-import { inventoryAgeLabel } from '@/lib/inventoryAge';
+import { inventoryAgeLabelForItem } from '@/lib/inventoryAge';
 import { effectiveInventoryCustomer, hasManagedInventoryAssignment } from '@/lib/inventoryDealAssignment';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
@@ -457,7 +457,7 @@ export default function Inventory() {
   const brandOptions = inventoryBrandOptions(items);
   const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
   const groupedItems = groupInventoryItems(visibleItems);
-  const columnCount = showStore ? 11 : 10;
+  const columnCount = showStore ? 12 : 11;
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -524,6 +524,7 @@ export default function Inventory() {
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Customer</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Stock</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Order Date</th>
+                <th className={INVENTORY_HEADER_CELL_CLASS}>Date Received</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>
                 <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>
               </tr>
@@ -569,7 +570,7 @@ export default function Inventory() {
                     <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
-                    {inventoryAgeLabel(item.created_at)}
+                    {inventoryAgeLabelForItem(item.date_received, item.created_at)}
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <CustomerCell item={item} onSave={updateItem} />
@@ -579,6 +580,9 @@ export default function Inventory() {
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <EditableCell value={item.order_date} field="order_date" itemId={item.id} onSave={updateItem} type="date" />
+                  </td>
+                  <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                    <EditableCell value={item.date_received} field="date_received" itemId={item.id} onSave={updateItem} type="date" />
                   </td>
                   <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                     <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />

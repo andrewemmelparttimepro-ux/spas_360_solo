@@ -126,7 +126,7 @@ export default function Dashboard() {
             </h2>
             <p className="mt-0.5 text-[13px] text-ink-300 truncate">Your dealership pulse, personalized for the team.</p>
           </div>
-          <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-xl bg-transparent p-1 sm:h-[72px] sm:w-28">
+          <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-xl bg-transparent p-1 sm:h-[88px] sm:w-32">
             <img src="/mchl-duck-dashboard.png" alt="Magic City Home Leisure duck logo" className="max-h-full max-w-full object-contain" />
           </div>
         </div>

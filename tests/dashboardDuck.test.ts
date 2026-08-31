@@ -12,11 +12,11 @@ test('Dashboard uses the supplied duck asset at a larger responsive size', async
   assert.match(dashboard, /alt="Magic City Home Leisure duck logo"/);
   assert.match(
     dashboard,
-    /h-16 w-24[^"]*sm:h-\[72px\] sm:w-28/,
-    'the duck slot should be visibly larger than the previous h-14 welcome logo',
+    /h-20 w-28[^"]*sm:h-\[88px\] sm:w-32/,
+    'the transparent duck slot should be visibly larger than the previous h-16 sm:h-[72px] slot',
   );
-  assert.match(dashboard, /h-16 w-24[^"\n]*bg-transparent/);
-  assert.doesNotMatch(dashboard, /h-16 w-24[^"\n]*bg-white/);
+  assert.match(dashboard, /h-20 w-28[^"\n]*bg-transparent/);
+  assert.doesNotMatch(dashboard, /h-20 w-28[^"\n]*bg-white/);
   assert.doesNotMatch(dashboard, /logo_storage_path|logoUrl|ari-assets/);
 });
 

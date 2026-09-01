@@ -56,6 +56,17 @@ function workbookBytes(buffer: ArrayBuffer | Uint8Array): Uint8Array {
   return buffer instanceof Uint8Array ? new Uint8Array(buffer) : new Uint8Array(buffer);
 }
 
+function ownerSheetIndexAtPoint(clientX: number, clientY: number): number | null {
+  for (const element of document.querySelectorAll<HTMLElement>('[data-owner-sheet-index]')) {
+    const bounds = element.getBoundingClientRect();
+    if (clientX >= bounds.left && clientX <= bounds.right && clientY >= bounds.top && clientY <= bounds.bottom) {
+      const index = Number(element.dataset.ownerSheetIndex);
+      return Number.isInteger(index) ? index : null;
+    }
+  }
+  return null;
+}
+
 export function OwnerWorkbookLibrary() {
   const { profile, session } = useAuth();
   const [records, setRecords] = useState<OwnerWorkbookRecord[]>([]);
@@ -571,9 +582,8 @@ export function OwnerWorkbookLibrary() {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     gesture.moved = gesture.moved
       || Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 4;
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
-    const targetIndex = Number(target?.dataset.ownerSheetIndex);
-    if (Number.isInteger(targetIndex)) gesture.targetIndex = targetIndex;
+    const targetIndex = ownerSheetIndexAtPoint(event.clientX, event.clientY);
+    if (targetIndex != null) gesture.targetIndex = targetIndex;
   };
 
   const finishSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -583,9 +593,8 @@ export function OwnerWorkbookLibrary() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
     if (!gesture.moved || !workbook) return;
-    const releaseTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
-    const releaseTargetIndex = Number(releaseTarget?.dataset.ownerSheetIndex);
-    const targetIndex = Number.isInteger(releaseTargetIndex) ? releaseTargetIndex : gesture.targetIndex;
+    const releaseTargetIndex = ownerSheetIndexAtPoint(event.clientX, event.clientY);
+    const targetIndex = releaseTargetIndex ?? gesture.targetIndex;
     if (targetIndex == null || !Number.isInteger(targetIndex)) return;
     const activeSheetId = worksheet?.id;
     const nextIndex = moveWorksheet(workbook, gesture.sheetId, targetIndex);

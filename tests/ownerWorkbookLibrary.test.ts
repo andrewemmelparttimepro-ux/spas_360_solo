@@ -83,7 +83,7 @@ describe('owner workbook library', () => {
     assert.match(component, /Rename sheet \$\{sheet\.name\}/);
     assert.match(component, /aria-label=\{`Reorder sheet \$\{sheet\.name\}`\}/);
     assert.match(component, /onPointerDown=\{event => beginSheetPointerDrag\(event, sheet\.id\)\}/);
-    assert.match(component, /document\.elementFromPoint\(event\.clientX, event\.clientY\)/);
+    assert.match(component, /ownerSheetIndexAtPoint\(event\.clientX, event\.clientY\)/);
     assert.match(component, /Selection background/);
     assert.match(component, /selectedWorksheetCell\?\.fill\?\.type/);
     assert.match(component, /Select column \$\{columnLabel\(column\)\}/);

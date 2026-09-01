@@ -12,6 +12,7 @@ describe('Inventory brand filter', () => {
     { brand: 'Finnleo' },
     { brand: ' Covana ' },
     { brand: 'Visscher' },
+    { brand: 'Pools' },
     { brand: 'Hot Spring' },
     { brand: '   ' },
     { brand: null },
@@ -29,6 +30,7 @@ describe('Inventory brand filter', () => {
       'Visscher',
       ...INVENTORY_GROUP_FILTERS,
     ]);
+    assert.equal(inventoryBrandOptions(items).filter(option => option === 'Pools').length, 1);
   });
 
   it('preserves All Brands and matches using the same trimming as the options', () => {
@@ -41,6 +43,7 @@ describe('Inventory brand filter', () => {
     const groupedItems = [
       { brand: null, category: 'Saunas', status: 'In Stock' },
       { brand: null, category: 'Outdoor Living', status: 'In Stock' },
+      { brand: null, category: 'Pools', status: 'In Stock' },
       { brand: null, category: 'Covers', status: 'In Stock' },
       { brand: 'Master Spas', category: 'Hot Tubs', status: 'On Order' },
       { brand: null, category: 'Used Spas', status: 'In Stock' },
@@ -49,9 +52,10 @@ describe('Inventory brand filter', () => {
 
     assert.equal(inventoryMatchesBrand(groupedItems[0], 'Saunas'), true);
     assert.equal(inventoryMatchesBrand(groupedItems[1], 'Outdoor Living'), true);
-    assert.equal(inventoryMatchesBrand(groupedItems[2], 'Covers'), true);
-    assert.equal(inventoryMatchesBrand(groupedItems[3], 'Need To Order'), true);
-    assert.equal(inventoryMatchesBrand(groupedItems[4], 'Used Inventory'), true);
-    assert.equal(inventoryMatchesBrand(groupedItems[5], 'All Other'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[2], 'Pools'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[3], 'Covers'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[4], 'Need To Order'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[5], 'Used Inventory'), true);
+    assert.equal(inventoryMatchesBrand(groupedItems[6], 'All Other'), true);
   });
 });

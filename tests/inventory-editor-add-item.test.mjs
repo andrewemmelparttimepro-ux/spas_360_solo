@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 
-const source = await readFile(new URL('../src/components/InventoryEditor.tsx', import.meta.url), 'utf8');
+const [source, brandSource] = await Promise.all([
+  readFile(new URL('../src/components/InventoryEditor.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../src/lib/inventoryBrandFilter.ts', import.meta.url), 'utf8'),
+]);
 
 describe('Add Item editor contract', () => {
   it('offers Brandon’s exact alphabetical brand choices', () => {
-    const brandBlock = source.match(/const BRANDS = \[([\s\S]*?)\] as const;/)?.[1];
+    const brandBlock = brandSource.match(/export const INVENTORY_BRAND_CHOICES = \[([\s\S]*?)\] as const;/)?.[1];
     assert.ok(brandBlock, 'brand choices should be declared as a fixed list');
 
     const brands = [...brandBlock.matchAll(/'([^']+)'/g)].map(match => match[1]);
@@ -23,6 +26,7 @@ describe('Add Item editor contract', () => {
       'Sundance',
       'Visscher',
     ]);
+    assert.match(source, /INVENTORY_BRAND_CHOICES\.map\(b =>/);
     assert.doesNotMatch(source, /Other brand/);
   });
 

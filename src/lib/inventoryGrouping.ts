@@ -5,6 +5,7 @@ export type InventoryGroupKey =
   | 'eco'
   | 'saunas'
   | 'outdoor'
+  | 'pools'
   | 'covers'
   | 'need_to_order'
   | 'used'
@@ -41,13 +42,14 @@ const GROUPS: Record<InventoryGroupKey, Omit<InventoryGroup<InventoryGroupingIte
   eco: { key: 'eco', label: 'Eco Spas', tintClassName: 'bg-amber-500/[0.04] hover:bg-amber-500/[0.09]', headerClassName: 'bg-amber-500/10 text-amber-800', dotClassName: 'bg-amber-500' },
   saunas: { key: 'saunas', label: 'Saunas & Specialty', tintClassName: 'bg-slate-500/[0.04] hover:bg-slate-500/[0.09]', headerClassName: 'bg-slate-500/10 text-slate-700', dotClassName: 'bg-slate-500' },
   outdoor: { key: 'outdoor', label: 'Outdoor Living', tintClassName: 'bg-orange-500/[0.04] hover:bg-orange-500/[0.09]', headerClassName: 'bg-orange-500/10 text-orange-800', dotClassName: 'bg-orange-500' },
+  pools: { key: 'pools', label: 'Pools', tintClassName: 'bg-blue-500/[0.04] hover:bg-blue-500/[0.09]', headerClassName: 'bg-blue-500/10 text-blue-800', dotClassName: 'bg-blue-500' },
   covers: { key: 'covers', label: 'Covers', tintClassName: 'bg-cyan-500/[0.04] hover:bg-cyan-500/[0.09]', headerClassName: 'bg-cyan-500/10 text-cyan-800', dotClassName: 'bg-cyan-500' },
   need_to_order: { key: 'need_to_order', label: 'Need to Order', tintClassName: 'bg-yellow-500/[0.06] hover:bg-yellow-500/[0.12]', headerClassName: 'bg-yellow-500/15 text-yellow-800', dotClassName: 'bg-yellow-500' },
   used: { key: 'used', label: 'Used Inventory', tintClassName: 'bg-violet-500/[0.04] hover:bg-violet-500/[0.09]', headerClassName: 'bg-violet-500/10 text-violet-800', dotClassName: 'bg-violet-500' },
   other: { key: 'other', label: 'Other Inventory', tintClassName: 'hover:bg-ink-800/60', headerClassName: 'bg-ink-800/70 text-ink-500', dotClassName: 'bg-ink-400' },
 };
 
-const GROUP_ORDER: InventoryGroupKey[] = ['sundance', 'master', 'platinum', 'eco', 'saunas', 'outdoor', 'covers', 'need_to_order', 'used', 'other'];
+const GROUP_ORDER: InventoryGroupKey[] = ['sundance', 'master', 'platinum', 'eco', 'saunas', 'outdoor', 'pools', 'covers', 'need_to_order', 'used', 'other'];
 const SHEET_ORDER: Record<string, number> = { 'Bismarck Inventory': 0, 'Minot Inventory': 1, 'Used Inventory': 2 };
 
 export function inventorySourcePosition(notes?: string | null): InventorySourcePosition | null {
@@ -66,6 +68,7 @@ export function inventoryGroupKey(item: InventoryGroupingItem): InventoryGroupKe
   if (item.brand === 'Eco Spas') return 'eco';
   if (item.category === 'Saunas') return 'saunas';
   if (item.category === 'Outdoor Living') return 'outdoor';
+  if (item.category === 'Pools') return 'pools';
   if (item.category === 'Covers') return 'covers';
   return 'other';
 }

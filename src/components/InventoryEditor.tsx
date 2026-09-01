@@ -8,6 +8,7 @@ import type { InventoryItem } from '@/types/database';
 import { operationalStatusForNewStockState, type InventoryStockState } from '@/lib/inventoryFields';
 import { supabase } from '@/lib/supabase';
 import { useModal } from '@/hooks/useModal';
+import { INVENTORY_BRAND_CHOICES } from '@/lib/inventoryBrandFilter';
 
 /**
  * Inventory editor — slide-over drawer, create + edit. Same guided-clicks
@@ -17,19 +18,6 @@ import { useModal } from '@/hooks/useModal';
  * removal that keeps the row available to deal and job history.
  */
 
-const BRANDS = [
-  'Ashley Furniture',
-  'Eco Spas',
-  'Finnleo Saunas',
-  'FinnSaunas',
-  'GDI Saunas',
-  'Lux Craft',
-  'Master Spas',
-  'Other',
-  'Platinum Spas',
-  'Sundance',
-  'Visscher',
-] as const;
 const STATUSES = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'] as const;
 const ADD_ITEM_STOCK_STATES: InventoryStockState[] = ['Stock', 'On Order', 'Need To Order'];
 
@@ -233,7 +221,7 @@ export default function InventoryEditor({ item, onClose, onSave, onRemove }: Pro
           <div>
             <label className={labelClass}>Brand</label>
             <div className="flex flex-wrap gap-1.5">
-              {BRANDS.map(b => <Chip key={b} active={v.brand === b} onClick={() => set({ brand: b })}>{b}</Chip>)}
+              {INVENTORY_BRAND_CHOICES.map(b => <Chip key={b} active={v.brand === b} onClick={() => set({ brand: b })}>{b}</Chip>)}
             </div>
           </div>
 

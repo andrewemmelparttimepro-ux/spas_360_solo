@@ -39,6 +39,17 @@ describe('inventory workbook grouping', () => {
     assert.equal(inventoryGroupKey(item({ id: 'trainer-on-order', ...importedNeedToOrder, stock_state: 'On Order' })), 'master');
   });
 
+  it('places Pools exactly between Outdoor Living and Covers', () => {
+    const groups = groupInventoryItems([
+      item({ id: 'cover', category: 'Covers' }),
+      item({ id: 'pool', category: 'Pools' }),
+      item({ id: 'outdoor', category: 'Outdoor Living' }),
+    ]);
+
+    assert.deepEqual(groups.map(({ key }) => key), ['outdoor', 'pools', 'covers']);
+    assert.deepEqual(groups.map(({ label }) => label), ['Outdoor Living', 'Pools', 'Covers']);
+  });
+
   it('sorts groups in workbook order and rows by sheet, row, then unit without mutating input', () => {
     const input = [
       item({ id: 'manual-z', created_at: '2026-08-20T00:00:00Z' }),

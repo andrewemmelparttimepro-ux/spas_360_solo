@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import type { InventoryItem, InventoryStatus } from '@/types/database';
+import { INVENTORY_BRAND_CHOICES } from '@/lib/inventoryBrandFilter';
 
 const STATUS_OPTIONS: InventoryStatus[] = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'];
 const STATUS_COLORS: Record<string, string> = {
@@ -13,8 +14,6 @@ const STATUS_COLORS: Record<string, string> = {
   'On Order': 'bg-brand-500/15 text-brand-300', 'In Transit': 'bg-purple-500/15 text-purple-300',
   'Delivered': 'bg-ink-950 text-ink-300', 'Returned': 'bg-red-500/15 text-red-300',
 };
-const CATEGORY_OPTIONS = ['Hot Tubs', 'Swim Spas', 'Saunas', 'Cold Plunges', 'Chemicals', 'Parts', 'Accessories', 'Covers'];
-
 // --------------- Inline editable field for detail view ---------------
 type FieldOption = string | { value: string; label: string };
 
@@ -196,8 +195,7 @@ export default function InventoryDetail() {
           <span className="text-[10px] text-ink-500">Click any value to edit</span>
         </div>
         <div className="grid grid-cols-2 gap-6">
-          <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} />
-          <EditableField label="Category" value={item.category} field="category" itemId={item.id} onSave={handleSave} type="select" options={CATEGORY_OPTIONS} />
+          <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} type="select" options={[...INVENTORY_BRAND_CHOICES]} />
           <EditableField label="Model" value={item.model} field="model" itemId={item.id} onSave={handleSave} />
           <EditableField label="Color/Finish" value={item.color_finish} field="color_finish" itemId={item.id} onSave={handleSave} />
           <EditableField label="Location" value={item.location_id} displayValue={loc?.name ?? '—'} field="location_id" itemId={item.id} onSave={handleSave} type="select" options={locations.map(l => ({ value: l.id, label: l.name }))} />

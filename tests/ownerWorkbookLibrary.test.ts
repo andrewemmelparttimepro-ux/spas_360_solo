@@ -83,6 +83,7 @@ describe('owner workbook library', () => {
     assert.match(component, /Resize row \$\{row\}/);
     assert.match(component, /cursor-col-resize/);
     assert.match(component, /cursor-row-resize/);
+    assert.match(component, /<span className="relative block" style=\{\{ height: `\$\{worksheetRowHeightPx\(worksheet, row\)\}px` \}\}>[\s\S]*?-bottom-1[\s\S]*?cursor-row-resize/);
     assert.match(component, /Duplicate sheet/);
     assert.match(component, /Rename sheet \$\{sheet\.name\}/);
     assert.match(component, /aria-label=\{`Reorder sheet \$\{sheet\.name\}`\}/);

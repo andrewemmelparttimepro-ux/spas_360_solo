@@ -845,8 +845,8 @@ export function OwnerWorkbookLibrary() {
                 <tbody>
                   {rows.map(row => (
                     <tr key={row} style={{ height: `${worksheetRowHeightPx(worksheet, row)}px` }}>
-                      <th className="sticky left-0 z-10 overflow-hidden border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
-                        <span className="relative block overflow-hidden" style={{ height: `${worksheetRowHeightPx(worksheet, row)}px` }}>
+                      <th className="sticky left-0 z-10 border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
+                        <span className="relative block" style={{ height: `${worksheetRowHeightPx(worksheet, row)}px` }}>
                           <button
                             type="button"
                             aria-label={`Select row ${row}`}

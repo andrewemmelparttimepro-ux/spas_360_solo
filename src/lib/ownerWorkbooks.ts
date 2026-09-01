@@ -1,4 +1,4 @@
-import type { Cell, CellValue, Workbook, Worksheet } from 'exceljs';
+import type { Cell, CellValue, Fill, Workbook, Worksheet } from 'exceljs';
 import type { CSSProperties } from 'react';
 
 export const OWNER_WORKBOOK_BUCKET = 'owner-workbooks';
@@ -9,8 +9,17 @@ export const INVENTORY_PROFITS_SOURCE_SHA = 'e18ee4ac7288dc0896a150fcaeb779273da
 export const MAX_WORKBOOK_BYTES = 20 * 1024 * 1024;
 export const MAX_VISIBLE_ROWS = 250;
 export const MAX_VISIBLE_COLUMNS = 80;
+export const MIN_WORKSHEET_FIT_SCALE = 0.35;
+export const DEFAULT_WORKSHEET_COLUMN_WIDTH = 16;
+export const WORKSHEET_COLUMN_WIDTH_PX = 7;
+export const WORKSHEET_ROW_HEADER_WIDTH_PX = 40;
 
 export type OwnerWorkbookFolder = typeof INVENTORY_PROFITS_FOLDER | typeof MCHL_MAJOR_UNIT_SALES_FOLDER;
+
+export type WorkbookSelection =
+  | { kind: 'cell'; row: number; column: number }
+  | { kind: 'row'; row: number }
+  | { kind: 'column'; column: number };
 
 export type OwnerWorkbookRecord = {
   id: string;
@@ -59,14 +68,54 @@ export function duplicateWorkbookName(existingNames: string[], originalName: str
   }
 }
 
-export function setCellBackground(cell: Cell, hex: string | null): void {
+function backgroundFill(hex: string | null): Fill {
   if (!hex) {
-    cell.fill = { type: 'pattern', pattern: 'none' };
-    return;
+    return { type: 'pattern', pattern: 'none' };
   }
   const normalized = hex.replace(/^#/, '').toUpperCase();
   if (!/^[0-9A-F]{6}$/.test(normalized)) throw new Error('Cell background must be a six-digit hex color.');
-  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${normalized}` } };
+  return { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${normalized}` } };
+}
+
+export function setCellBackground(cell: Cell, hex: string | null): void {
+  cell.fill = backgroundFill(hex);
+}
+
+export function setWorksheetSelectionBackground(
+  worksheet: Worksheet,
+  selection: WorkbookSelection,
+  hex: string | null,
+): void {
+  if (selection.kind === 'cell') {
+    setCellBackground(worksheet.getCell(selection.row, selection.column), hex);
+    return;
+  }
+  if (selection.kind === 'row') {
+    const fill = backgroundFill(hex);
+    worksheet.getRow(selection.row).fill = fill;
+    for (let column = 1; column <= Math.max(1, worksheet.columnCount); column += 1) {
+      worksheet.getCell(selection.row, column).fill = fill;
+    }
+    return;
+  }
+  const fill = backgroundFill(hex);
+  worksheet.getColumn(selection.column).fill = fill;
+  for (let row = 1; row <= Math.max(1, worksheet.rowCount); row += 1) {
+    worksheet.getCell(row, selection.column).fill = fill;
+  }
+}
+
+export function worksheetGridWidth(worksheet: Worksheet, columnCount: number): number {
+  let width = WORKSHEET_ROW_HEADER_WIDTH_PX;
+  for (let column = 1; column <= columnCount; column += 1) {
+    width += Math.max(4, worksheet.getColumn(column).width ?? DEFAULT_WORKSHEET_COLUMN_WIDTH) * WORKSHEET_COLUMN_WIDTH_PX;
+  }
+  return width;
+}
+
+export function worksheetFitScale(availableWidth: number, naturalWidth: number): number {
+  if (!Number.isFinite(availableWidth) || !Number.isFinite(naturalWidth) || availableWidth <= 0 || naturalWidth <= 0) return 1;
+  return Math.max(MIN_WORKSHEET_FIT_SCALE, Math.min(1, (availableWidth - 2) / naturalWidth));
 }
 
 export function columnLabel(columnNumber: number): string {

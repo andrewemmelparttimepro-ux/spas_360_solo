@@ -11,6 +11,9 @@ import {
   normalizeWorkbookName,
   setCellBackground,
   setCellEditorValue,
+  setWorksheetSelectionBackground,
+  worksheetFitScale,
+  worksheetGridWidth,
 } from '../src/lib/ownerWorkbooks.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url));
@@ -61,9 +64,12 @@ describe('owner workbook library', () => {
     assert.match(component, /workbook\.worksheets\.map/);
     assert.match(component, /Row height/);
     assert.match(component, /Column width/);
-    assert.match(component, /Cell background/);
+    assert.match(component, /Selection background/);
     assert.match(component, /selectedWorksheetCell\?\.fill\?\.type/);
-    assert.match(component, /Set background \$\{preset\.label\.toLowerCase\(\)\} for \$\{selectedWorksheetCell\.address\}/);
+    assert.match(component, /Select column \$\{columnLabel\(column\)\}/);
+    assert.match(component, /Select row \$\{row\}/);
+    assert.match(component, /style=\{\{ zoom: fitScale \}\}/);
+    assert.match(component, /setWorksheetSelectionBackground\(worksheet, selection, color\)/);
     assert.match(component, /\.copy\(record\.storage_path, path\)/);
     assert.match(component, /copiedSha !== record\.current_sha256/);
     assert.match(component, /copiedBytes\.byteLength !== record\.file_size_bytes/);
@@ -122,5 +128,46 @@ describe('owner workbook library', () => {
       ['2020 Major Unit Deals.xlsx', '2020 Major Unit Deals copy.xlsx'],
       '2020 Major Unit Deals.xlsx',
     ), '2020 Major Unit Deals copy 2.xlsx');
+  });
+
+  it('fits a worksheet to the available pane without rewriting stored column widths', () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Fit');
+    sheet.getColumn(1).width = 20;
+    sheet.getColumn(2).width = 30;
+    const naturalWidth = worksheetGridWidth(sheet, 2);
+    assert.equal(naturalWidth, 390);
+    assert.equal(worksheetFitScale(780, naturalWidth), 1);
+    assert.equal(worksheetFitScale(197, naturalWidth), 0.5);
+    assert.equal(worksheetFitScale(100, naturalWidth), 0.35);
+    assert.equal(sheet.getColumn(1).width, 20);
+    assert.equal(sheet.getColumn(2).width, 30);
+  });
+
+  it('applies row and column fill changes to the whole used sheet and preserves them on reopen', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Selection');
+    sheet.getCell('C3').value = 'used range';
+    setWorksheetSelectionBackground(sheet, { kind: 'row', row: 2 }, '#38BDF8');
+    setWorksheetSelectionBackground(sheet, { kind: 'column', column: 3 }, '#D9EAD3');
+
+    const saved = await workbook.xlsx.writeBuffer();
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(saved);
+    const reopenedSheet = reopened.getWorksheet('Selection');
+    assert.ok(reopenedSheet);
+    const rowFill = reopenedSheet.getCell('A2').fill;
+    const columnFill = reopenedSheet.getCell('C1').fill;
+    const overlapFill = reopenedSheet.getCell('C2').fill;
+    assert.equal(rowFill.type, 'pattern');
+    assert.equal(rowFill.type === 'pattern' ? rowFill.fgColor?.argb : undefined, 'FF38BDF8');
+    assert.equal(columnFill.type, 'pattern');
+    assert.equal(columnFill.type === 'pattern' ? columnFill.fgColor?.argb : undefined, 'FFD9EAD3');
+    assert.equal(overlapFill.type === 'pattern' ? overlapFill.fgColor?.argb : undefined, 'FFD9EAD3');
+
+    setWorksheetSelectionBackground(reopenedSheet, { kind: 'column', column: 3 }, null);
+    const clearedFill = reopenedSheet.getCell('C1').fill;
+    assert.equal(clearedFill.type, 'pattern');
+    assert.equal(clearedFill.type === 'pattern' ? clearedFill.pattern : undefined, 'none');
   });
 });

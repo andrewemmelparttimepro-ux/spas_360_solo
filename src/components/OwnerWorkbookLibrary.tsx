@@ -17,10 +17,13 @@ import {
   markWorkbookForRecalculation,
   normalizeWorkbookName,
   setCellEditorValue,
-  setCellBackground,
+  setWorksheetSelectionBackground,
   sha256Hex,
   storagePath,
   visibleGridSize,
+  worksheetFitScale,
+  worksheetGridWidth,
+  type WorkbookSelection,
   type OwnerWorkbookFolder,
   type OwnerWorkbookRecord,
 } from '@/lib/ownerWorkbooks';
@@ -58,7 +61,8 @@ export function OwnerWorkbookLibrary() {
   const [dirtyRevision, setDirtyRevision] = useState(0);
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [selectedCell, setSelectedCell] = useState<{ row: number; column: number } | null>(null);
+  const [selection, setSelection] = useState<WorkbookSelection | null>(null);
+  const [workbookPaneWidth, setWorkbookPaneWidth] = useState(0);
   const [renameTarget, setRenameTarget] = useState<OwnerWorkbookRecord | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [uploadFolder, setUploadFolder] = useState<OwnerWorkbookFolder>(MCHL_MAJOR_UNIT_SALES_FOLDER);
@@ -67,6 +71,7 @@ export function OwnerWorkbookLibrary() {
   const savedRevisionRef = useRef(0);
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const activeVersionRef = useRef(1);
+  const workbookPaneRef = useRef<HTMLDivElement>(null);
 
   const loadRecords = useCallback(async () => {
     if (profile?.role !== 'owner_manager' || !profile.org_id) return;
@@ -270,7 +275,7 @@ export function OwnerWorkbookLibrary() {
       setActive(record);
       setWorkbook(parsed);
       setSheetIndex(0);
-      setSelectedCell(null);
+      setSelection(null);
       setEditingCell(null);
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : 'The workbook could not be opened.');
@@ -355,6 +360,16 @@ export function OwnerWorkbookLibrary() {
   const columns = useMemo(() => grid ? Array.from({ length: grid.columns }, (_, index) => index + 1) : [], [grid?.columns]);
   const rows = useMemo(() => grid ? Array.from({ length: grid.rows }, (_, index) => index + 1) : [], [grid?.rows]);
 
+  useEffect(() => {
+    const pane = workbookPaneRef.current;
+    if (!pane) return;
+    const updateWidth = () => setWorkbookPaneWidth(pane.clientWidth);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [active?.id]);
+
   const markDirty = () => {
     if (!workbook) return;
     markWorkbookForRecalculation(workbook);
@@ -372,30 +387,44 @@ export function OwnerWorkbookLibrary() {
   };
 
   const resizeSelectedRow = (height: number) => {
-    if (!worksheet || !selectedCell || !Number.isFinite(height)) return;
-    worksheet.getRow(selectedCell.row).height = Math.min(240, Math.max(12, height));
+    if (!worksheet || !selection || selection.kind === 'column' || !Number.isFinite(height)) return;
+    worksheet.getRow(selection.row).height = Math.min(240, Math.max(12, height));
     markDirty();
   };
 
   const resizeSelectedColumn = (width: number) => {
-    if (!worksheet || !selectedCell || !Number.isFinite(width)) return;
-    worksheet.getColumn(selectedCell.column).width = Math.min(80, Math.max(3, width));
+    if (!worksheet || !selection || selection.kind === 'row' || !Number.isFinite(width)) return;
+    worksheet.getColumn(selection.column).width = Math.min(80, Math.max(3, width));
     markDirty();
   };
 
   const changeSelectedBackground = (color: string | null) => {
-    if (!worksheet || !selectedCell) return;
-    setCellBackground(worksheet.getCell(selectedCell.row, selectedCell.column), color);
+    if (!worksheet || !selection) return;
+    setWorksheetSelectionBackground(worksheet, selection, color);
     markDirty();
   };
 
+  const selectedCell = selection
+    ? {
+        row: selection.kind === 'column' ? 1 : selection.row,
+        column: selection.kind === 'row' ? 1 : selection.column,
+      }
+    : null;
   const selectedWorksheetCell = worksheet && selectedCell
     ? worksheet.getCell(selectedCell.row, selectedCell.column)
     : null;
+  const selectionLabel = selection?.kind === 'row'
+    ? `row ${selection.row}`
+    : selection?.kind === 'column'
+      ? `column ${columnLabel(selection.column)}`
+      : selectedWorksheetCell?.address ?? '';
+  const selectionBackgroundLabel = selection?.kind === 'cell' ? 'Cell background' : 'Selection background';
   const selectedFill = selectedWorksheetCell?.fill?.type === 'pattern'
     ? selectedWorksheetCell.fill.fgColor?.argb
     : undefined;
   const selectedFillHex = selectedFill?.length === 8 ? `#${selectedFill.slice(2)}` : '#ffffff';
+  const naturalGridWidth = worksheet && grid ? worksheetGridWidth(worksheet, grid.columns) : 0;
+  const fitScale = worksheetFitScale(workbookPaneWidth, naturalGridWidth);
 
   return (
     <section aria-labelledby="owner-workbooks-heading" className="rounded-2xl border border-amber-500/30 bg-ink-900 p-5 shadow-sm">
@@ -460,45 +489,45 @@ export function OwnerWorkbookLibrary() {
           </div>
           <div className="flex gap-1 overflow-x-auto border-b border-ink-700 p-2">
             {workbook.worksheets.map((sheet, index) => (
-              <button key={`${sheet.id}-${sheet.name}`} type="button" onClick={() => { setSheetIndex(index); setSelectedCell(null); setEditingCell(null); }} className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-bold ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'}`}>
+              <button key={`${sheet.id}-${sheet.name}`} type="button" onClick={() => { setSheetIndex(index); setSelection(null); setEditingCell(null); }} className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-bold ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'}`}>
                 {sheet.name}
               </button>
             ))}
           </div>
           <div aria-label="Workbook formatting controls" className="flex flex-wrap items-end gap-3 border-b border-ink-700 bg-ink-900 px-3 py-3">
-            {selectedCell && selectedWorksheetCell ? (
+            {selection && selectedCell && selectedWorksheetCell ? (
               <>
-                <p className="self-center text-xs font-bold text-ink-300">Selected {selectedWorksheetCell.address}</p>
-                <label className="text-[11px] font-semibold text-ink-400">
+                <p className="self-center text-xs font-bold text-ink-300">Selected {selectionLabel}</p>
+                {selection.kind !== 'column' && <label className="text-[11px] font-semibold text-ink-400">
                   Row height
                   <input
                     type="number"
                     min="12"
                     max="240"
                     step="1"
-                    value={Math.round((worksheet.getRow(selectedCell.row).height ?? 24) * 10) / 10}
+                    value={Math.round((worksheet.getRow(selection.row).height ?? 24) * 10) / 10}
                     onChange={event => resizeSelectedRow(Number(event.target.value))}
                     className="mt-1 block w-24 rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm text-ink-100"
                   />
-                </label>
-                <label className="text-[11px] font-semibold text-ink-400">
+                </label>}
+                {selection.kind !== 'row' && <label className="text-[11px] font-semibold text-ink-400">
                   Column width
                   <input
                     type="number"
                     min="3"
                     max="80"
                     step="1"
-                    value={Math.round((worksheet.getColumn(selectedCell.column).width ?? 16) * 10) / 10}
+                    value={Math.round((worksheet.getColumn(selection.column).width ?? 16) * 10) / 10}
                     onChange={event => resizeSelectedColumn(Number(event.target.value))}
                     className="mt-1 block w-24 rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm text-ink-100"
                   />
-                </label>
+                </label>}
                 <label className="text-[11px] font-semibold text-ink-400">
-                  Cell background
+                  {selectionBackgroundLabel}
                   <span className="mt-1 flex items-center gap-2">
                     <input
                       type="color"
-                      aria-label={`Background color for ${selectedWorksheetCell.address}`}
+                      aria-label={`Background color for ${selectionLabel}`}
                       value={selectedFillHex}
                       onChange={event => changeSelectedBackground(event.target.value)}
                       className="h-8 w-11 cursor-pointer rounded-md border border-ink-700 bg-ink-950 p-1"
@@ -507,7 +536,7 @@ export function OwnerWorkbookLibrary() {
                       <button
                         key={preset.value}
                         type="button"
-                        aria-label={`Set background ${preset.label.toLowerCase()} for ${selectedWorksheetCell.address}`}
+                        aria-label={`Set background ${preset.label.toLowerCase()} for ${selectionLabel}`}
                         title={preset.label}
                         onClick={() => changeSelectedBackground(preset.value)}
                         style={{ backgroundColor: preset.value }}
@@ -519,44 +548,71 @@ export function OwnerWorkbookLibrary() {
                 </label>
               </>
             ) : (
-              <p className="flex items-center gap-2 text-xs text-ink-500"><PaintBucket className="h-4 w-4" />Select a cell to resize its row or column and change its background.</p>
+              <p className="flex items-center gap-2 text-xs text-ink-500"><PaintBucket className="h-4 w-4" />Select a cell, row number, or column letter to resize and format it.</p>
             )}
           </div>
           {grid.clipped && <p className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">This sheet is large. The editor shows the first {grid.rows} rows and {grid.columns} columns.</p>}
-          <div className="max-h-[62vh] overflow-auto">
-            <table className="border-collapse text-xs">
-              <thead className="sticky top-0 z-20 bg-ink-800">
-                <tr><th className="sticky left-0 z-30 min-w-10 border border-ink-700 bg-ink-800" />{columns.map(column => <th key={column} style={{ minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px` }} className="border border-ink-700 px-2 py-1 text-center font-bold text-ink-400">{columnLabel(column)}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row}>
-                    <th className="sticky left-0 z-10 border border-ink-700 bg-ink-800 px-2 text-right font-bold text-ink-400">{row}</th>
-                    {columns.map(column => {
-                      const cell = worksheet.getCell(row, column);
-                      const editorKey = `${worksheet.id}:${cell.address}`;
-                      return (
-                        <td key={column} className="border border-ink-700 p-0">
-                          <input
-                            aria-label={`${worksheet.name} ${cell.address}`}
-                            value={editingCell === editorKey ? cellEditorValue(cell.value) : cell.text}
-                            onFocus={() => { setEditingCell(editorKey); setSelectedCell({ row, column }); }}
-                            onBlur={() => setEditingCell(current => current === editorKey ? null : current)}
-                            onChange={event => editCell(row, column, event.target.value)}
-                            style={{
-                              ...cellStyle(cell),
-                              minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px`,
-                              height: `${Math.max(16, worksheet.getRow(row).height ?? 24) * 1.25}px`,
-                            }}
-                            className="bg-transparent px-2 text-ink-100 outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500"
-                          />
-                        </td>
-                      );
-                    })}
+          <div ref={workbookPaneRef} className="max-h-[62vh] overflow-auto">
+            <div style={{ width: `${naturalGridWidth * fitScale}px` }}>
+              <table aria-label={`${worksheet.name} worksheet at ${Math.round(fitScale * 100)}% scale`} className="border-collapse text-xs" style={{ zoom: fitScale }}>
+                <thead className="sticky top-0 z-20 bg-ink-800">
+                  <tr>
+                    <th className="sticky left-0 z-30 min-w-10 border border-ink-700 bg-ink-800" />
+                    {columns.map(column => (
+                      <th key={column} style={{ minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px` }} className="border border-ink-700 p-0 text-center font-bold text-ink-400">
+                        <button
+                          type="button"
+                          aria-label={`Select column ${columnLabel(column)}`}
+                          aria-pressed={selection?.kind === 'column' && selection.column === column}
+                          onClick={() => { setSelection({ kind: 'column', column }); setEditingCell(null); }}
+                          className={`w-full px-2 py-1 ${selection?.kind === 'column' && selection.column === column ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
+                        >
+                          {columnLabel(column)}
+                        </button>
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row}>
+                      <th className="sticky left-0 z-10 border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
+                        <button
+                          type="button"
+                          aria-label={`Select row ${row}`}
+                          aria-pressed={selection?.kind === 'row' && selection.row === row}
+                          onClick={() => { setSelection({ kind: 'row', row }); setEditingCell(null); }}
+                          className={`h-full w-full px-2 ${selection?.kind === 'row' && selection.row === row ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
+                        >
+                          {row}
+                        </button>
+                      </th>
+                      {columns.map(column => {
+                        const cell = worksheet.getCell(row, column);
+                        const editorKey = `${worksheet.id}:${cell.address}`;
+                        return (
+                          <td key={column} className="border border-ink-700 p-0">
+                            <input
+                              aria-label={`${worksheet.name} ${cell.address}`}
+                              value={editingCell === editorKey ? cellEditorValue(cell.value) : cell.text}
+                              onFocus={() => { setEditingCell(editorKey); setSelection({ kind: 'cell', row, column }); }}
+                              onBlur={() => setEditingCell(current => current === editorKey ? null : current)}
+                              onChange={event => editCell(row, column, event.target.value)}
+                              style={{
+                                ...cellStyle(cell),
+                                minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px`,
+                                height: `${Math.max(16, worksheet.getRow(row).height ?? 24) * 1.25}px`,
+                              }}
+                              className="bg-transparent px-2 text-ink-100 outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500"
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       ) : null}

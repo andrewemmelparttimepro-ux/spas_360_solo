@@ -109,6 +109,7 @@ export function OwnerWorkbookLibrary() {
     startX: number;
     startY: number;
     moved: boolean;
+    reordered: boolean;
     targetIndex: number | null;
   } | null>(null);
   const [, forceResizePreview] = useState(0);
@@ -572,6 +573,7 @@ export function OwnerWorkbookLibrary() {
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
+      reordered: false,
       targetIndex: null,
     };
     setDraggingSheetId(sheetId);
@@ -583,7 +585,18 @@ export function OwnerWorkbookLibrary() {
     gesture.moved = gesture.moved
       || Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 4;
     const targetIndex = ownerSheetIndexAtPoint(event.clientX, event.clientY);
-    if (targetIndex != null) gesture.targetIndex = targetIndex;
+    if (targetIndex != null) {
+      gesture.targetIndex = targetIndex;
+      const sourceIndex = workbook?.worksheets.findIndex(sheet => sheet.id === gesture.sheetId) ?? -1;
+      if (workbook && sourceIndex >= 0 && sourceIndex !== targetIndex) {
+        const activeSheetId = worksheet?.id;
+        const nextIndex = moveWorksheet(workbook, gesture.sheetId, targetIndex);
+        gesture.reordered = true;
+        if (activeSheetId === gesture.sheetId) setSheetIndex(nextIndex);
+        else setSheetIndex(Math.max(0, workbook.worksheets.findIndex(sheet => sheet.id === activeSheetId)));
+        forceResizePreview(current => current + 1);
+      }
+    }
   };
 
   const finishSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -593,6 +606,10 @@ export function OwnerWorkbookLibrary() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
     if (!gesture.moved || !workbook) return;
+    if (gesture.reordered) {
+      markDirty();
+      return;
+    }
     const releaseTargetIndex = ownerSheetIndexAtPoint(event.clientX, event.clientY);
     const targetIndex = releaseTargetIndex ?? gesture.targetIndex;
     if (targetIndex == null || !Number.isInteger(targetIndex)) return;

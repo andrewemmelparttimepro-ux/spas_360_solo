@@ -98,6 +98,7 @@ export function OwnerWorkbookLibrary() {
     startX: number;
     startY: number;
     moved: boolean;
+    targetIndex: number | null;
   } | null>(null);
   const [, forceResizePreview] = useState(0);
 
@@ -560,6 +561,7 @@ export function OwnerWorkbookLibrary() {
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
+      targetIndex: null,
     };
     setDraggingSheetId(sheetId);
   };
@@ -569,6 +571,9 @@ export function OwnerWorkbookLibrary() {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     gesture.moved = gesture.moved
       || Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 4;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
+    const targetIndex = Number(target?.dataset.ownerSheetIndex);
+    if (Number.isInteger(targetIndex)) gesture.targetIndex = targetIndex;
   };
 
   const finishSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -578,9 +583,10 @@ export function OwnerWorkbookLibrary() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
     if (!gesture.moved || !workbook) return;
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
-    const targetIndex = Number(target?.dataset.ownerSheetIndex);
-    if (!Number.isInteger(targetIndex)) return;
+    const releaseTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
+    const releaseTargetIndex = Number(releaseTarget?.dataset.ownerSheetIndex);
+    const targetIndex = Number.isInteger(releaseTargetIndex) ? releaseTargetIndex : gesture.targetIndex;
+    if (targetIndex == null || !Number.isInteger(targetIndex)) return;
     const activeSheetId = worksheet?.id;
     const nextIndex = moveWorksheet(workbook, gesture.sheetId, targetIndex);
     if (activeSheetId === gesture.sheetId) setSheetIndex(nextIndex);

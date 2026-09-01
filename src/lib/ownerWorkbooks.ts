@@ -13,6 +13,11 @@ export const MIN_WORKSHEET_FIT_SCALE = 0.35;
 export const DEFAULT_WORKSHEET_COLUMN_WIDTH = 16;
 export const WORKSHEET_COLUMN_WIDTH_PX = 7;
 export const WORKSHEET_ROW_HEADER_WIDTH_PX = 40;
+export const WORKSHEET_ROW_HEIGHT_PX = 1.25;
+export const MIN_WORKSHEET_COLUMN_WIDTH = 3;
+export const MAX_WORKSHEET_COLUMN_WIDTH = 80;
+export const MIN_WORKSHEET_ROW_HEIGHT = 12;
+export const MAX_WORKSHEET_ROW_HEIGHT = 240;
 
 export type OwnerWorkbookFolder = typeof INVENTORY_PROFITS_FOLDER | typeof MCHL_MAJOR_UNIT_SALES_FOLDER;
 
@@ -101,6 +106,102 @@ export function sortOwnerWorkbooks<T extends Pick<OwnerWorkbookRecord, 'id' | 'd
   records: readonly T[],
 ): T[] {
   return [...records].sort(compareOwnerWorkbooks);
+}
+
+export function normalizeWorksheetName(value: string): string {
+  const name = value.trim();
+  if (!name) throw new Error('Sheet names cannot be empty.');
+  if (name.length > 31) throw new Error('Sheet names cannot be longer than 31 characters.');
+  if (/[\\/?*:[\]]/.test(name)) throw new Error('Sheet names cannot contain \\, /, ?, *, :, [, or ].');
+  if (name.startsWith("'") || name.endsWith("'")) throw new Error("Sheet names cannot begin or end with an apostrophe.");
+  return name;
+}
+
+export function renameWorksheet(workbook: Workbook, worksheet: Worksheet, value: string): string {
+  const name = normalizeWorksheetName(value);
+  const duplicate = workbook.worksheets.some(candidate => (
+    candidate.id !== worksheet.id && candidate.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+  ));
+  if (duplicate) throw new Error(`A sheet named ${name} already exists.`);
+  worksheet.name = name;
+  return name;
+}
+
+export function renameDefaultWorksheetToCovana(workbook: Workbook): boolean {
+  const defaultSheet = workbook.worksheets.find(worksheet => worksheet.name.trim().toLocaleLowerCase() === 'sheet1');
+  if (!defaultSheet || workbook.worksheets.some(worksheet => worksheet.name.trim().toLocaleLowerCase() === 'covana')) return false;
+  renameWorksheet(workbook, defaultSheet, 'Covana');
+  return true;
+}
+
+function nextWorksheetCopyName(workbook: Workbook, originalName: string): string {
+  const names = new Set(workbook.worksheets.map(worksheet => worksheet.name.toLocaleLowerCase()));
+  for (let copyNumber = 1; ; copyNumber += 1) {
+    const suffix = copyNumber === 1 ? ' copy' : ` copy ${copyNumber}`;
+    const stem = originalName.slice(0, Math.max(1, 31 - suffix.length)).trimEnd();
+    const candidate = `${stem}${suffix}`;
+    if (!names.has(candidate.toLocaleLowerCase())) return candidate;
+  }
+}
+
+type OrderedWorksheet = Worksheet & { orderNo: number; rowBreaks: unknown[] };
+type CloneableWorksheetModel = Worksheet['model'] & {
+  merges?: string[];
+  mergeCells?: string[];
+};
+
+function applyWorksheetOrder(worksheets: Worksheet[]): void {
+  worksheets.forEach((worksheet, index) => {
+    (worksheet as OrderedWorksheet).orderNo = index;
+  });
+}
+
+export function moveWorksheet(workbook: Workbook, worksheetId: number, targetIndex: number): number {
+  const ordered = workbook.worksheets;
+  const sourceIndex = ordered.findIndex(worksheet => worksheet.id === worksheetId);
+  if (sourceIndex < 0) return -1;
+  const boundedTarget = Math.min(ordered.length - 1, Math.max(0, targetIndex));
+  if (sourceIndex === boundedTarget) return sourceIndex;
+  const [moved] = ordered.splice(sourceIndex, 1);
+  ordered.splice(boundedTarget, 0, moved);
+  applyWorksheetOrder(ordered);
+  return boundedTarget;
+}
+
+export function duplicateWorksheet(workbook: Workbook, source: Worksheet): Worksheet {
+  const sourceIndex = workbook.worksheets.findIndex(worksheet => worksheet.id === source.id);
+  if (sourceIndex < 0) throw new Error('The selected sheet is no longer available.');
+
+  const name = nextWorksheetCopyName(workbook, source.name);
+  const sourceModel = structuredClone(source.model) as CloneableWorksheetModel;
+  const duplicate = workbook.addWorksheet(name, { state: source.state });
+  sourceModel.id = duplicate.id;
+  sourceModel.name = name;
+  // ExcelJS exposes merges as `merges` but its worksheet model setter consumes
+  // `mergeCells`; bridge both so duplicated merged regions survive round-trip.
+  sourceModel.mergeCells = sourceModel.merges ? [...sourceModel.merges] : [];
+  duplicate.model = sourceModel;
+  duplicate.state = source.state;
+  (duplicate as OrderedWorksheet).rowBreaks = structuredClone((source as OrderedWorksheet).rowBreaks);
+
+  const ordered = workbook.worksheets.filter(worksheet => worksheet.id !== duplicate.id);
+  ordered.splice(sourceIndex + 1, 0, duplicate);
+  applyWorksheetOrder(ordered);
+  return duplicate;
+}
+
+function resizeScale(scale: number): number {
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+export function resizedWorksheetColumnWidth(startWidth: number, screenDeltaPx: number, scale: number): number {
+  const next = startWidth + screenDeltaPx / (WORKSHEET_COLUMN_WIDTH_PX * resizeScale(scale));
+  return Math.min(MAX_WORKSHEET_COLUMN_WIDTH, Math.max(MIN_WORKSHEET_COLUMN_WIDTH, next));
+}
+
+export function resizedWorksheetRowHeight(startHeight: number, screenDeltaPx: number, scale: number): number {
+  const next = startHeight + screenDeltaPx / (WORKSHEET_ROW_HEIGHT_PX * resizeScale(scale));
+  return Math.min(MAX_WORKSHEET_ROW_HEIGHT, Math.max(MIN_WORKSHEET_ROW_HEIGHT, next));
 }
 
 function backgroundFill(hex: string | null): Fill {

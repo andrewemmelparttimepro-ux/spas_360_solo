@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Workbook } from 'exceljs';
-import { Copy, FileSpreadsheet, FolderOpen, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X } from 'lucide-react';
+import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
@@ -13,9 +13,15 @@ import {
   cellStyle,
   columnLabel,
   duplicateWorkbookName,
+  duplicateWorksheet,
   isXlsxFile,
   markWorkbookForRecalculation,
   normalizeWorkbookName,
+  moveWorksheet,
+  renameDefaultWorksheetToCovana,
+  renameWorksheet,
+  resizedWorksheetColumnWidth,
+  resizedWorksheetRowHeight,
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sha256Hex,
@@ -62,6 +68,9 @@ export function OwnerWorkbookLibrary() {
   const [dirtyRevision, setDirtyRevision] = useState(0);
   const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
   const [editingCell, setEditingCell] = useState<string | null>(null);
+  const [renamingSheetId, setRenamingSheetId] = useState<number | null>(null);
+  const [sheetNameDraft, setSheetNameDraft] = useState('');
+  const [draggingSheetId, setDraggingSheetId] = useState<number | null>(null);
   const [selection, setSelection] = useState<WorkbookSelection | null>(null);
   const [workbookPaneWidth, setWorkbookPaneWidth] = useState(0);
   const [renameTarget, setRenameTarget] = useState<OwnerWorkbookRecord | null>(null);
@@ -74,6 +83,16 @@ export function OwnerWorkbookLibrary() {
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const activeVersionRef = useRef(1);
   const workbookPaneRef = useRef<HTMLDivElement>(null);
+  const resizeGestureRef = useRef<{
+    kind: 'column' | 'row';
+    index: number;
+    pointerId: number;
+    startClient: number;
+    startValue: number;
+    scale: number;
+    changed: boolean;
+  } | null>(null);
+  const [, forceResizePreview] = useState(0);
 
   const loadRecords = useCallback(async () => {
     if (profile?.role !== 'owner_manager' || !profile.org_id) return;
@@ -328,16 +347,20 @@ export function OwnerWorkbookLibrary() {
       const response = await fetch(signed.signedUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error('The workbook file could not be loaded.');
       const parsed = await parseWorkbook(await response.arrayBuffer());
-      revisionRef.current = 0;
+      const renamedDefault = record.folder_key === INVENTORY_PROFITS_FOLDER
+        ? renameDefaultWorksheetToCovana(parsed)
+        : false;
+      revisionRef.current = renamedDefault ? 1 : 0;
       savedRevisionRef.current = 0;
-      setDirtyRevision(0);
-      setSaveState('saved');
+      setDirtyRevision(renamedDefault ? 1 : 0);
+      setSaveState(renamedDefault ? 'unsaved' : 'saved');
       activeVersionRef.current = record.version;
       setActive(record);
       setWorkbook(parsed);
       setSheetIndex(0);
       setSelection(null);
       setEditingCell(null);
+      setRenamingSheetId(null);
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : 'The workbook could not be opened.');
     } finally {
@@ -447,15 +470,85 @@ export function OwnerWorkbookLibrary() {
     markDirty();
   };
 
-  const resizeSelectedRow = (height: number) => {
-    if (!worksheet || !selection || selection.kind === 'column' || !Number.isFinite(height)) return;
-    worksheet.getRow(selection.row).height = Math.min(240, Math.max(12, height));
-    markDirty();
+  const beginResize = (event: React.PointerEvent<HTMLButtonElement>, kind: 'column' | 'row', index: number) => {
+    if (!worksheet) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeGestureRef.current = {
+      kind,
+      index,
+      pointerId: event.pointerId,
+      startClient: kind === 'column' ? event.clientX : event.clientY,
+      startValue: kind === 'column'
+        ? worksheet.getColumn(index).width ?? 16
+        : worksheet.getRow(index).height ?? 24,
+      scale: fitScale,
+      changed: false,
+    };
+    setSelection(kind === 'column' ? { kind, column: index } : { kind, row: index });
+    setEditingCell(null);
   };
 
-  const resizeSelectedColumn = (width: number) => {
-    if (!worksheet || !selection || selection.kind === 'row' || !Number.isFinite(width)) return;
-    worksheet.getColumn(selection.column).width = Math.min(80, Math.max(3, width));
+  const continueResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = resizeGestureRef.current;
+    if (!worksheet || !gesture || gesture.pointerId !== event.pointerId) return;
+    const delta = (gesture.kind === 'column' ? event.clientX : event.clientY) - gesture.startClient;
+    if (gesture.kind === 'column') {
+      worksheet.getColumn(gesture.index).width = resizedWorksheetColumnWidth(gesture.startValue, delta, gesture.scale);
+    } else {
+      worksheet.getRow(gesture.index).height = resizedWorksheetRowHeight(gesture.startValue, delta, gesture.scale);
+    }
+    gesture.changed = gesture.changed || Math.abs(delta) >= 1;
+    forceResizePreview(current => current + 1);
+  };
+
+  const finishResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = resizeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    resizeGestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (gesture.changed) markDirty();
+  };
+
+  const beginSheetRename = (sheet: Workbook['worksheets'][number]) => {
+    setError(null);
+    setRenamingSheetId(sheet.id);
+    setSheetNameDraft(sheet.name);
+  };
+
+  const commitSheetRename = (sheet: Workbook['worksheets'][number]) => {
+    if (!workbook || renamingSheetId !== sheet.id) return;
+    try {
+      const previous = sheet.name;
+      const next = renameWorksheet(workbook, sheet, sheetNameDraft);
+      setRenamingSheetId(null);
+      if (next !== previous) markDirty();
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : 'The sheet could not be renamed.');
+    }
+  };
+
+  const duplicateSelectedSheet = () => {
+    if (!workbook || !worksheet) return;
+    try {
+      const duplicate = duplicateWorksheet(workbook, worksheet);
+      setSheetIndex(workbook.worksheets.findIndex(sheet => sheet.id === duplicate.id));
+      setSelection(null);
+      setEditingCell(null);
+      setRenamingSheetId(null);
+      markDirty();
+    } catch (duplicateError) {
+      setError(duplicateError instanceof Error ? duplicateError.message : 'The sheet could not be duplicated.');
+    }
+  };
+
+  const dropSheetAt = (targetIndex: number) => {
+    if (!workbook || draggingSheetId == null) return;
+    const activeSheetId = worksheet?.id;
+    moveWorksheet(workbook, draggingSheetId, targetIndex);
+    setDraggingSheetId(null);
+    setSheetIndex(Math.max(0, workbook.worksheets.findIndex(sheet => sheet.id === activeSheetId)));
     markDirty();
   };
 
@@ -549,41 +642,53 @@ export function OwnerWorkbookLibrary() {
               <X className="h-3.5 w-3.5" />Close workbook
             </button>
           </div>
-          <div className="flex gap-1 overflow-x-auto border-b border-ink-700 p-2">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-ink-700 p-2">
             {workbook.worksheets.map((sheet, index) => (
-              <button key={`${sheet.id}-${sheet.name}`} type="button" onClick={() => { setSheetIndex(index); setSelection(null); setEditingCell(null); }} className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-bold ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'}`}>
-                {sheet.name}
-              </button>
+              <div
+                key={sheet.id}
+                draggable={renamingSheetId !== sheet.id}
+                onDragStart={event => { setDraggingSheetId(sheet.id); event.dataTransfer.effectAllowed = 'move'; }}
+                onDragEnd={() => setDraggingSheetId(null)}
+                onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                onDrop={event => { event.preventDefault(); dropSheetAt(index); }}
+                className={`group flex shrink-0 items-center rounded-md ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'} ${draggingSheetId === sheet.id ? 'opacity-50' : ''}`}
+                title="Click and hold, then drag to reorder"
+              >
+                <GripVertical className="ml-1 h-3.5 w-3.5 cursor-grab opacity-60" aria-hidden="true" />
+                {renamingSheetId === sheet.id ? (
+                  <input
+                    autoFocus
+                    aria-label={`Sheet name for ${sheet.name}`}
+                    value={sheetNameDraft}
+                    maxLength={31}
+                    onChange={event => setSheetNameDraft(event.target.value)}
+                    onBlur={() => commitSheetRename(sheet)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') { event.preventDefault(); commitSheetRename(sheet); }
+                      if (event.key === 'Escape') { event.preventDefault(); setRenamingSheetId(null); setError(null); }
+                    }}
+                    className="mx-1 w-32 rounded bg-white px-2 py-1 text-xs font-bold text-ink-900 outline-none ring-2 ring-amber-300"
+                  />
+                ) : (
+                  <button type="button" onClick={() => { setSheetIndex(index); setSelection(null); setEditingCell(null); }} onDoubleClick={() => beginSheetRename(sheet)} className="whitespace-nowrap px-2 py-1.5 text-xs font-bold">
+                    {sheet.name}
+                  </button>
+                )}
+                {renamingSheetId !== sheet.id && (
+                  <button type="button" aria-label={`Rename sheet ${sheet.name}`} onClick={() => beginSheetRename(sheet)} className="mr-1 rounded p-1 opacity-60 hover:bg-black/10 hover:opacity-100">
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             ))}
+            <button type="button" onClick={duplicateSelectedSheet} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-ink-700 px-2.5 py-1.5 text-xs font-bold text-ink-300 hover:border-amber-500" aria-label={`Duplicate sheet ${worksheet.name}`}>
+              <Copy className="h-3.5 w-3.5" />Duplicate sheet
+            </button>
           </div>
           <div aria-label="Workbook formatting controls" className="flex flex-wrap items-end gap-3 border-b border-ink-700 bg-ink-900 px-3 py-3">
             {selection && selectedCell && selectedWorksheetCell ? (
               <>
                 <p className="self-center text-xs font-bold text-ink-300">Selected {selectionLabel}</p>
-                {selection.kind !== 'column' && <label className="text-[11px] font-semibold text-ink-400">
-                  Row height
-                  <input
-                    type="number"
-                    min="12"
-                    max="240"
-                    step="1"
-                    value={Math.round((worksheet.getRow(selection.row).height ?? 24) * 10) / 10}
-                    onChange={event => resizeSelectedRow(Number(event.target.value))}
-                    className="mt-1 block w-24 rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm text-ink-100"
-                  />
-                </label>}
-                {selection.kind !== 'row' && <label className="text-[11px] font-semibold text-ink-400">
-                  Column width
-                  <input
-                    type="number"
-                    min="3"
-                    max="80"
-                    step="1"
-                    value={Math.round((worksheet.getColumn(selection.column).width ?? 16) * 10) / 10}
-                    onChange={event => resizeSelectedColumn(Number(event.target.value))}
-                    className="mt-1 block w-24 rounded-md border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm text-ink-100"
-                  />
-                </label>}
                 <label className="text-[11px] font-semibold text-ink-400">
                   {selectionBackgroundLabel}
                   <span className="mt-1 flex items-center gap-2">
@@ -610,7 +715,7 @@ export function OwnerWorkbookLibrary() {
                 </label>
               </>
             ) : (
-              <p className="flex items-center gap-2 text-xs text-ink-500"><PaintBucket className="h-4 w-4" />Select a cell, row number, or column letter to resize and format it.</p>
+              <p className="flex items-center gap-2 text-xs text-ink-500"><PaintBucket className="h-4 w-4" />Select a cell, row number, or column letter to format it. Drag a row or column boundary to resize.</p>
             )}
           </div>
           {grid.clipped && <p className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">This sheet is large. The editor shows the first {grid.rows} rows and {grid.columns} columns.</p>}
@@ -621,7 +726,7 @@ export function OwnerWorkbookLibrary() {
                   <tr>
                     <th className="sticky left-0 z-30 min-w-10 border border-ink-700 bg-ink-800" />
                     {columns.map(column => (
-                      <th key={column} style={{ minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px` }} className="border border-ink-700 p-0 text-center font-bold text-ink-400">
+                      <th key={column} style={{ minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px` }} className="relative border border-ink-700 p-0 text-center font-bold text-ink-400">
                         <button
                           type="button"
                           aria-label={`Select column ${columnLabel(column)}`}
@@ -631,6 +736,16 @@ export function OwnerWorkbookLibrary() {
                         >
                           {columnLabel(column)}
                         </button>
+                        <button
+                          type="button"
+                          aria-label={`Resize column ${columnLabel(column)}`}
+                          title={`Drag to resize column ${columnLabel(column)}`}
+                          onPointerDown={event => beginResize(event, 'column', column)}
+                          onPointerMove={continueResize}
+                          onPointerUp={finishResize}
+                          onPointerCancel={finishResize}
+                          className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none bg-transparent hover:bg-amber-400/60"
+                        />
                       </th>
                     ))}
                   </tr>
@@ -639,15 +754,27 @@ export function OwnerWorkbookLibrary() {
                   {rows.map(row => (
                     <tr key={row}>
                       <th className="sticky left-0 z-10 border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
-                        <button
-                          type="button"
-                          aria-label={`Select row ${row}`}
-                          aria-pressed={selection?.kind === 'row' && selection.row === row}
-                          onClick={() => { setSelection({ kind: 'row', row }); setEditingCell(null); }}
-                          className={`h-full w-full px-2 ${selection?.kind === 'row' && selection.row === row ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
-                        >
-                          {row}
-                        </button>
+                        <span className="relative block h-full">
+                          <button
+                            type="button"
+                            aria-label={`Select row ${row}`}
+                            aria-pressed={selection?.kind === 'row' && selection.row === row}
+                            onClick={() => { setSelection({ kind: 'row', row }); setEditingCell(null); }}
+                            className={`h-full w-full px-2 ${selection?.kind === 'row' && selection.row === row ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
+                          >
+                            {row}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Resize row ${row}`}
+                            title={`Drag to resize row ${row}`}
+                            onPointerDown={event => beginResize(event, 'row', row)}
+                            onPointerMove={continueResize}
+                            onPointerUp={finishResize}
+                            onPointerCancel={finishResize}
+                            className="absolute -bottom-1 left-0 z-10 h-2 w-full cursor-row-resize touch-none bg-transparent hover:bg-amber-400/60"
+                          />
+                        </span>
                       </th>
                       {columns.map(column => {
                         const cell = worksheet.getCell(row, column);

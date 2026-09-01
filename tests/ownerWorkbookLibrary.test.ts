@@ -7,8 +7,15 @@ import {
   cellEditorValue,
   columnLabel,
   duplicateWorkbookName,
+  duplicateWorksheet,
   markWorkbookForRecalculation,
+  moveWorksheet,
   normalizeWorkbookName,
+  normalizeWorksheetName,
+  renameDefaultWorksheetToCovana,
+  renameWorksheet,
+  resizedWorksheetColumnWidth,
+  resizedWorksheetRowHeight,
   setCellBackground,
   setCellEditorValue,
   setWorksheetSelectionBackground,
@@ -67,8 +74,14 @@ describe('owner workbook library', () => {
     assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.update/);
     assert.match(component, /window\.setTimeout\([\s\S]*1200/);
     assert.match(component, /workbook\.worksheets\.map/);
-    assert.match(component, /Row height/);
-    assert.match(component, /Column width/);
+    assert.doesNotMatch(component, /type="number"/);
+    assert.match(component, /Resize column \$\{columnLabel\(column\)\}/);
+    assert.match(component, /Resize row \$\{row\}/);
+    assert.match(component, /cursor-col-resize/);
+    assert.match(component, /cursor-row-resize/);
+    assert.match(component, /Duplicate sheet/);
+    assert.match(component, /Rename sheet \$\{sheet\.name\}/);
+    assert.match(component, /draggable=\{renamingSheetId !== sheet\.id\}/);
     assert.match(component, /Selection background/);
     assert.match(component, /selectedWorksheetCell\?\.fill\?\.type/);
     assert.match(component, /Select column \$\{columnLabel\(column\)\}/);
@@ -189,6 +202,61 @@ describe('owner workbook library', () => {
       'same-newer',
       'same-older',
     ]);
+  });
+
+  it('renames the default tab, allows validated sheet names, duplicates full contents beside the source, and reorders tabs', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const first = workbook.addWorksheet('Sheet1');
+    const second = workbook.addWorksheet('Sales');
+    first.getCell('A1').value = 'Covana profit';
+    first.getCell('B2').value = { formula: 'SUM(1,2)' };
+    first.getCell('B2').font = { bold: true, color: { argb: 'FF123456' } };
+    first.getColumn(2).width = 27;
+    first.getRow(2).height = 41;
+    first.mergeCells('C3:D3');
+    first.getCell('C3').value = 'merged';
+
+    assert.equal(renameDefaultWorksheetToCovana(workbook), true);
+    assert.equal(first.name, 'Covana');
+    assert.equal(renameDefaultWorksheetToCovana(workbook), false);
+    assert.equal(renameWorksheet(workbook, second, ' Sales 2026 '), 'Sales 2026');
+    assert.equal(normalizeWorksheetName(' Covana Covers '), 'Covana Covers');
+    assert.throws(() => renameWorksheet(workbook, second, 'Covana'), /already exists/);
+    assert.throws(() => normalizeWorksheetName('Bad/Name'), /cannot contain/);
+
+    const copy = duplicateWorksheet(workbook, first);
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Covana', 'Covana copy', 'Sales 2026']);
+    assert.equal(copy.getCell('A1').value, 'Covana profit');
+    assert.equal(cellEditorValue(copy.getCell('B2').value), '=SUM(1,2)');
+    assert.deepEqual(copy.getCell('B2').font, first.getCell('B2').font);
+    assert.equal(copy.getColumn(2).width, 27);
+    assert.equal(copy.getRow(2).height, 41);
+    assert.equal(copy.getCell('C3').isMerged, true);
+
+    assert.equal(moveWorksheet(workbook, second.id, 0), 0);
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Sales 2026', 'Covana', 'Covana copy']);
+
+    const saved = await workbook.xlsx.writeBuffer();
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(saved);
+    assert.deepEqual(reopened.worksheets.map(sheet => sheet.name), ['Sales 2026', 'Covana', 'Covana copy']);
+    const reopenedCopy = reopened.getWorksheet('Covana copy');
+    assert.ok(reopenedCopy);
+    assert.equal(reopenedCopy.getCell('A1').value, 'Covana profit');
+    assert.equal(cellEditorValue(reopenedCopy.getCell('B2').value), '=SUM(1,2)');
+    assert.deepEqual(reopenedCopy.getCell('B2').font, first.getCell('B2').font);
+    assert.equal(reopenedCopy.getCell('C3').isMerged, true);
+  });
+
+  it('converts pointer movement at scaled row and column boundaries into bounded workbook sizes', () => {
+    assert.equal(resizedWorksheetColumnWidth(20, 35, 1), 25);
+    assert.equal(resizedWorksheetColumnWidth(20, 17.5, 0.5), 25);
+    assert.equal(resizedWorksheetColumnWidth(4, -100, 1), 3);
+    assert.equal(resizedWorksheetColumnWidth(79, 100, 1), 80);
+    assert.equal(resizedWorksheetRowHeight(20, 12.5, 1), 30);
+    assert.equal(resizedWorksheetRowHeight(20, 6.25, 0.5), 30);
+    assert.equal(resizedWorksheetRowHeight(13, -100, 1), 12);
+    assert.equal(resizedWorksheetRowHeight(239, 100, 1), 240);
   });
 
   it('fits a worksheet to the available pane without rewriting stored column widths', () => {

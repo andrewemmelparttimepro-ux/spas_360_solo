@@ -68,6 +68,41 @@ export function duplicateWorkbookName(existingNames: string[], originalName: str
   }
 }
 
+function workbookYear(displayName: string): number | null {
+  const match = displayName.trim().match(/^(\d{4})(?=\D|$)/);
+  return match ? Number(match[1]) : null;
+}
+
+export function compareOwnerWorkbooks(
+  left: Pick<OwnerWorkbookRecord, 'id' | 'display_name' | 'created_at'>,
+  right: Pick<OwnerWorkbookRecord, 'id' | 'display_name' | 'created_at'>,
+): number {
+  const leftYear = workbookYear(left.display_name);
+  const rightYear = workbookYear(right.display_name);
+  if (leftYear !== null && rightYear !== null && leftYear !== rightYear) return rightYear - leftYear;
+  if (leftYear !== null && rightYear === null) return -1;
+  if (leftYear === null && rightYear !== null) return 1;
+
+  const nameOrder = left.display_name.localeCompare(right.display_name, 'en-US', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  if (nameOrder) return nameOrder;
+
+  // Resolve otherwise-equivalent names without relying on the database's
+  // delivery order, which can change after an edit or upload.
+  if (left.display_name !== right.display_name) return left.display_name < right.display_name ? -1 : 1;
+  const createdOrder = right.created_at.localeCompare(left.created_at);
+  if (createdOrder) return createdOrder;
+  return left.id.localeCompare(right.id);
+}
+
+export function sortOwnerWorkbooks<T extends Pick<OwnerWorkbookRecord, 'id' | 'display_name' | 'created_at'>>(
+  records: readonly T[],
+): T[] {
+  return [...records].sort(compareOwnerWorkbooks);
+}
+
 function backgroundFill(hex: string | null): Fill {
   if (!hex) {
     return { type: 'pattern', pattern: 'none' };

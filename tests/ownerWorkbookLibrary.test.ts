@@ -12,6 +12,7 @@ import {
   setCellBackground,
   setCellEditorValue,
   setWorksheetSelectionBackground,
+  sortOwnerWorkbooks,
   worksheetFitScale,
   worksheetGridWidth,
 } from '../src/lib/ownerWorkbooks.ts';
@@ -140,6 +141,54 @@ describe('owner workbook library', () => {
       ['2020 Major Unit Deals.xlsx', '2020 Major Unit Deals copy.xlsx'],
       '2020 Major Unit Deals.xlsx',
     ), '2020 Major Unit Deals copy 2.xlsx');
+  });
+
+  it('sorts year-prefixed workbooks newest-first with deterministic fallback ordering', () => {
+    const record = (id: string, displayName: string, createdAt = '2026-09-01T00:00:00.000Z') => ({
+      id,
+      display_name: displayName,
+      created_at: createdAt,
+    });
+    const input = [
+      record('non-year-10', 'Archive 10.xlsx'),
+      record('2022', '2022 Major Unit Deals.xlsx'),
+      record('2025', '2025 Major Unit Deals 2.xlsx'),
+      record('non-year-2', 'Archive 2.xlsx'),
+      record('2020', '2020 Major Unit Deals.xlsx'),
+      record('2024', '2024 Major Unit Deals.xlsx'),
+      record('2021', '2021 Major Unit Deals.xlsx'),
+      record('2023', '2023 Major Unit Deals.xlsx'),
+      record('embedded-year', 'Archive 2026.xlsx'),
+      record('same-newer', 'Reference.xlsx', '2026-09-02T00:00:00.000Z'),
+      record('same-older', 'Reference.xlsx', '2026-09-01T00:00:00.000Z'),
+    ];
+
+    assert.deepEqual(sortOwnerWorkbooks(input).map(workbook => workbook.id), [
+      '2025',
+      '2024',
+      '2023',
+      '2022',
+      '2021',
+      '2020',
+      'non-year-2',
+      'non-year-10',
+      'embedded-year',
+      'same-newer',
+      'same-older',
+    ]);
+    assert.deepEqual(input.map(workbook => workbook.id), [
+      'non-year-10',
+      '2022',
+      '2025',
+      'non-year-2',
+      '2020',
+      '2024',
+      '2021',
+      '2023',
+      'embedded-year',
+      'same-newer',
+      'same-older',
+    ]);
   });
 
   it('fits a worksheet to the available pane without rewriting stored column widths', () => {

@@ -19,6 +19,7 @@ import {
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sha256Hex,
+  sortOwnerWorkbooks,
   storagePath,
   visibleGridSize,
   worksheetFitScale,
@@ -92,7 +93,9 @@ export function OwnerWorkbookLibrary() {
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
   const inventoryWorkbook = records.find(record => record.folder_key === INVENTORY_PROFITS_FOLDER);
-  const majorUnitWorkbooks = records.filter(record => record.folder_key === MCHL_MAJOR_UNIT_SALES_FOLDER);
+  const majorUnitWorkbooks = sortOwnerWorkbooks(
+    records.filter(record => record.folder_key === MCHL_MAJOR_UNIT_SALES_FOLDER),
+  );
 
   const importBytes = async (folder: OwnerWorkbookFolder, displayName: string, bytes: ArrayBuffer, expectedSha?: string) => {
     if (profile?.role !== 'owner_manager' || !profile.org_id || !profile.id) throw new Error('Owner access is required.');

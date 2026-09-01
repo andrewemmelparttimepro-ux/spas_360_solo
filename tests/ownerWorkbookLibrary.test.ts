@@ -87,7 +87,9 @@ describe('owner workbook library', () => {
     assert.match(component, /cursor-row-resize/);
     assert.match(component, /<span className="relative block" style=\{\{ height: `\$\{worksheetRowHeightPx\(worksheet, row\)\}px` \}\}>[\s\S]*?bottom-0[\s\S]*?cursor-row-resize/);
     assert.doesNotMatch(component, /duplicateSelectedSheet/);
-    assert.doesNotMatch(component, /aria-label=\{`Duplicate sheet/);
+    assert.equal((component.match(/aria-label=\{`Duplicate sheet/g) ?? []).length, 1);
+    assert.match(component, /renamingSheetId === sheet\.id \? \([\s\S]*aria-label=\{`Duplicate sheet \$\{sheet\.name\}`\}[\s\S]*aria-label=\{`Delete sheet \$\{sheet\.name\}`\}/);
+    assert.match(component, /onClick=\{\(\) => duplicateEditingSheet\(sheet\)\}/);
     assert.match(component, /Rename sheet \$\{sheet\.name\}/);
     assert.match(component, /aria-label=\{`Delete sheet \$\{sheet\.name\}`\}/);
     assert.match(component, /Confirm delete sheet/);

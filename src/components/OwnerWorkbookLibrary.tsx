@@ -16,6 +16,7 @@ import {
   cellStyle,
   columnLabel,
   duplicateWorkbookName,
+  duplicateWorksheet,
   deleteWorksheet,
   inventoryProfitsCellText,
   isXlsxFile,
@@ -558,6 +559,20 @@ export function OwnerWorkbookLibrary() {
     }
   };
 
+  const duplicateEditingSheet = (sheet: Workbook['worksheets'][number]) => {
+    if (!workbook || renamingSheetId !== sheet.id) return;
+    try {
+      const duplicate = duplicateWorksheet(workbook, sheet);
+      setSheetIndex(workbook.worksheets.findIndex(candidate => candidate.id === duplicate.id));
+      setSelection(null);
+      setEditingCell(null);
+      setRenamingSheetId(null);
+      markDirty();
+    } catch (duplicateError) {
+      setError(duplicateError instanceof Error ? duplicateError.message : 'The sheet could not be duplicated.');
+    }
+  };
+
   const confirmDeleteSheet = () => {
     if (!workbook || deleteSheetTargetId == null) return;
     try {
@@ -779,6 +794,16 @@ export function OwnerWorkbookLibrary() {
                       }}
                       className="w-32 rounded bg-white px-2 py-1 text-xs font-bold text-ink-900 outline-none ring-2 ring-amber-300"
                     />
+                    <button
+                      type="button"
+                      aria-label={`Duplicate sheet ${sheet.name}`}
+                      title={`Duplicate ${sheet.name}`}
+                      onPointerDown={event => event.preventDefault()}
+                      onClick={() => duplicateEditingSheet(sheet)}
+                      className="inline-flex items-center gap-1 rounded border border-ink-600 bg-ink-800 px-2 py-1 text-xs font-bold text-ink-200 hover:border-amber-400"
+                    >
+                      <Copy className="h-3 w-3" />Duplicate sheet
+                    </button>
                     <button
                       type="button"
                       aria-label={`Delete sheet ${sheet.name}`}

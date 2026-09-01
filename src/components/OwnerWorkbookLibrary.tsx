@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Workbook } from 'exceljs';
-import { Copy, FileSpreadsheet, FolderOpen, LoaderCircle, PaintBucket, Pencil, Save, Upload, X } from 'lucide-react';
+import { Copy, FileSpreadsheet, FolderOpen, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
@@ -65,6 +65,7 @@ export function OwnerWorkbookLibrary() {
   const [workbookPaneWidth, setWorkbookPaneWidth] = useState(0);
   const [renameTarget, setRenameTarget] = useState<OwnerWorkbookRecord | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<OwnerWorkbookRecord | null>(null);
   const [uploadFolder, setUploadFolder] = useState<OwnerWorkbookFolder>(MCHL_MAJOR_UNIT_SALES_FOLDER);
   const uploadRef = useRef<HTMLInputElement>(null);
   const revisionRef = useRef(0);
@@ -248,6 +249,63 @@ export function OwnerWorkbookLibrary() {
     } catch (duplicateError) {
       if (copiedPathCreated && !metadataCreated) await supabase.storage.from(OWNER_WORKBOOK_BUCKET).remove([path]);
       setError(duplicateError instanceof Error ? duplicateError.message : 'The workbook could not be duplicated.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteWorkbook = async () => {
+    if (!deleteTarget || profile?.role !== 'owner_manager' || !profile.org_id) return;
+    if (deleteTarget.org_id !== profile.org_id) {
+      setError('This workbook does not belong to your dealership.');
+      setDeleteTarget(null);
+      return;
+    }
+    const target = deleteTarget;
+    setBusyId(`delete-${target.id}`);
+    setError(null);
+    try {
+      // Keep exact bytes in memory until the metadata delete succeeds so a
+      // database failure cannot leave a workbook row pointing at a missing file.
+      const { data: signed, error: signedError } = await supabase.storage
+        .from(OWNER_WORKBOOK_BUCKET)
+        .createSignedUrl(target.storage_path, 60);
+      if (signedError) throw signedError;
+      const storedResponse = await fetch(signed.signedUrl, { cache: 'no-store' });
+      if (!storedResponse.ok) throw new Error('The workbook file could not be prepared for deletion.');
+      const storedBytes = await storedResponse.arrayBuffer();
+      if (storedBytes.byteLength !== target.file_size_bytes || await sha256Hex(storedBytes) !== target.current_sha256) {
+        throw new Error('The stored workbook changed. Reload the page before deleting it.');
+      }
+
+      const { error: storageError } = await supabase.storage
+        .from(OWNER_WORKBOOK_BUCKET)
+        .remove([target.storage_path]);
+      if (storageError) throw storageError;
+
+      const { data: deleted, error: metadataError } = await supabase
+        .from('owner_workbooks')
+        .delete()
+        .eq('id', target.id)
+        .eq('org_id', profile.org_id)
+        .select('id')
+        .single();
+      if (metadataError || deleted?.id !== target.id) {
+        const { error: restoreError } = await supabase.storage.from(OWNER_WORKBOOK_BUCKET).upload(
+          target.storage_path,
+          storedBytes,
+          { contentType: target.mime_type, upsert: false },
+        );
+        if (restoreError) {
+          throw new Error(`The workbook metadata could not be deleted and its file could not be restored: ${restoreError.message}`);
+        }
+        throw metadataError ?? new Error('The workbook metadata could not be deleted.');
+      }
+
+      setRecords(current => current.filter(record => record.id !== target.id));
+      setDeleteTarget(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'The workbook could not be deleted.');
     } finally {
       setBusyId(null);
     }
@@ -476,6 +534,7 @@ export function OwnerWorkbookLibrary() {
             onUpload={() => chooseUpload(MCHL_MAJOR_UNIT_SALES_FOLDER)}
             onRename={beginRename}
             onDuplicate={record => void duplicateWorkbook(record)}
+            onDelete={record => { setError(null); setDeleteTarget(record); }}
             busyId={busyId}
           />
         </div>
@@ -645,6 +704,24 @@ export function OwnerWorkbookLibrary() {
           </form>
         </div>
       )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-workbook-heading">
+          <div className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
+            <h3 id="delete-workbook-heading" className="text-lg font-bold text-ink-100">Delete workbook?</h3>
+            <p className="mt-2 text-sm text-ink-400">
+              Confirm that you want to permanently delete <span className="font-bold text-ink-100">{deleteTarget.display_name}</span> from MCHL Major Unit Sales.
+            </p>
+            {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500">{error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteTarget(null)} disabled={busyId === `delete-${deleteTarget.id}`} className="rounded-lg border border-ink-700 px-3 py-2 text-sm font-bold text-ink-300 hover:border-amber-500 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={() => void deleteWorkbook()} disabled={busyId === `delete-${deleteTarget.id}`} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                {busyId === `delete-${deleteTarget.id}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Confirm delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -661,6 +738,7 @@ function WorkbookFolder({
   onUpload,
   onRename,
   onDuplicate,
+  onDelete,
 }: {
   title: string;
   description: string;
@@ -673,6 +751,7 @@ function WorkbookFolder({
   onUpload?: () => void;
   onRename?: (record: OwnerWorkbookRecord) => void;
   onDuplicate?: (record: OwnerWorkbookRecord) => void;
+  onDelete?: (record: OwnerWorkbookRecord) => void;
 }) {
   return (
     <article className="rounded-xl border border-ink-700 bg-ink-950/50 p-4">
@@ -682,18 +761,21 @@ function WorkbookFolder({
       </div>
       <div className="mt-4 space-y-2">
         {records.map(record => {
-          const recordBusy = busyId === record.id || busyId === `rename-${record.id}` || busyId === `duplicate-${record.id}`;
+          const recordBusy = busyId === record.id || busyId === `rename-${record.id}` || busyId === `duplicate-${record.id}` || busyId === `delete-${record.id}`;
           return (
             <div key={record.id} className="flex items-stretch gap-2 rounded-lg border border-ink-700 bg-ink-900 p-1.5">
               <button type="button" onClick={() => onOpen(record)} disabled={recordBusy} className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 py-1 text-left hover:bg-ink-800 disabled:opacity-60">
-                <span className="min-w-0"><span className="block truncate text-sm font-bold text-ink-100">{record.display_name}</span><span className="block text-[11px] text-ink-500">Autosaved version {record.version}</span></span>
+                <span className="min-w-0"><span className="block truncate text-sm font-bold text-ink-100">{record.display_name}</span></span>
                 {busyId === record.id ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 shrink-0 text-amber-500" />}
               </button>
-              {onRename && onDuplicate && (
+              {onRename && onDuplicate && onDelete && (
                 <div className="flex items-center gap-1 border-l border-ink-700 pl-1.5">
                   <button type="button" aria-label={`Rename ${record.display_name}`} title="Rename" onClick={() => onRename(record)} disabled={recordBusy} className="rounded-md p-2 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                   <button type="button" aria-label={`Duplicate ${record.display_name}`} title="Duplicate" onClick={() => onDuplicate(record)} disabled={recordBusy} className="rounded-md p-2 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50">
                     {busyId === `duplicate-${record.id}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                  <button type="button" onClick={() => onDelete(record)} disabled={recordBusy} className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 disabled:opacity-50">
+                    <Trash2 className="h-4 w-4" />Delete
                   </button>
                 </div>
               )}

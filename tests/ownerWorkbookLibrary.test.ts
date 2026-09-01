@@ -30,15 +30,17 @@ function formulaCount(workbook: ExcelJS.Workbook): number {
 
 describe('owner workbook library', () => {
   it('defines an owner-only private bucket and tenant-scoped metadata policies', async () => {
-    const [migrationBytes, controlsMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
+    const [migrationBytes, controlsMigrationBytes, deleteMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
       read('supabase/migrations/20260831234029_add_owner_workbook_library.sql'),
       read('supabase/migrations/20260901000635_allow_owner_workbook_rename.sql'),
+      read('supabase/migrations/20260901163251_allow_owner_workbook_delete.sql'),
       read('src/components/OwnerWorkbookLibrary.tsx'),
       read('src/pages/OwnersCorner.tsx'),
       read('api/_assets/Inventory Profits.xlsx'),
     ]);
     const migration = migrationBytes.toString('utf8');
     const controlsMigration = controlsMigrationBytes.toString('utf8');
+    const deleteMigration = deleteMigrationBytes.toString('utf8');
     const component = componentBytes.toString('utf8');
     const page = pageBytes.toString('utf8');
 
@@ -52,6 +54,8 @@ describe('owner workbook library', () => {
     assert.match(migration, /for insert to authenticated[\s\S]*created_by = \(select auth\.uid\(\)\)/);
     assert.match(migration, /owner_workbooks_storage_update[\s\S]*for update to authenticated[\s\S]*with check/);
     assert.match(controlsMigration, /grant update \(display_name\) on table public\.owner_workbooks to authenticated/);
+    assert.match(deleteMigration, /create policy owner_workbooks_delete on public\.owner_workbooks[\s\S]*for delete to authenticated[\s\S]*org_id = \(select public\.auth_org\(\)\)[\s\S]*public\.auth_role\(\)\) = 'owner_manager'/);
+    assert.match(deleteMigration, /grant delete on table public\.owner_workbooks to authenticated/);
     assert.doesNotMatch(migration, /to anon/);
     assert.match(page, /profile\?\.role === 'owner_manager'[\s\S]*<OwnerWorkbookLibrary \/>/);
     assert.match(component, /MCHL Major Unit Sales/);
@@ -76,6 +80,14 @@ describe('owner workbook library', () => {
     assert.match(component, /source_sha256: copiedSha/);
     assert.match(component, /current_sha256: copiedSha/);
     assert.match(component, /display_name: displayName/);
+    assert.match(component, /Delete workbook\?/);
+    assert.match(component, /Confirm delete/);
+    assert.match(component, /onClick=\{\(\) => setDeleteTarget\(null\)\}/);
+    assert.match(component, /\.remove\(\[target\.storage_path\]\)/);
+    assert.match(component, /\.from\('owner_workbooks'\)[\s\S]*\.delete\(\)[\s\S]*\.eq\('id', target\.id\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
+    assert.match(component, /The stored workbook changed\. Reload the page before deleting it\./);
+    assert.match(component, /target\.storage_path,[\s\S]*storedBytes,[\s\S]*upsert: false/);
+    assert.doesNotMatch(component, /Autosaved version/);
   });
 
   it('round-trips formulas and styles when one real workbook cell changes', async () => {

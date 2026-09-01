@@ -29,6 +29,22 @@ const deals: OwnersReportDeal[] = [
 describe('Owners Corner sales reports', () => {
   const now = new Date(2026, 7, 25, 10, 30);
 
+  it('keeps owner destinations at the bottom after every workbook and performance section', async () => {
+    const page = await read('src/pages/OwnersCorner.tsx');
+    const ownerWorkbooks = page.indexOf('<OwnerWorkbookLibrary />');
+    const paidCommissions = page.indexOf('<PaidCommissionsTracker />');
+    const performanceReport = page.indexOf('<OwnersPerformanceReport />');
+    const ownerDestinations = page.indexOf('<section aria-label="Owner destinations"');
+
+    assert.ok(ownerWorkbooks >= 0, 'Owner Workbooks section is missing');
+    assert.ok(paidCommissions > ownerWorkbooks, 'Paid Commissions must follow Owner Workbooks');
+    assert.ok(performanceReport > paidCommissions, 'Sales Outcome & Closing Rate must follow Paid Commissions');
+    assert.ok(ownerDestinations > performanceReport, 'Owner destinations must be the final owner section');
+    assert.match(page, /<OwnersPerformanceReport \/>\s*<section aria-label="Owner destinations"[\s\S]*?<\/section>\s*<\/>/);
+    assert.match(page, /name: 'Reports',[\s\S]*path: '\/reports',[\s\S]*name: 'Citadel',[\s\S]*path: '\/citadel',[\s\S]*name: 'Settings',[\s\S]*path: '\/settings'/);
+    assert.match(page, /aria-label="Owner destinations" className="grid gap-4 md:grid-cols-3"/);
+  });
+
   it('builds the exact standard periods and only exposes the requested presets', async () => {
     const month = ownersReportRanges('this_month', null, now)!;
     const year = ownersReportRanges('this_year', null, now)!;

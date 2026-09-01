@@ -66,6 +66,8 @@ export default function OwnersCorner() {
             <p>Owner access is active. Each destination keeps its existing permissions and data controls.</p>
           </div>
           <OwnerWorkbookLibrary />
+          <PaidCommissionsTracker />
+          <OwnersPerformanceReport />
           <section aria-label="Owner destinations" className="grid gap-4 md:grid-cols-3">
             {OWNER_DESTINATIONS.map(destination => (
               <NavLink
@@ -81,8 +83,6 @@ export default function OwnersCorner() {
               </NavLink>
             ))}
           </section>
-          <PaidCommissionsTracker />
-          <OwnersPerformanceReport />
         </>
       ) : (
         <section className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-ink-700 bg-ink-900/60 px-6 text-center">

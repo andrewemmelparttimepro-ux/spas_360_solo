@@ -14,10 +14,18 @@ export const DEFAULT_WORKSHEET_COLUMN_WIDTH = 16;
 export const WORKSHEET_COLUMN_WIDTH_PX = 7;
 export const WORKSHEET_ROW_HEADER_WIDTH_PX = 40;
 export const WORKSHEET_ROW_HEIGHT_PX = 1.25;
-export const MIN_WORKSHEET_COLUMN_WIDTH = 3;
+export const MIN_WORKSHEET_COLUMN_WIDTH = 1;
 export const MAX_WORKSHEET_COLUMN_WIDTH = 80;
-export const MIN_WORKSHEET_ROW_HEIGHT = 12;
+export const MIN_WORKSHEET_ROW_HEIGHT = 4;
 export const MAX_WORKSHEET_ROW_HEIGHT = 240;
+
+const INVENTORY_PROFITS_MARGIN_LABEL = /profit margin % and \$/i;
+const USD_CELL_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export type OwnerWorkbookFolder = typeof INVENTORY_PROFITS_FOLDER | typeof MCHL_MAJOR_UNIT_SALES_FOLDER;
 
@@ -259,10 +267,24 @@ export function setWorksheetSelectionBackground(
   }
 }
 
+export function worksheetColumnWidthPx(worksheet: Worksheet, column: number): number {
+  return Math.max(
+    MIN_WORKSHEET_COLUMN_WIDTH,
+    worksheet.getColumn(column).width ?? DEFAULT_WORKSHEET_COLUMN_WIDTH,
+  ) * WORKSHEET_COLUMN_WIDTH_PX;
+}
+
+export function worksheetRowHeightPx(worksheet: Worksheet, row: number): number {
+  return Math.max(
+    MIN_WORKSHEET_ROW_HEIGHT,
+    worksheet.getRow(row).height ?? 24,
+  ) * WORKSHEET_ROW_HEIGHT_PX;
+}
+
 export function worksheetGridWidth(worksheet: Worksheet, columnCount: number): number {
   let width = WORKSHEET_ROW_HEADER_WIDTH_PX;
   for (let column = 1; column <= columnCount; column += 1) {
-    width += Math.max(4, worksheet.getColumn(column).width ?? DEFAULT_WORKSHEET_COLUMN_WIDTH) * WORKSHEET_COLUMN_WIDTH_PX;
+    width += worksheetColumnWidthPx(worksheet, column);
   }
   return width;
 }
@@ -294,6 +316,35 @@ export function cellEditorValue(value: CellValue): string {
     if ('error' in value) return String(value.error);
   }
   return String(value);
+}
+
+function numericCellValue(cell: Cell): number | null {
+  if (typeof cell.value === 'number') return Number.isFinite(cell.value) ? cell.value : null;
+  if (cell.value && typeof cell.value === 'object' && ('formula' in cell.value || 'sharedFormula' in cell.value)) {
+    return typeof cell.value.result === 'number' && Number.isFinite(cell.value.result)
+      ? cell.value.result
+      : null;
+  }
+  return null;
+}
+
+export function inventoryProfitsCellText(worksheet: Worksheet, cell: Cell): string {
+  const numericValue = numericCellValue(cell);
+  if (numericValue === null) return cell.text;
+  const { row, col } = cell.fullAddress;
+  const labelCell = col > 1 ? worksheet.getCell(row, col - 1) : null;
+  const label = labelCell && numericCellValue(labelCell) === null ? labelCell.text.trim() : '';
+  if (INVENTORY_PROFITS_MARGIN_LABEL.test(label)) return numericValue.toFixed(2);
+
+  // Margin rows place the percentage between the descriptive label and its
+  // dollar value, so the currency cell's label is two columns to its left.
+  const precedingLabelCell = col > 2 ? worksheet.getCell(row, col - 2) : null;
+  const precedingLabel = precedingLabelCell && numericCellValue(precedingLabelCell) === null
+    ? precedingLabelCell.text.trim()
+    : '';
+  const followsMarginRatio = labelCell && numericCellValue(labelCell) !== null
+    && INVENTORY_PROFITS_MARGIN_LABEL.test(precedingLabel);
+  return label || followsMarginRatio ? USD_CELL_FORMATTER.format(numericValue) : cell.text;
 }
 
 export function setCellEditorValue(cell: Cell, raw: string): void {

@@ -9,11 +9,13 @@ import {
   MCHL_MAJOR_UNIT_SALES_FOLDER,
   OWNER_WORKBOOK_BUCKET,
   OWNER_WORKBOOK_MIME,
+  WORKSHEET_ROW_HEADER_WIDTH_PX,
   cellEditorValue,
   cellStyle,
   columnLabel,
   duplicateWorkbookName,
   duplicateWorksheet,
+  inventoryProfitsCellText,
   isXlsxFile,
   markWorkbookForRecalculation,
   normalizeWorkbookName,
@@ -28,7 +30,9 @@ import {
   storagePath,
   visibleGridSize,
   worksheetFitScale,
+  worksheetColumnWidthPx,
   worksheetGridWidth,
+  worksheetRowHeightPx,
   type WorkbookSelection,
   type OwnerWorkbookFolder,
   type OwnerWorkbookRecord,
@@ -801,18 +805,26 @@ export function OwnerWorkbookLibrary() {
           {grid.clipped && <p className="border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">This sheet is large. The editor shows the first {grid.rows} rows and {grid.columns} columns.</p>}
           <div ref={workbookPaneRef} className="max-h-[62vh] overflow-auto">
             <div style={{ width: `${naturalGridWidth * fitScale}px` }}>
-              <table aria-label={`${worksheet.name} worksheet at ${Math.round(fitScale * 100)}% scale`} className="border-collapse text-xs" style={{ zoom: fitScale }}>
+              <table
+                aria-label={`${worksheet.name} worksheet at ${Math.round(fitScale * 100)}% scale`}
+                className="table-fixed border-collapse text-xs"
+                style={{ zoom: fitScale, width: `${naturalGridWidth}px` }}
+              >
+                <colgroup>
+                  <col style={{ width: `${WORKSHEET_ROW_HEADER_WIDTH_PX}px` }} />
+                  {columns.map(column => <col key={column} style={{ width: `${worksheetColumnWidthPx(worksheet, column)}px` }} />)}
+                </colgroup>
                 <thead className="sticky top-0 z-20 bg-ink-800">
                   <tr>
                     <th className="sticky left-0 z-30 min-w-10 border border-ink-700 bg-ink-800" />
                     {columns.map(column => (
-                      <th key={column} style={{ minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px` }} className="relative border border-ink-700 p-0 text-center font-bold text-ink-400">
+                      <th key={column} className="relative border border-ink-700 p-0 text-center font-bold text-ink-400">
                         <button
                           type="button"
                           aria-label={`Select column ${columnLabel(column)}`}
                           aria-pressed={selection?.kind === 'column' && selection.column === column}
                           onClick={() => { setSelection({ kind: 'column', column }); setEditingCell(null); }}
-                          className={`w-full px-2 py-1 ${selection?.kind === 'column' && selection.column === column ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
+                          className={`w-full overflow-hidden px-2 py-1 ${selection?.kind === 'column' && selection.column === column ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
                         >
                           {columnLabel(column)}
                         </button>
@@ -832,15 +844,15 @@ export function OwnerWorkbookLibrary() {
                 </thead>
                 <tbody>
                   {rows.map(row => (
-                    <tr key={row}>
-                      <th className="sticky left-0 z-10 border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
-                        <span className="relative block h-full">
+                    <tr key={row} style={{ height: `${worksheetRowHeightPx(worksheet, row)}px` }}>
+                      <th className="sticky left-0 z-10 overflow-hidden border border-ink-700 bg-ink-800 p-0 text-right font-bold text-ink-400">
+                        <span className="relative block overflow-hidden" style={{ height: `${worksheetRowHeightPx(worksheet, row)}px` }}>
                           <button
                             type="button"
                             aria-label={`Select row ${row}`}
                             aria-pressed={selection?.kind === 'row' && selection.row === row}
                             onClick={() => { setSelection({ kind: 'row', row }); setEditingCell(null); }}
-                            className={`h-full w-full px-2 ${selection?.kind === 'row' && selection.row === row ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
+                            className={`h-full w-full overflow-hidden px-2 leading-none ${selection?.kind === 'row' && selection.row === row ? 'bg-amber-500 text-white' : 'hover:bg-ink-700 hover:text-ink-100'}`}
                           >
                             {row}
                           </button>
@@ -860,19 +872,22 @@ export function OwnerWorkbookLibrary() {
                         const cell = worksheet.getCell(row, column);
                         const editorKey = `${worksheet.id}:${cell.address}`;
                         return (
-                          <td key={column} className="border border-ink-700 p-0">
+                          <td key={column} className="overflow-hidden border border-ink-700 p-0">
                             <input
                               aria-label={`${worksheet.name} ${cell.address}`}
-                              value={editingCell === editorKey ? cellEditorValue(cell.value) : cell.text}
+                              value={editingCell === editorKey
+                                ? cellEditorValue(cell.value)
+                                : active.folder_key === INVENTORY_PROFITS_FOLDER
+                                  ? inventoryProfitsCellText(worksheet, cell)
+                                  : cell.text}
                               onFocus={() => { setEditingCell(editorKey); setSelection({ kind: 'cell', row, column }); }}
                               onBlur={() => setEditingCell(current => current === editorKey ? null : current)}
                               onChange={event => editCell(row, column, event.target.value)}
                               style={{
                                 ...cellStyle(cell),
-                                minWidth: `${Math.max(4, worksheet.getColumn(column).width ?? 16) * 7}px`,
-                                height: `${Math.max(16, worksheet.getRow(row).height ?? 24) * 1.25}px`,
+                                height: `${worksheetRowHeightPx(worksheet, row)}px`,
                               }}
-                              className="bg-transparent px-2 text-ink-100 outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500"
+                              className="block w-full min-w-0 truncate bg-transparent px-2 text-ink-100 outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500"
                             />
                           </td>
                         );

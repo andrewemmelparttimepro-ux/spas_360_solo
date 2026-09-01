@@ -8,6 +8,7 @@ import {
   columnLabel,
   duplicateWorkbookName,
   duplicateWorksheet,
+  inventoryProfitsCellText,
   markWorkbookForRecalculation,
   moveWorksheet,
   normalizeWorkbookName,
@@ -22,7 +23,9 @@ import {
   setWorksheetSelectionBackground,
   sortOwnerWorkbooks,
   worksheetFitScale,
+  worksheetColumnWidthPx,
   worksheetGridWidth,
+  worksheetRowHeightPx,
 } from '../src/lib/ownerWorkbooks.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url));
@@ -89,7 +92,9 @@ describe('owner workbook library', () => {
     assert.match(component, /selectedWorksheetCell\?\.fill\?\.type/);
     assert.match(component, /Select column \$\{columnLabel\(column\)\}/);
     assert.match(component, /Select row \$\{row\}/);
-    assert.match(component, /style=\{\{ zoom: fitScale \}\}/);
+    assert.match(component, /className="table-fixed border-collapse text-xs"/);
+    assert.match(component, /style=\{\{ zoom: fitScale, width: `\$\{naturalGridWidth\}px` \}\}/);
+    assert.match(component, /<colgroup>[\s\S]*worksheetColumnWidthPx\(worksheet, column\)/);
     assert.match(component, /const fitScale = useMemo\([\s\S]*?worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)[\s\S]*?\[active\?\.id, workbookPaneWidth, worksheet\?\.id\]/);
     assert.doesNotMatch(component, /const fitScale = worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)/);
     assert.match(component, /setWorksheetSelectionBackground\(worksheet, selection, color\)/);
@@ -159,6 +164,36 @@ describe('owner workbook library', () => {
       ['2020 Major Unit Deals.xlsx', '2020 Major Unit Deals copy.xlsx'],
       '2020 Major Unit Deals.xlsx',
     ), '2020 Major Unit Deals copy 2.xlsx');
+  });
+
+  it('formats Inventory Profits numbers to hundredths with only margin-ratio cells left non-currency', async () => {
+    const source = await read('api/_assets/Inventory Profits.xlsx');
+    const sourceWorkbook = new ExcelJS.Workbook();
+    await sourceWorkbook.xlsx.load(source);
+    const sourceSheet = sourceWorkbook.getWorksheet('Sundance Spas');
+    assert.ok(sourceSheet);
+    assert.equal(inventoryProfitsCellText(sourceSheet, sourceSheet.getCell('A1')), '880');
+    assert.equal(inventoryProfitsCellText(sourceSheet, sourceSheet.getCell('C2')), '$13,069.00');
+    assert.equal(inventoryProfitsCellText(sourceSheet, sourceSheet.getCell('G6')), '$1,019.94');
+    assert.equal(inventoryProfitsCellText(sourceSheet, sourceSheet.getCell('B9')), '0.36');
+    assert.equal(inventoryProfitsCellText(sourceSheet, sourceSheet.getCell('C9')), '$8,675.06');
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Inventory Profits');
+    sheet.getCell('A9').value = 'Profit Margin % and $';
+    sheet.getCell('B9').value = { formula: 'C9/C8', result: 0.3614758948289512 };
+    sheet.getCell('C9').value = { formula: 'C8-C7', result: 8675.059999999998 };
+    sheet.getCell('B2').value = 'Cost of Tub + Cover';
+    sheet.getCell('C2').value = 13069;
+    sheet.getCell('B3').value = 'Cost of Freight';
+    sheet.getCell('C3').value = -550.5;
+    sheet.getCell('D3').value = 'not numeric';
+
+    assert.equal(inventoryProfitsCellText(sheet, sheet.getCell('B9')), '0.36');
+    assert.equal(inventoryProfitsCellText(sheet, sheet.getCell('C9')), '$8,675.06');
+    assert.equal(inventoryProfitsCellText(sheet, sheet.getCell('C2')), '$13,069.00');
+    assert.equal(inventoryProfitsCellText(sheet, sheet.getCell('C3')), '-$550.50');
+    assert.equal(inventoryProfitsCellText(sheet, sheet.getCell('D3')), 'not numeric');
   });
 
   it('sorts year-prefixed workbooks newest-first with deterministic fallback ordering', () => {
@@ -256,12 +291,24 @@ describe('owner workbook library', () => {
   it('converts pointer movement at scaled row and column boundaries into bounded workbook sizes', () => {
     assert.equal(resizedWorksheetColumnWidth(20, 35, 1), 25);
     assert.equal(resizedWorksheetColumnWidth(20, 17.5, 0.5), 25);
-    assert.equal(resizedWorksheetColumnWidth(4, -100, 1), 3);
+    assert.equal(resizedWorksheetColumnWidth(4, -100, 1), 1);
     assert.equal(resizedWorksheetColumnWidth(79, 100, 1), 80);
     assert.equal(resizedWorksheetRowHeight(20, 12.5, 1), 30);
     assert.equal(resizedWorksheetRowHeight(20, 6.25, 0.5), 30);
-    assert.equal(resizedWorksheetRowHeight(13, -100, 1), 12);
+    assert.equal(resizedWorksheetRowHeight(13, -100, 1), 4);
     assert.equal(resizedWorksheetRowHeight(239, 100, 1), 240);
+  });
+
+  it('renders minimum row and column sizes without content-driven floors', () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Compact');
+    sheet.getCell('A1').value = 'content that is intentionally wider and taller than its boundary';
+
+    assert.equal(resizeWorksheetBoundary(sheet, 'column', 1, 16, -10_000, 1), 1);
+    assert.equal(resizeWorksheetBoundary(sheet, 'row', 1, 24, -10_000, 1), 4);
+    assert.equal(worksheetColumnWidthPx(sheet, 1), 7);
+    assert.equal(worksheetRowHeightPx(sheet, 1), 5);
+    assert.equal(worksheetGridWidth(sheet, 1), 47);
   });
 
   it('resizes only the targeted worksheet boundary and preserves it on reopen', async () => {

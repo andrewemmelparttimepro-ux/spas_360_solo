@@ -159,9 +159,16 @@ export function OwnerWorkbookLibrary() {
     setBusyId(record.id);
     setError(null);
     try {
-      const { data, error: downloadError } = await supabase.storage.from(OWNER_WORKBOOK_BUCKET).download(record.storage_path);
-      if (downloadError) throw downloadError;
-      const parsed = await parseWorkbook(await data.arrayBuffer());
+      // Generate a fresh signed URL for every open. Reusing the stable object
+      // download URL can return a CDN-cached pre-autosave version immediately
+      // after an overwrite, which makes a successful save appear to vanish.
+      const { data: signed, error: signedError } = await supabase.storage
+        .from(OWNER_WORKBOOK_BUCKET)
+        .createSignedUrl(record.storage_path, 60);
+      if (signedError) throw signedError;
+      const response = await fetch(signed.signedUrl, { cache: 'no-store' });
+      if (!response.ok) throw new Error('The workbook file could not be loaded.');
+      const parsed = await parseWorkbook(await response.arrayBuffer());
       revisionRef.current = 0;
       savedRevisionRef.current = 0;
       setDirtyRevision(0);

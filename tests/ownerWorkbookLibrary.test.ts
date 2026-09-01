@@ -48,7 +48,8 @@ describe('owner workbook library', () => {
     assert.match(component, /MCHL Major Unit Sales/);
     assert.match(component, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/);
     assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.upload/);
-    assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.download/);
+    assert.match(component, /\.storage[\s\S]*\.from\(OWNER_WORKBOOK_BUCKET\)[\s\S]*\.createSignedUrl\(record\.storage_path, 60\)/);
+    assert.match(component, /fetch\(signed\.signedUrl, \{ cache: 'no-store' \}\)/);
     assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.update/);
     assert.match(component, /window\.setTimeout\([\s\S]*1200/);
     assert.match(component, /workbook\.worksheets\.map/);

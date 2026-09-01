@@ -14,6 +14,7 @@ import {
   normalizeWorksheetName,
   renameDefaultWorksheetToCovana,
   renameWorksheet,
+  resizeWorksheetBoundary,
   resizedWorksheetColumnWidth,
   resizedWorksheetRowHeight,
   setCellBackground,
@@ -89,6 +90,8 @@ describe('owner workbook library', () => {
     assert.match(component, /Select column \$\{columnLabel\(column\)\}/);
     assert.match(component, /Select row \$\{row\}/);
     assert.match(component, /style=\{\{ zoom: fitScale \}\}/);
+    assert.match(component, /const fitScale = useMemo\([\s\S]*?worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)[\s\S]*?\[active\?\.id, workbookPaneWidth, worksheet\?\.id\]/);
+    assert.doesNotMatch(component, /const fitScale = worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)/);
     assert.match(component, /setWorksheetSelectionBackground\(worksheet, selection, color\)/);
     assert.match(component, /\.copy\(record\.storage_path, path\)/);
     assert.match(component, /copiedSha !== record\.current_sha256/);
@@ -259,6 +262,31 @@ describe('owner workbook library', () => {
     assert.equal(resizedWorksheetRowHeight(20, 6.25, 0.5), 30);
     assert.equal(resizedWorksheetRowHeight(13, -100, 1), 12);
     assert.equal(resizedWorksheetRowHeight(239, 100, 1), 240);
+  });
+
+  it('resizes only the targeted worksheet boundary and preserves it on reopen', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Dimensions');
+    sheet.getColumn(1).width = 12;
+    sheet.getColumn(2).width = 20;
+    sheet.getColumn(3).width = 28;
+    sheet.getRow(1).height = 18;
+    sheet.getRow(2).height = 24;
+    sheet.getRow(3).height = 30;
+    const scale = worksheetFitScale(920, worksheetGridWidth(sheet, 3));
+
+    assert.equal(resizeWorksheetBoundary(sheet, 'column', 2, 20, 35, scale), 25);
+    assert.equal(resizeWorksheetBoundary(sheet, 'row', 2, 24, 12.5, scale), 34);
+    assert.deepEqual([1, 2, 3].map(index => sheet.getColumn(index).width), [12, 25, 28]);
+    assert.deepEqual([1, 2, 3].map(index => sheet.getRow(index).height), [18, 34, 30]);
+
+    const saved = await workbook.xlsx.writeBuffer();
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(saved);
+    const reopenedSheet = reopened.getWorksheet('Dimensions');
+    assert.ok(reopenedSheet);
+    assert.deepEqual([1, 2, 3].map(index => reopenedSheet.getColumn(index).width), [12, 25, 28]);
+    assert.deepEqual([1, 2, 3].map(index => reopenedSheet.getRow(index).height), [18, 34, 30]);
   });
 
   it('fits a worksheet to the available pane without rewriting stored column widths', () => {

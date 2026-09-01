@@ -20,8 +20,7 @@ import {
   moveWorksheet,
   renameDefaultWorksheetToCovana,
   renameWorksheet,
-  resizedWorksheetColumnWidth,
-  resizedWorksheetRowHeight,
+  resizeWorksheetBoundary,
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sha256Hex,
@@ -514,11 +513,7 @@ export function OwnerWorkbookLibrary() {
     const gesture = resizeGestureRef.current;
     if (!worksheet || !gesture || gesture.pointerId !== event.pointerId) return;
     const delta = (gesture.kind === 'column' ? event.clientX : event.clientY) - gesture.startClient;
-    if (gesture.kind === 'column') {
-      worksheet.getColumn(gesture.index).width = resizedWorksheetColumnWidth(gesture.startValue, delta, gesture.scale);
-    } else {
-      worksheet.getRow(gesture.index).height = resizedWorksheetRowHeight(gesture.startValue, delta, gesture.scale);
-    }
+    resizeWorksheetBoundary(worksheet, gesture.kind, gesture.index, gesture.startValue, delta, gesture.scale);
     gesture.changed = gesture.changed || Math.abs(delta) >= 1;
     forceResizePreview(current => current + 1);
   };
@@ -651,7 +646,12 @@ export function OwnerWorkbookLibrary() {
     : undefined;
   const selectedFillHex = selectedFill?.length === 8 ? `#${selectedFill.slice(2)}` : '#ffffff';
   const naturalGridWidth = worksheet && grid ? worksheetGridWidth(worksheet, grid.columns) : 0;
-  const fitScale = worksheetFitScale(workbookPaneWidth, naturalGridWidth);
+  // Keep the current sheet's zoom stable while one boundary changes. The grid
+  // can grow into the scrollable pane without visually rescaling every column.
+  const fitScale = useMemo(
+    () => worksheetFitScale(workbookPaneWidth, naturalGridWidth),
+    [active?.id, workbookPaneWidth, worksheet?.id],
+  );
 
   return (
     <section aria-labelledby="owner-workbooks-heading" className="rounded-2xl border border-amber-500/30 bg-ink-900 p-5 shadow-sm">

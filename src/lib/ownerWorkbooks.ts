@@ -204,6 +204,24 @@ export function resizedWorksheetRowHeight(startHeight: number, screenDeltaPx: nu
   return Math.min(MAX_WORKSHEET_ROW_HEIGHT, Math.max(MIN_WORKSHEET_ROW_HEIGHT, next));
 }
 
+export function resizeWorksheetBoundary(
+  worksheet: Worksheet,
+  kind: 'column' | 'row',
+  index: number,
+  startValue: number,
+  screenDeltaPx: number,
+  scale: number,
+): number {
+  if (kind === 'column') {
+    const width = resizedWorksheetColumnWidth(startValue, screenDeltaPx, scale);
+    worksheet.getColumn(index).width = width;
+    return width;
+  }
+  const height = resizedWorksheetRowHeight(startValue, screenDeltaPx, scale);
+  worksheet.getRow(index).height = height;
+  return height;
+}
+
 function backgroundFill(hex: string | null): Fill {
   if (!hex) {
     return { type: 'pattern', pattern: 'none' };

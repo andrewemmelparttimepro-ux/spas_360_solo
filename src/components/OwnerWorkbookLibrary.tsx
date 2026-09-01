@@ -103,6 +103,7 @@ export function OwnerWorkbookLibrary() {
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const activeVersionRef = useRef(1);
   const workbookPaneRef = useRef<HTMLDivElement>(null);
+  const sheetEditControlsRef = useRef<HTMLSpanElement>(null);
   const resizeGestureRef = useRef<{
     kind: 'column' | 'row';
     index: number;
@@ -485,6 +486,11 @@ export function OwnerWorkbookLibrary() {
     return () => observer.disconnect();
   }, [active?.id]);
 
+  useEffect(() => {
+    if (renamingSheetId == null) return;
+    sheetEditControlsRef.current?.scrollIntoView({ block: 'nearest', inline: 'end' });
+  }, [renamingSheetId]);
+
   const markDirty = () => {
     if (!workbook) return;
     markWorkbookForRecalculation(workbook);
@@ -780,7 +786,7 @@ export function OwnerWorkbookLibrary() {
                   <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
                 {renamingSheetId === sheet.id ? (
-                  <span className="flex items-center gap-1 px-1">
+                  <span ref={sheetEditControlsRef} className="flex shrink-0 items-center gap-1 px-1">
                     <input
                       autoFocus
                       aria-label={`Sheet name for ${sheet.name}`}

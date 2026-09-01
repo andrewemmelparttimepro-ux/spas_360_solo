@@ -43,6 +43,14 @@ function formulaCount(workbook: ExcelJS.Workbook): number {
 }
 
 describe('owner workbook library', () => {
+  it('scrolls the complete pencil flow into view for rightmost sheets', async () => {
+    const component = (await read('src/components/OwnerWorkbookLibrary.tsx')).toString('utf8');
+
+    assert.match(component, /const sheetEditControlsRef = useRef<HTMLSpanElement>\(null\)/);
+    assert.match(component, /if \(renamingSheetId == null\) return;[\s\S]*sheetEditControlsRef\.current\?\.scrollIntoView\(\{ block: 'nearest', inline: 'end' \}\)/);
+    assert.match(component, /<span ref=\{sheetEditControlsRef\} className="flex shrink-0 items-center gap-1 px-1">[\s\S]*Duplicate sheet[\s\S]*Delete sheet/);
+  });
+
   it('defines an owner-only private bucket and tenant-scoped metadata policies', async () => {
     const [migrationBytes, controlsMigrationBytes, deleteMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
       read('supabase/migrations/20260831234029_add_owner_workbook_library.sql'),

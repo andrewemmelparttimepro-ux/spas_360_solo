@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Workbook } from 'exceljs';
-import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X } from 'lucide-react';
+import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
   INVENTORY_PROFITS_FOLDER,
   INVENTORY_PROFITS_SOURCE_SHA,
+  MAX_WORKSHEET_ZOOM_SCALE,
   MCHL_MAJOR_UNIT_SALES_FOLDER,
+  MIN_WORKSHEET_ZOOM_SCALE,
   OWNER_WORKBOOK_BUCKET,
   OWNER_WORKBOOK_MIME,
   WORKSHEET_ROW_HEADER_WIDTH_PX,
@@ -14,7 +16,7 @@ import {
   cellStyle,
   columnLabel,
   duplicateWorkbookName,
-  duplicateWorksheet,
+  deleteWorksheet,
   inventoryProfitsCellText,
   isXlsxFile,
   markWorkbookForRecalculation,
@@ -27,6 +29,7 @@ import {
   setWorksheetSelectionBackground,
   sha256Hex,
   sortOwnerWorkbooks,
+  stepWorksheetZoomScale,
   storagePath,
   visibleGridSize,
   worksheetFitScale,
@@ -84,6 +87,8 @@ export function OwnerWorkbookLibrary() {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [renamingSheetId, setRenamingSheetId] = useState<number | null>(null);
   const [sheetNameDraft, setSheetNameDraft] = useState('');
+  const [deleteSheetTargetId, setDeleteSheetTargetId] = useState<number | null>(null);
+  const [sheetZoomById, setSheetZoomById] = useState<Record<number, number>>({});
   const [draggingSheetId, setDraggingSheetId] = useState<number | null>(null);
   const [selection, setSelection] = useState<WorkbookSelection | null>(null);
   const [workbookPaneWidth, setWorkbookPaneWidth] = useState(0);
@@ -384,6 +389,8 @@ export function OwnerWorkbookLibrary() {
       setSelection(null);
       setEditingCell(null);
       setRenamingSheetId(null);
+      setDeleteSheetTargetId(null);
+      setSheetZoomById({});
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : 'The workbook could not be opened.');
     } finally {
@@ -532,6 +539,9 @@ export function OwnerWorkbookLibrary() {
 
   const beginSheetRename = (sheet: Workbook['worksheets'][number]) => {
     setError(null);
+    setSheetIndex(workbook?.worksheets.findIndex(candidate => candidate.id === sheet.id) ?? 0);
+    setSelection(null);
+    setEditingCell(null);
     setRenamingSheetId(sheet.id);
     setSheetNameDraft(sheet.name);
   };
@@ -548,17 +558,23 @@ export function OwnerWorkbookLibrary() {
     }
   };
 
-  const duplicateSelectedSheet = () => {
-    if (!workbook || !worksheet) return;
+  const confirmDeleteSheet = () => {
+    if (!workbook || deleteSheetTargetId == null) return;
     try {
-      const duplicate = duplicateWorksheet(workbook, worksheet);
-      setSheetIndex(workbook.worksheets.findIndex(sheet => sheet.id === duplicate.id));
+      const nextSheetIndex = deleteWorksheet(workbook, deleteSheetTargetId);
+      setSheetIndex(nextSheetIndex);
       setSelection(null);
       setEditingCell(null);
       setRenamingSheetId(null);
+      setDeleteSheetTargetId(null);
+      setSheetZoomById(current => {
+        const next = { ...current };
+        delete next[deleteSheetTargetId];
+        return next;
+      });
       markDirty();
-    } catch (duplicateError) {
-      setError(duplicateError instanceof Error ? duplicateError.message : 'The sheet could not be duplicated.');
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'The sheet could not be deleted.');
     }
   };
 
@@ -652,10 +668,19 @@ export function OwnerWorkbookLibrary() {
   const naturalGridWidth = worksheet && grid ? worksheetGridWidth(worksheet, grid.columns) : 0;
   // Keep the current sheet's zoom stable while one boundary changes. The grid
   // can grow into the scrollable pane without visually rescaling every column.
-  const fitScale = useMemo(
+  const autoFitScale = useMemo(
     () => worksheetFitScale(workbookPaneWidth, naturalGridWidth),
     [active?.id, workbookPaneWidth, worksheet?.id],
   );
+  const fitScale = worksheet ? sheetZoomById[worksheet.id] ?? autoFitScale : autoFitScale;
+
+  const changeWorksheetZoom = (direction: -1 | 1) => {
+    if (!worksheet) return;
+    setSheetZoomById(current => ({
+      ...current,
+      [worksheet.id]: stepWorksheetZoomScale(current[worksheet.id] ?? autoFitScale, direction),
+    }));
+  };
 
   return (
     <section aria-labelledby="owner-workbooks-heading" className="rounded-2xl border border-amber-500/30 bg-ink-900 p-5 shadow-sm">
@@ -740,19 +765,32 @@ export function OwnerWorkbookLibrary() {
                   <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
                 {renamingSheetId === sheet.id ? (
-                  <input
-                    autoFocus
-                    aria-label={`Sheet name for ${sheet.name}`}
-                    value={sheetNameDraft}
-                    maxLength={31}
-                    onChange={event => setSheetNameDraft(event.target.value)}
-                    onBlur={() => commitSheetRename(sheet)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter') { event.preventDefault(); commitSheetRename(sheet); }
-                      if (event.key === 'Escape') { event.preventDefault(); setRenamingSheetId(null); setError(null); }
-                    }}
-                    className="mx-1 w-32 rounded bg-white px-2 py-1 text-xs font-bold text-ink-900 outline-none ring-2 ring-amber-300"
-                  />
+                  <span className="flex items-center gap-1 px-1">
+                    <input
+                      autoFocus
+                      aria-label={`Sheet name for ${sheet.name}`}
+                      value={sheetNameDraft}
+                      maxLength={31}
+                      onChange={event => setSheetNameDraft(event.target.value)}
+                      onBlur={() => commitSheetRename(sheet)}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') { event.preventDefault(); commitSheetRename(sheet); }
+                        if (event.key === 'Escape') { event.preventDefault(); setRenamingSheetId(null); setError(null); }
+                      }}
+                      className="w-32 rounded bg-white px-2 py-1 text-xs font-bold text-ink-900 outline-none ring-2 ring-amber-300"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Delete sheet ${sheet.name}`}
+                      title={workbook.worksheets.length <= 1 ? 'A workbook must keep at least one sheet' : `Delete ${sheet.name}`}
+                      disabled={workbook.worksheets.length <= 1}
+                      onPointerDown={event => event.preventDefault()}
+                      onClick={() => setDeleteSheetTargetId(sheet.id)}
+                      className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 className="h-3 w-3" />Delete sheet
+                    </button>
+                  </span>
                 ) : (
                   <button type="button" onClick={() => { setSheetIndex(index); setSelection(null); setEditingCell(null); }} onDoubleClick={() => beginSheetRename(sheet)} className="whitespace-nowrap px-2 py-1.5 text-xs font-bold">
                     {sheet.name}
@@ -765,11 +803,31 @@ export function OwnerWorkbookLibrary() {
                 )}
               </div>
             ))}
-            <button type="button" onClick={duplicateSelectedSheet} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-md border border-ink-700 px-2.5 py-1.5 text-xs font-bold text-ink-300 hover:border-amber-500" aria-label={`Duplicate sheet ${worksheet.name}`}>
-              <Copy className="h-3.5 w-3.5" />Duplicate sheet
-            </button>
           </div>
           <div aria-label="Workbook formatting controls" className="flex flex-wrap items-end gap-3 border-b border-ink-700 bg-ink-900 px-3 py-3">
+            <div aria-label="Worksheet zoom controls" className="flex items-center gap-1 rounded-lg border border-ink-700 bg-ink-950 p-1">
+              <button
+                type="button"
+                aria-label={`Zoom out ${worksheet.name}`}
+                title="Zoom out"
+                onClick={() => changeWorksheetZoom(-1)}
+                disabled={fitScale <= MIN_WORKSHEET_ZOOM_SCALE}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-bold text-ink-300 hover:bg-ink-800 disabled:opacity-40"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />Zoom Out
+              </button>
+              <output aria-label={`${worksheet.name} zoom level`} className="min-w-12 text-center text-xs font-bold tabular-nums text-ink-300">{Math.round(fitScale * 100)}%</output>
+              <button
+                type="button"
+                aria-label={`Zoom in ${worksheet.name}`}
+                title="Zoom in"
+                onClick={() => changeWorksheetZoom(1)}
+                disabled={fitScale >= MAX_WORKSHEET_ZOOM_SCALE}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-bold text-ink-300 hover:bg-ink-800 disabled:opacity-40"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />Zoom In
+              </button>
+            </div>
             {selection && selectedCell && selectedWorksheetCell ? (
               <>
                 <p className="self-center text-xs font-bold text-ink-300">Selected {selectionLabel}</p>
@@ -927,6 +985,22 @@ export function OwnerWorkbookLibrary() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {deleteSheetTargetId != null && workbook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-sheet-heading">
+          <div className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
+            <h3 id="delete-sheet-heading" className="text-lg font-bold text-ink-100">Delete sheet?</h3>
+            <p className="mt-2 text-sm text-ink-400">
+              This permanently removes <span className="font-bold text-ink-100">{workbook.worksheets.find(sheet => sheet.id === deleteSheetTargetId)?.name}</span> from this workbook. Other sheets will not be changed.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteSheetTargetId(null)} className="rounded-lg border border-ink-700 px-3 py-2 text-sm font-bold text-ink-300 hover:border-amber-500">Cancel</button>
+              <button type="button" onClick={confirmDeleteSheet} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white hover:bg-red-700">
+                <Trash2 className="h-4 w-4" />Confirm delete sheet
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {deleteTarget && (

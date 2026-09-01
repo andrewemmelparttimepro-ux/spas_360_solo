@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import {
   cellEditorValue,
   columnLabel,
+  deleteWorksheet,
   duplicateWorkbookName,
   duplicateWorksheet,
   inventoryProfitsCellText,
@@ -22,6 +23,7 @@ import {
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sortOwnerWorkbooks,
+  stepWorksheetZoomScale,
   worksheetFitScale,
   worksheetColumnWidthPx,
   worksheetGridWidth,
@@ -84,8 +86,15 @@ describe('owner workbook library', () => {
     assert.match(component, /cursor-col-resize/);
     assert.match(component, /cursor-row-resize/);
     assert.match(component, /<span className="relative block" style=\{\{ height: `\$\{worksheetRowHeightPx\(worksheet, row\)\}px` \}\}>[\s\S]*?bottom-0[\s\S]*?cursor-row-resize/);
-    assert.match(component, /Duplicate sheet/);
+    assert.doesNotMatch(component, /duplicateSelectedSheet/);
+    assert.doesNotMatch(component, /aria-label=\{`Duplicate sheet/);
     assert.match(component, /Rename sheet \$\{sheet\.name\}/);
+    assert.match(component, /aria-label=\{`Delete sheet \$\{sheet\.name\}`\}/);
+    assert.match(component, /Confirm delete sheet/);
+    assert.match(component, /workbook\.worksheets\.length <= 1/);
+    assert.match(component, /aria-label=\{`Zoom out \$\{worksheet\.name\}`\}/);
+    assert.match(component, /aria-label=\{`Zoom in \$\{worksheet\.name\}`\}/);
+    assert.match(component, /sheetZoomById\[worksheet\.id\] \?\? autoFitScale/);
     assert.match(component, /aria-label=\{`Reorder sheet \$\{sheet\.name\}`\}/);
     assert.match(component, /onPointerDown=\{event => beginSheetPointerDrag\(event, sheet\.id\)\}/);
     assert.match(component, /ownerSheetIndexAtPoint\(event\.clientX, event\.clientY\)/);
@@ -96,7 +105,7 @@ describe('owner workbook library', () => {
     assert.match(component, /className="table-fixed border-collapse text-xs"/);
     assert.match(component, /style=\{\{ zoom: fitScale, width: `\$\{naturalGridWidth\}px` \}\}/);
     assert.match(component, /<colgroup>[\s\S]*worksheetColumnWidthPx\(worksheet, column\)/);
-    assert.match(component, /const fitScale = useMemo\([\s\S]*?worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)[\s\S]*?\[active\?\.id, workbookPaneWidth, worksheet\?\.id\]/);
+    assert.match(component, /const autoFitScale = useMemo\([\s\S]*?worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)[\s\S]*?\[active\?\.id, workbookPaneWidth, worksheet\?\.id\]/);
     assert.doesNotMatch(component, /const fitScale = worksheetFitScale\(workbookPaneWidth, naturalGridWidth\)/);
     assert.match(component, /setWorksheetSelectionBackground\(worksheet, selection, color\)/);
     assert.match(component, /\.copy\(record\.storage_path, path\)/);
@@ -287,6 +296,32 @@ describe('owner workbook library', () => {
     assert.equal(cellEditorValue(reopenedCopy.getCell('B2').value), '=SUM(1,2)');
     assert.deepEqual(reopenedCopy.getCell('B2').font, first.getCell('B2').font);
     assert.equal(reopenedCopy.getCell('C3').isMerged, true);
+  });
+
+  it('deletes only the selected sheet and keeps at least one worksheet', () => {
+    const workbook = new ExcelJS.Workbook();
+    const first = workbook.addWorksheet('First');
+    const second = workbook.addWorksheet('Second');
+    const third = workbook.addWorksheet('Third');
+    first.getCell('A1').value = 'keep first';
+    second.getCell('A1').value = 'delete only this';
+    third.getCell('A1').value = 'keep third';
+
+    assert.equal(deleteWorksheet(workbook, second.id), 1);
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['First', 'Third']);
+    assert.equal(workbook.getWorksheet('First')?.getCell('A1').value, 'keep first');
+    assert.equal(workbook.getWorksheet('Third')?.getCell('A1').value, 'keep third');
+    assert.equal(deleteWorksheet(workbook, third.id), 0);
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['First']);
+    assert.throws(() => deleteWorksheet(workbook, first.id), /must keep at least one sheet/);
+  });
+
+  it('steps worksheet zoom within readable bounds', () => {
+    assert.equal(stepWorksheetZoomScale(1, -1), 0.9);
+    assert.equal(stepWorksheetZoomScale(0.35, 1), 0.45);
+    assert.equal(stepWorksheetZoomScale(0.25, -1), 0.25);
+    assert.equal(stepWorksheetZoomScale(2, 1), 2);
+    assert.equal(stepWorksheetZoomScale(Number.NaN, -1), 0.9);
   });
 
   it('converts pointer movement at scaled row and column boundaries into bounded workbook sizes', () => {

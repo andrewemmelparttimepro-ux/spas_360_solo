@@ -10,6 +10,9 @@ export const MAX_WORKBOOK_BYTES = 20 * 1024 * 1024;
 export const MAX_VISIBLE_ROWS = 250;
 export const MAX_VISIBLE_COLUMNS = 80;
 export const MIN_WORKSHEET_FIT_SCALE = 0.35;
+export const MIN_WORKSHEET_ZOOM_SCALE = 0.25;
+export const MAX_WORKSHEET_ZOOM_SCALE = 2;
+export const WORKSHEET_ZOOM_STEP = 0.1;
 export const DEFAULT_WORKSHEET_COLUMN_WIDTH = 16;
 export const WORKSHEET_COLUMN_WIDTH_PX = 7;
 export const WORKSHEET_ROW_HEADER_WIDTH_PX = 40;
@@ -176,6 +179,14 @@ export function moveWorksheet(workbook: Workbook, worksheetId: number, targetInd
   return boundedTarget;
 }
 
+export function deleteWorksheet(workbook: Workbook, worksheetId: number): number {
+  if (workbook.worksheets.length <= 1) throw new Error('A workbook must keep at least one sheet.');
+  const sourceIndex = workbook.worksheets.findIndex(worksheet => worksheet.id === worksheetId);
+  if (sourceIndex < 0) throw new Error('The selected sheet is no longer available.');
+  workbook.removeWorksheet(worksheetId);
+  return Math.min(sourceIndex, workbook.worksheets.length - 1);
+}
+
 export function duplicateWorksheet(workbook: Workbook, source: Worksheet): Worksheet {
   const sourceIndex = workbook.worksheets.findIndex(worksheet => worksheet.id === source.id);
   if (sourceIndex < 0) throw new Error('The selected sheet is no longer available.');
@@ -210,6 +221,12 @@ export function resizedWorksheetColumnWidth(startWidth: number, screenDeltaPx: n
 export function resizedWorksheetRowHeight(startHeight: number, screenDeltaPx: number, scale: number): number {
   const next = startHeight + screenDeltaPx / (WORKSHEET_ROW_HEIGHT_PX * resizeScale(scale));
   return Math.min(MAX_WORKSHEET_ROW_HEIGHT, Math.max(MIN_WORKSHEET_ROW_HEIGHT, next));
+}
+
+export function stepWorksheetZoomScale(scale: number, direction: -1 | 1): number {
+  const current = Number.isFinite(scale) ? scale : 1;
+  const next = current + direction * WORKSHEET_ZOOM_STEP;
+  return Math.round(Math.min(MAX_WORKSHEET_ZOOM_SCALE, Math.max(MIN_WORKSHEET_ZOOM_SCALE, next)) * 100) / 100;
 }
 
 export function resizeWorksheetBoundary(

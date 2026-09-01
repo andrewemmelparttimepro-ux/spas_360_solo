@@ -62,6 +62,7 @@ describe('owner workbook library', () => {
     assert.match(component, /Row height/);
     assert.match(component, /Column width/);
     assert.match(component, /Cell background/);
+    assert.match(component, /selectedWorksheetCell\?\.fill\?\.type/);
     assert.match(component, /Set background \$\{preset\.label\.toLowerCase\(\)\} for \$\{selectedWorksheetCell\.address\}/);
     assert.match(component, /\.copy\(record\.storage_path, path\)/);
     assert.match(component, /copiedSha !== record\.current_sha256/);

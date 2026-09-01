@@ -392,7 +392,7 @@ export function OwnerWorkbookLibrary() {
   const selectedWorksheetCell = worksheet && selectedCell
     ? worksheet.getCell(selectedCell.row, selectedCell.column)
     : null;
-  const selectedFill = selectedWorksheetCell?.fill.type === 'pattern'
+  const selectedFill = selectedWorksheetCell?.fill?.type === 'pattern'
     ? selectedWorksheetCell.fill.fgColor?.argb
     : undefined;
   const selectedFillHex = selectedFill?.length === 8 ? `#${selectedFill.slice(2)}` : '#ffffff';

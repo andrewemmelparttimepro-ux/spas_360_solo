@@ -177,6 +177,9 @@ export default function InventoryDetail() {
   if (!item) return <div className="text-center text-ink-500"><p>Item not found</p><Link to="/inventory" className="text-brand-400 text-sm mt-2 hover:underline">Back</Link></div>;
 
   const loc = (item as unknown as Record<string, unknown>).locations as { name: string } | undefined;
+  const brandOptions = item.brand && !INVENTORY_BRAND_CHOICES.some(brand => brand === item.brand)
+    ? [item.brand, ...INVENTORY_BRAND_CHOICES]
+    : [...INVENTORY_BRAND_CHOICES];
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -195,7 +198,7 @@ export default function InventoryDetail() {
           <span className="text-[10px] text-ink-500">Click any value to edit</span>
         </div>
         <div className="grid grid-cols-2 gap-6">
-          <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} type="select" options={[...INVENTORY_BRAND_CHOICES]} />
+          <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} type="select" options={brandOptions} />
           <EditableField label="Model" value={item.model} field="model" itemId={item.id} onSave={handleSave} />
           <EditableField label="Color/Finish" value={item.color_finish} field="color_finish" itemId={item.id} onSave={handleSave} />
           <EditableField label="Location" value={item.location_id} displayValue={loc?.name ?? '—'} field="location_id" itemId={item.id} onSave={handleSave} type="select" options={locations.map(l => ({ value: l.id, label: l.name }))} />

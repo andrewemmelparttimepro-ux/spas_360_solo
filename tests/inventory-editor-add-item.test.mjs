@@ -23,6 +23,7 @@ describe('Add Item editor contract', () => {
       'Master Spas',
       'Other',
       'Platinum Spas',
+      'Pool',
       'Sundance',
       'Visscher',
     ]);

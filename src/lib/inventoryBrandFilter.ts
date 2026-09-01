@@ -10,6 +10,7 @@ export const INVENTORY_BRAND_CHOICES = [
   'Master Spas',
   'Other',
   'Platinum Spas',
+  'Pool',
   'Sundance',
   'Visscher',
 ] as const;

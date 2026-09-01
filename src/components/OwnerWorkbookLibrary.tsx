@@ -26,6 +26,12 @@ import {
 } from '@/lib/ownerWorkbooks';
 
 const LIST_COLUMNS = 'id,org_id,folder_key,display_name,storage_path,mime_type,file_size_bytes,source_sha256,current_sha256,version,created_at,updated_at';
+const CELL_BACKGROUND_PRESETS = [
+  { label: 'Yellow', value: '#fff2cc' },
+  { label: 'Red', value: '#f4cccc' },
+  { label: 'Green', value: '#d9ead3' },
+  { label: 'Blue', value: '#cfe2f3' },
+] as const;
 
 async function parseWorkbook(bytes: ArrayBuffer): Promise<Workbook> {
   const ExcelJS = (await import('exceljs')).default;
@@ -497,6 +503,17 @@ export function OwnerWorkbookLibrary() {
                       onChange={event => changeSelectedBackground(event.target.value)}
                       className="h-8 w-11 cursor-pointer rounded-md border border-ink-700 bg-ink-950 p-1"
                     />
+                    {CELL_BACKGROUND_PRESETS.map(preset => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        aria-label={`Set background ${preset.label.toLowerCase()} for ${selectedWorksheetCell.address}`}
+                        title={preset.label}
+                        onClick={() => changeSelectedBackground(preset.value)}
+                        style={{ backgroundColor: preset.value }}
+                        className="h-8 w-8 rounded-md border border-ink-700"
+                      />
+                    ))}
                     <button type="button" onClick={() => changeSelectedBackground(null)} className="rounded-md border border-ink-700 px-2 py-1.5 text-xs font-bold text-ink-300 hover:border-amber-500">Clear</button>
                   </span>
                 </label>

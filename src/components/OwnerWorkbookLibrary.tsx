@@ -563,10 +563,9 @@ export function OwnerWorkbookLibrary() {
     }
   };
 
-  const beginSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>, sheetId: number) => {
+  const beginSheetPointerDrag = (event: React.PointerEvent<HTMLElement>, sheetId: number) => {
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
     sheetDragGestureRef.current = {
       sheetId,
       pointerId: event.pointerId,
@@ -579,7 +578,7 @@ export function OwnerWorkbookLibrary() {
     setDraggingSheetId(sheetId);
   };
 
-  const continueSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const continueSheetPointerDrag = (event: React.PointerEvent<HTMLElement>) => {
     const gesture = sheetDragGestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     gesture.moved = gesture.moved
@@ -599,11 +598,10 @@ export function OwnerWorkbookLibrary() {
     }
   };
 
-  const finishSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const finishSheetPointerDrag = (event: React.PointerEvent<HTMLElement>) => {
     const gesture = sheetDragGestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     sheetDragGestureRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
     if (!gesture.moved || !workbook) return;
     if (gesture.reordered) {
@@ -620,11 +618,10 @@ export function OwnerWorkbookLibrary() {
     markDirty();
   };
 
-  const cancelSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const cancelSheetPointerDrag = (event: React.PointerEvent<HTMLElement>) => {
     const gesture = sheetDragGestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     sheetDragGestureRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
   };
 
@@ -723,6 +720,9 @@ export function OwnerWorkbookLibrary() {
               <div
                 key={sheet.id}
                 data-owner-sheet-index={index}
+                onPointerMove={continueSheetPointerDrag}
+                onPointerUp={finishSheetPointerDrag}
+                onPointerCancel={cancelSheetPointerDrag}
                 className={`group flex shrink-0 items-center rounded-md ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'} ${draggingSheetId === sheet.id ? 'opacity-50' : ''}`}
                 title="Click and hold, then drag to reorder"
               >
@@ -731,9 +731,6 @@ export function OwnerWorkbookLibrary() {
                   aria-label={`Reorder sheet ${sheet.name}`}
                   title={`Drag to reorder ${sheet.name}`}
                   onPointerDown={event => beginSheetPointerDrag(event, sheet.id)}
-                  onPointerMove={continueSheetPointerDrag}
-                  onPointerUp={finishSheetPointerDrag}
-                  onPointerCancel={cancelSheetPointerDrag}
                   className="ml-1 inline-flex h-7 w-4 touch-none items-center justify-center cursor-grab opacity-60 active:cursor-grabbing"
                 >
                   <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />

@@ -41,6 +41,34 @@ export function storagePath(orgId: string, folder: OwnerWorkbookFolder): string 
   return `${orgId}/${folder}/${crypto.randomUUID()}.xlsx`;
 }
 
+export function normalizeWorkbookName(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.toLowerCase().endsWith('.xlsx') ? trimmed : `${trimmed}.xlsx`;
+}
+
+export function duplicateWorkbookName(existingNames: string[], originalName: string): string {
+  const stem = originalName.replace(/\.xlsx$/i, '');
+  const names = new Set(existingNames.map(name => name.toLocaleLowerCase()));
+  let copyNumber = 1;
+  while (true) {
+    const suffix = copyNumber === 1 ? ' copy' : ` copy ${copyNumber}`;
+    const candidate = `${stem}${suffix}.xlsx`;
+    if (!names.has(candidate.toLocaleLowerCase())) return candidate;
+    copyNumber += 1;
+  }
+}
+
+export function setCellBackground(cell: Cell, hex: string | null): void {
+  if (!hex) {
+    cell.fill = { type: 'pattern', pattern: 'none' };
+    return;
+  }
+  const normalized = hex.replace(/^#/, '').toUpperCase();
+  if (!/^[0-9A-F]{6}$/.test(normalized)) throw new Error('Cell background must be a six-digit hex color.');
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${normalized}` } };
+}
+
 export function columnLabel(columnNumber: number): string {
   let value = columnNumber;
   let label = '';

@@ -6,7 +6,10 @@ import ExcelJS from 'exceljs';
 import {
   cellEditorValue,
   columnLabel,
+  duplicateWorkbookName,
   markWorkbookForRecalculation,
+  normalizeWorkbookName,
+  setCellBackground,
   setCellEditorValue,
 } from '../src/lib/ownerWorkbooks.ts';
 
@@ -24,13 +27,15 @@ function formulaCount(workbook: ExcelJS.Workbook): number {
 
 describe('owner workbook library', () => {
   it('defines an owner-only private bucket and tenant-scoped metadata policies', async () => {
-    const [migrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
+    const [migrationBytes, controlsMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
       read('supabase/migrations/20260831234029_add_owner_workbook_library.sql'),
+      read('supabase/migrations/20260901000635_allow_owner_workbook_rename.sql'),
       read('src/components/OwnerWorkbookLibrary.tsx'),
       read('src/pages/OwnersCorner.tsx'),
       read('api/_assets/Inventory Profits.xlsx'),
     ]);
     const migration = migrationBytes.toString('utf8');
+    const controlsMigration = controlsMigrationBytes.toString('utf8');
     const component = componentBytes.toString('utf8');
     const page = pageBytes.toString('utf8');
 
@@ -43,6 +48,7 @@ describe('owner workbook library', () => {
     assert.match(migration, /for select to authenticated[\s\S]*public\.auth_role\(\)\) = 'owner_manager'/);
     assert.match(migration, /for insert to authenticated[\s\S]*created_by = \(select auth\.uid\(\)\)/);
     assert.match(migration, /owner_workbooks_storage_update[\s\S]*for update to authenticated[\s\S]*with check/);
+    assert.match(controlsMigration, /grant update \(display_name\) on table public\.owner_workbooks to authenticated/);
     assert.doesNotMatch(migration, /to anon/);
     assert.match(page, /profile\?\.role === 'owner_manager'[\s\S]*<OwnerWorkbookLibrary \/>/);
     assert.match(component, /MCHL Major Unit Sales/);
@@ -53,6 +59,15 @@ describe('owner workbook library', () => {
     assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.update/);
     assert.match(component, /window\.setTimeout\([\s\S]*1200/);
     assert.match(component, /workbook\.worksheets\.map/);
+    assert.match(component, /Row height/);
+    assert.match(component, /Column width/);
+    assert.match(component, /Cell background/);
+    assert.match(component, /\.copy\(record\.storage_path, path\)/);
+    assert.match(component, /copiedSha !== record\.current_sha256/);
+    assert.match(component, /copiedBytes\.byteLength !== record\.file_size_bytes/);
+    assert.match(component, /source_sha256: copiedSha/);
+    assert.match(component, /current_sha256: copiedSha/);
+    assert.match(component, /display_name: displayName/);
   });
 
   it('round-trips formulas and styles when one real workbook cell changes', async () => {
@@ -68,6 +83,9 @@ describe('owner workbook library', () => {
     const styleBefore = structuredClone(formulaCell.style);
     const editable = sheet.getCell('A2');
     setCellEditorValue(editable, 'Autosave fidelity test');
+    sheet.getRow(2).height = 42;
+    sheet.getColumn(1).width = 24;
+    setCellBackground(editable, '#38BDF8');
     markWorkbookForRecalculation(workbook);
     assert.equal(workbook.calcProperties.fullCalcOnLoad, true);
 
@@ -78,6 +96,11 @@ describe('owner workbook library', () => {
     assert.equal(cellEditorValue(reopened.worksheets[0].getCell('G4').value), formulaBefore);
     assert.deepEqual(reopened.worksheets[0].getCell('G4').style, styleBefore);
     assert.equal(reopened.worksheets[0].getCell('A2').value, 'Autosave fidelity test');
+    assert.equal(reopened.worksheets[0].getRow(2).height, 42);
+    assert.equal(reopened.worksheets[0].getColumn(1).width, 24);
+    assert.deepEqual(reopened.worksheets[0].getCell('A2').fill, {
+      type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF38BDF8' },
+    });
   });
 
   it('keeps formulas editable and renders spreadsheet column labels', () => {
@@ -91,5 +114,11 @@ describe('owner workbook library', () => {
     setCellEditorValue(sheet.getCell('A2'), '00125');
     assert.equal(sheet.getCell('A2').value, '00125');
     assert.deepEqual([1, 26, 27, 52, 53].map(columnLabel), ['A', 'Z', 'AA', 'AZ', 'BA']);
+    assert.equal(normalizeWorkbookName('  Major Unit Deals 2021  '), 'Major Unit Deals 2021.xlsx');
+    assert.equal(normalizeWorkbookName('Named.xlsx'), 'Named.xlsx');
+    assert.equal(duplicateWorkbookName(
+      ['2020 Major Unit Deals.xlsx', '2020 Major Unit Deals copy.xlsx'],
+      '2020 Major Unit Deals.xlsx',
+    ), '2020 Major Unit Deals copy 2.xlsx');
   });
 });

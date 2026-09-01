@@ -864,7 +864,7 @@ export function OwnerWorkbookLibrary() {
                             onPointerMove={continueResize}
                             onPointerUp={finishResize}
                             onPointerCancel={finishResize}
-                            className="absolute -bottom-1 left-0 z-10 h-2 w-full cursor-row-resize touch-none bg-transparent hover:bg-amber-400/60"
+                            className="absolute bottom-0 left-0 z-10 h-2 w-full cursor-row-resize touch-none bg-transparent hover:bg-amber-400/60"
                           />
                         </span>
                       </th>

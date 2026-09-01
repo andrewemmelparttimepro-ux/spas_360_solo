@@ -92,6 +92,13 @@ export function OwnerWorkbookLibrary() {
     scale: number;
     changed: boolean;
   } | null>(null);
+  const sheetDragGestureRef = useRef<{
+    sheetId: number;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
   const [, forceResizePreview] = useState(0);
 
   const loadRecords = useCallback(async () => {
@@ -543,13 +550,50 @@ export function OwnerWorkbookLibrary() {
     }
   };
 
-  const dropSheetAt = (targetIndex: number) => {
-    if (!workbook || draggingSheetId == null) return;
-    const activeSheetId = worksheet?.id;
-    moveWorksheet(workbook, draggingSheetId, targetIndex);
+  const beginSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>, sheetId: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    sheetDragGestureRef.current = {
+      sheetId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    setDraggingSheetId(sheetId);
+  };
+
+  const continueSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = sheetDragGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    gesture.moved = gesture.moved
+      || Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= 4;
+  };
+
+  const finishSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = sheetDragGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    sheetDragGestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     setDraggingSheetId(null);
-    setSheetIndex(Math.max(0, workbook.worksheets.findIndex(sheet => sheet.id === activeSheetId)));
+    if (!gesture.moved || !workbook) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-owner-sheet-index]');
+    const targetIndex = Number(target?.dataset.ownerSheetIndex);
+    if (!Number.isInteger(targetIndex)) return;
+    const activeSheetId = worksheet?.id;
+    const nextIndex = moveWorksheet(workbook, gesture.sheetId, targetIndex);
+    if (activeSheetId === gesture.sheetId) setSheetIndex(nextIndex);
+    else setSheetIndex(Math.max(0, workbook.worksheets.findIndex(sheet => sheet.id === activeSheetId)));
     markDirty();
+  };
+
+  const cancelSheetPointerDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const gesture = sheetDragGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    sheetDragGestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setDraggingSheetId(null);
   };
 
   const changeSelectedBackground = (color: string | null) => {
@@ -646,15 +690,22 @@ export function OwnerWorkbookLibrary() {
             {workbook.worksheets.map((sheet, index) => (
               <div
                 key={sheet.id}
-                draggable={renamingSheetId !== sheet.id}
-                onDragStart={event => { setDraggingSheetId(sheet.id); event.dataTransfer.effectAllowed = 'move'; }}
-                onDragEnd={() => setDraggingSheetId(null)}
-                onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
-                onDrop={event => { event.preventDefault(); dropSheetAt(index); }}
+                data-owner-sheet-index={index}
                 className={`group flex shrink-0 items-center rounded-md ${index === sheetIndex ? 'bg-amber-500 text-white' : 'bg-ink-800 text-ink-400 hover:text-ink-100'} ${draggingSheetId === sheet.id ? 'opacity-50' : ''}`}
                 title="Click and hold, then drag to reorder"
               >
-                <GripVertical className="ml-1 h-3.5 w-3.5 cursor-grab opacity-60" aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-label={`Reorder sheet ${sheet.name}`}
+                  title={`Drag to reorder ${sheet.name}`}
+                  onPointerDown={event => beginSheetPointerDrag(event, sheet.id)}
+                  onPointerMove={continueSheetPointerDrag}
+                  onPointerUp={finishSheetPointerDrag}
+                  onPointerCancel={cancelSheetPointerDrag}
+                  className="ml-1 inline-flex h-7 w-4 touch-none items-center justify-center cursor-grab opacity-60 active:cursor-grabbing"
+                >
+                  <GripVertical className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
                 {renamingSheetId === sheet.id ? (
                   <input
                     autoFocus

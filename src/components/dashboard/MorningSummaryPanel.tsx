@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Sunrise } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -16,29 +16,46 @@ import {
 } from '@/lib/morningSummary';
 import { cn } from '@/lib/utils';
 
-const OPEN_KEY = 'spas360.morningSummary.open';
-
-// Owners land on the summary open; it stays however they last left it.
-function readOpen(): boolean {
-  try { return window.localStorage.getItem(OPEN_KEY) !== '0'; } catch { return true; }
-}
-
 const timeLabel = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
 
-export default function MorningSummaryPanel() {
+type MorningSummaryContextValue = ReturnType<typeof useMorningSummary> & {
+  day: string;
+  setDay: Dispatch<SetStateAction<string>>;
+  isOwner: boolean;
+};
+
+const MorningSummaryContext = createContext<MorningSummaryContextValue | null>(null);
+
+function useDashboardMorningSummary(): MorningSummaryContextValue {
+  const value = useContext(MorningSummaryContext);
+  if (!value) throw new Error('Morning summary components must be inside MorningSummaryProvider');
+  return value;
+}
+
+export function MorningSummaryProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
-  const location = useLocation();
-  const [open, setOpen] = useState(readOpen);
   const [day, setDay] = useState(defaultSummaryDay);
   const isOwner = profile?.role === 'owner_manager';
-  const { summary, isLoading, error, refresh } = useMorningSummary(day, Boolean(isOwner));
+  const summaryState = useMorningSummary(day, Boolean(isOwner));
+
+  const value = useMemo(
+    () => ({ ...summaryState, day, setDay, isOwner }),
+    [summaryState, day, isOwner],
+  );
+
+  return <MorningSummaryContext.Provider value={value}>{children}</MorningSummaryContext.Provider>;
+}
+
+export default function MorningSummaryPanel() {
+  const location = useLocation();
+  const { day, setDay, isOwner, summary, isLoading, error, refresh } = useDashboardMorningSummary();
   const [narration, setNarration] = useState<{ day: string; text: string } | null>(null);
   const [narrating, setNarrating] = useState(false);
   const [narrationError, setNarrationError] = useState<string | null>(null);
 
   // Ari's three-sentence read, fetched once per day and cached server-side.
   useEffect(() => {
-    if (!isOwner || !open || !summary || narration?.day === summary.day) return;
+    if (!isOwner || !summary || narration?.day === summary.day) return;
     let cancelled = false;
     (async () => {
       setNarrating(true);
@@ -58,19 +75,14 @@ export default function MorningSummaryPanel() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isOwner, open, summary, narration?.day]);
+  }, [isOwner, summary, narration?.day]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('summary') === 'open') {
-      setOpen(true);
       document.getElementById('morning-summary-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [location.search]);
-
-  useEffect(() => {
-    try { window.localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* ignore */ }
-  }, [open]);
 
   const today = centralDateKey();
   const canGoForward = day < today;
@@ -81,19 +93,16 @@ export default function MorningSummaryPanel() {
   return (
     <section className="dashboard-panel overflow-hidden rounded-xl border border-amber-500/30 bg-ink-900" aria-labelledby="morning-summary-heading">
       <div className="flex flex-col gap-3 border-b border-ink-700 bg-amber-500/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <button type="button" onClick={() => setOpen(value => !value)} className="flex min-w-0 items-start gap-3 text-left" aria-expanded={open} aria-controls="morning-summary-body">
+        <div className="flex min-w-0 items-start gap-3">
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-500"><Sunrise className="h-5 w-5" /></span>
           <span className="min-w-0">
-            <span className="flex items-center gap-2">
-              <h2 id="morning-summary-heading" className="text-base font-semibold text-ink-100">Morning Summary</h2>
-              <ChevronDown className={cn('h-4 w-4 text-ink-500 transition-transform', open && 'rotate-180')} />
-            </span>
+            <h2 id="morning-summary-heading" className="text-base font-semibold text-ink-100">Morning Summary</h2>
             <span className="block text-xs text-ink-500">
               {summaryDayLabel(day)}{day === today ? ' (today so far)' : ''}
               {headline ? ` · ${headline}` : isLoading ? ' · Loading…' : ''}
             </span>
           </span>
-        </button>
+        </div>
         <div className="flex items-center gap-1 self-start sm:self-auto">
           <button type="button" aria-label="Previous day" onClick={() => setDay(current => shiftDateKey(current, -1))} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"><ChevronLeft className="h-4 w-4" /></button>
           <input aria-label="Summary day" type="date" value={day} max={today} onChange={event => { if (event.target.value) setDay(event.target.value); }} className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs font-medium text-ink-200" />
@@ -101,20 +110,58 @@ export default function MorningSummaryPanel() {
           <button type="button" aria-label="Refresh summary" onClick={() => void refresh()} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"><RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} /></button>
         </div>
       </div>
+      <div className="space-y-3 p-5">
+        {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">Summary couldn't load. ({error})</p>}
+        {!summary && isLoading && <p className="text-sm text-ink-500">Pulling yesterday together…</p>}
+        {summary && (
+          <div className="flex items-start gap-3 rounded-lg border border-brand-500/25 bg-brand-500/5 px-4 py-3" aria-label="Ari's read">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
+            <div className="min-w-0 text-sm text-ink-200">
+              <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-brand-400">Ari's read</span>
+              {narration?.day === summary.day ? narration.text : narrating ? 'Reading the day…' : narrationError ? `Ari couldn't read this one (${narrationError}).` : ''}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function EveryonesDayPanel() {
+  const location = useLocation();
+  const { day, isOwner, summary, isLoading, error } = useDashboardMorningSummary();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('summary') === 'open') setOpen(true);
+  }, [location.search]);
+
+  if (!isOwner) return null;
+
+  return (
+    <section className="dashboard-panel overflow-hidden rounded-xl border border-ink-700 bg-ink-900" aria-labelledby="everyones-day-heading">
+      <button
+        type="button"
+        onClick={() => setOpen(value => !value)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-ink-850/70"
+        aria-expanded={open}
+        aria-controls="everyones-day-body"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <Sunrise className="h-5 w-5 shrink-0 text-amber-500" />
+          <span id="everyones-day-heading" className="shrink-0 text-base font-semibold text-ink-100">Everyone's Day</span>
+          <span className="truncate text-xs text-ink-500">{summaryDayLabel(day)}</span>
+        </span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-ink-500 transition-transform', open && 'rotate-180')} />
+      </button>
 
       {open && (
-        <div id="morning-summary-body" className="space-y-5 p-5">
+        <div id="everyones-day-body" className="space-y-5 border-t border-ink-700 p-5">
           {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">Summary couldn't load. ({error})</p>}
           {!summary && isLoading && <p className="text-sm text-ink-500">Pulling yesterday together…</p>}
           {summary && (
             <>
-              <div className="flex items-start gap-3 rounded-lg border border-brand-500/25 bg-brand-500/5 px-4 py-3" aria-label="Ari's read">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
-                <div className="min-w-0 text-sm text-ink-200">
-                  <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-brand-400">Ari's read</span>
-                  {narration?.day === summary.day ? narration.text : narrating ? 'Reading the day…' : narrationError ? `Ari couldn't read this one (${narrationError}).` : ''}
-                </div>
-              </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { label: 'Clocked in', value: summary.activity.clocked_in_count },
@@ -132,7 +179,6 @@ export default function MorningSummaryPanel() {
               </div>
 
               <section aria-label="Staff activity">
-                <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-400">Everyone's day</h3>
                 <div className="overflow-x-auto rounded-lg border border-ink-700">
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="bg-ink-850 text-[10px] font-bold uppercase tracking-wider text-ink-500">

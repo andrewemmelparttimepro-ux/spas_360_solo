@@ -52,6 +52,34 @@ function normalizeTask(row: Record<string, unknown>): DelegatedTask {
 
 type Result = { ok: boolean; message: string };
 
+const TASK_PAGE_SIZE = 500;
+
+/**
+ * Supabase responses are capped, so walk every page instead of silently
+ * truncating the owner's completed and incomplete task history.
+ */
+async function fetchAllDelegatedTasks(orgId: string): Promise<{
+  data: Record<string, unknown>[];
+  error: { message: string } | null;
+}> {
+  const data: Record<string, unknown>[] = [];
+
+  for (let offset = 0; ; offset += TASK_PAGE_SIZE) {
+    const response = await supabase
+      .from('tasks')
+      .select(SELECT)
+      .eq('org_id', orgId)
+      .eq('task_type', DELEGATED_TASK_TYPE)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + TASK_PAGE_SIZE - 1);
+    if (response.error) return { data, error: response.error };
+    const page = (response.data ?? []) as unknown as Record<string, unknown>[];
+    data.push(...page);
+    if (page.length < TASK_PAGE_SIZE) return { data, error: null };
+  }
+}
+
 export function useDelegatedTasks(enabled = true) {
   const { profile } = useAuth();
   const [tasks, setTasks] = useState<DelegatedTask[]>([]);
@@ -71,13 +99,7 @@ export function useDelegatedTasks(enabled = true) {
     const sequence = ++fetchSequence.current;
     setIsLoading(true);
     const [tasksRes, staffRes] = await Promise.all([
-      supabase
-        .from('tasks')
-        .select(SELECT)
-        .eq('org_id', profile.org_id)
-        .eq('task_type', DELEGATED_TASK_TYPE)
-        .order('created_at', { ascending: false })
-        .limit(1000),
+      fetchAllDelegatedTasks(profile.org_id),
       supabase
         .from('profiles')
         .select('id, first_name, last_name, role')
@@ -90,7 +112,7 @@ export function useDelegatedTasks(enabled = true) {
 
     const firstError = tasksRes.error ?? staffRes.error;
     setError(firstError?.message ?? null);
-    if (!tasksRes.error) setTasks(((tasksRes.data ?? []) as unknown as Record<string, unknown>[]).map(normalizeTask));
+    if (!tasksRes.error) setTasks(tasksRes.data.map(normalizeTask));
     if (!staffRes.error) setStaff((staffRes.data ?? []) as DelegatedPerson[]);
     setIsLoading(false);
   }, [profile, enabled]);

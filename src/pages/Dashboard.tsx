@@ -17,7 +17,7 @@ import {
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
-import MorningSummaryPanel from '@/components/dashboard/MorningSummaryPanel';
+import MorningSummaryPanel, { EveryonesDayPanel, MorningSummaryProvider } from '@/components/dashboard/MorningSummaryPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -92,6 +92,7 @@ export default function Dashboard() {
   }
 
   return (
+    <MorningSummaryProvider>
     <div className="space-y-5 max-w-7xl mx-auto">
       {loadError && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -136,6 +137,13 @@ export default function Dashboard() {
 
       <MorningSummaryPanel />
 
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <DelegatedTasksPanel />
+        </div>
+        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} openDeals={openDeals} />
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statMeta.map((meta) => {
           const value = stats[meta.key];
@@ -155,10 +163,7 @@ export default function Dashboard() {
         })}
       </div>
 
-      <DelegatedTasksPanel />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="dashboard-panel lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
+      <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-ink-700 bg-ink-850/70 px-6 py-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="text-base font-semibold text-ink-100 whitespace-nowrap">Revenue Overview</h2>
@@ -299,10 +304,10 @@ export default function Dashboard() {
               </ResponsiveContainer>
             )}
           </div>
-        </div>
-
-        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} openDeals={openDeals} />
       </div>
+
+      <EveryonesDayPanel />
     </div>
+    </MorningSummaryProvider>
   );
 }

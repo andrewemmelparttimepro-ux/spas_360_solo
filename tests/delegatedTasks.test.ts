@@ -92,6 +92,9 @@ describe('Delegated Tasks v2', () => {
     assert.match(panel, /Due date and time \(optional\)/);
     assert.match(panel, /DELEGATED_STATUS_LABELS\.incomplete/);
     assert.doesNotMatch(panel, /Not Completed/);
+    assert.match(panel, /<option value="">All Staff<\/option>/);
+    assert.match(panel, /<option value="incomplete">All Incomplete<\/option>/);
+    assert.match(panel, /<option value="completed">All Complete<\/option>/);
     assert.match(panel, /aria-label="Incomplete delegated tasks"/);
     assert.match(panel, /aria-label="Completed delegated tasks"/);
     assert.match(panel, /Completed tasks stay here as history/);
@@ -100,6 +103,8 @@ describe('Delegated Tasks v2', () => {
     assert.match(panel, /params\.get\('delegated'\)/);
     assert.match(hook, /task_type: DELEGATED_TASK_TYPE/);
     assert.match(hook, /sender:created_by\(id, first_name, last_name, role\)/);
+    assert.match(hook, /fetchAllDelegatedTasks\(profile\.org_id\)/);
+    assert.match(hook, /\.range\(offset, offset \+ TASK_PAGE_SIZE - 1\)/);
     assert.match(hook, /\.delete\(\{ count: 'exact' \}\)/);
     assert.match(hook, /export async function fetchMyIncompleteDelegatedTasks/);
   });

@@ -345,9 +345,9 @@ export default function DelegatedTasksPanel() {
             </select>
           )}
           <select aria-label="Filter delegated tasks by completion" value={statusFilter} onChange={event => setStatusFilter(event.target.value as DelegatedTaskStatusFilter)} className={chipClass}>
-            <option value="all">All Statuses</option>
-            <option value="incomplete">{DELEGATED_STATUS_LABELS.incomplete}</option>
-            <option value="completed">{DELEGATED_STATUS_LABELS.completed}</option>
+            <option value="all">All Tasks</option>
+            <option value="incomplete">All Incomplete</option>
+            <option value="completed">All Complete</option>
           </select>
         </div>
       </div>

@@ -56,20 +56,31 @@ describe('Owner Morning Summary', () => {
     assert.match(migration, /'\/dashboard\?summary=open'/);
     assert.match(panel, /Morning Summary/);
     assert.match(panel, /params\.get\('summary'\) === 'open'/);
-    assert.match(panel, /Everyone's day/);
+    assert.match(panel, /Everyone's Day/);
     assert.match(hook, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
-    assert.ok(dashboard.indexOf('<MorningSummaryPanel />') < dashboard.indexOf('<DelegatedTasksPanel />'));
+    const summaryIndex = dashboard.indexOf('<MorningSummaryPanel />');
+    const delegatedIndex = dashboard.indexOf('<DelegatedTasksPanel />');
+    const followUpIndex = dashboard.indexOf('<UpcomingTasksPanel');
+    const revenueIndex = dashboard.indexOf('Revenue Overview');
+    const everyoneIndex = dashboard.indexOf('<EveryonesDayPanel />');
+    assert.ok(summaryIndex < delegatedIndex);
+    assert.ok(delegatedIndex < followUpIndex);
+    assert.ok(followUpIndex < revenueIndex);
+    assert.ok(revenueIndex < everyoneIndex);
   });
 
-  it('opens by default for owners and reads Ari\'s narration from a cached, owner-only endpoint', async () => {
+  it('keeps Ari\'s read visible while Everyone\'s Day starts as a one-line disclosure', async () => {
     const [panel, api, migration] = await Promise.all([
       read('src/components/dashboard/MorningSummaryPanel.tsx'),
       read('api/owners/morning-narration.ts'),
       read('supabase/migrations/20260903170000_staff_ops_round_two.sql'),
     ]);
-    assert.match(panel, /getItem\(OPEN_KEY\) !== '0'/);
     assert.match(panel, /\/api\/owners\/morning-narration\?day=/);
     assert.match(panel, /Ari's read/);
+    assert.match(panel, /const \[open, setOpen\] = useState\(false\)/);
+    assert.match(panel, /aria-controls="everyones-day-body"/);
+    assert.match(panel, /aria-expanded=\{open\}/);
+    assert.match(panel, /\{open && \(/);
     assert.match(api, /profile\.role !== 'owner_manager'/);
     assert.match(api, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
     assert.match(api, /at most three short sentences/);

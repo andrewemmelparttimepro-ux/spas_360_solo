@@ -271,3 +271,42 @@ stays the deep engineering companion the Bible points to.
 - UX psychology principles applied deliberately (smart defaults, honest endowed progress, IKEA
   highlight, loss framing, MSRP anchoring) — extend them, don't fake them (no dishonest progress,
   no defaulting the wizard's lead-source chip: source data quality > one saved tap).
+
+## 10. 2026-09-03 — Staff operations layer (Brandon's "replace a manager" asks)
+
+- **Delegated Tasks** (`src/components/dashboard/DelegatedTasksPanel.tsx`, `src/hooks/useDelegatedTasks.ts`,
+  `src/lib/delegatedTasks.ts`, migration `20260903150000_delegated_tasks_v2.sql`): tasks with
+  `task_type = 'Delegated'`. ANY teammate → ANY teammate, optional `due_at` (nullable only for
+  Delegated), sender-or-owner edit/delete (trigger `private.prepare_delegated_task_update` +
+  `task_delete` policy), assignee completes/annotates, `completed_at` is DB-authored, completed rows
+  are permanent history. Trigger `notify_delegated_task` pings assignee on send and sender on
+  completion (`/dashboard?delegated=open`, technicians `/service?delegated=open`). Wording is
+  Brandon's: "Please Complete", "Incomplete"/"Completed". `profile_read` is now org-wide so
+  technicians can pick teammates.
+- **Time clock** (`StaffTimeClockControl.tsx`, `StaffTimeReport.tsx` in Owners Corner,
+  `useStaffTimeClock.ts`, migrations `…021301_staff_attendance_time_clock.sql` +
+  `…150500_clock_out_acknowledgements.sql`): `staff_time_entries`, RPCs `staff_clock_in()`,
+  `staff_clock_out(p_reason, p_acknowledged_task_ids)`. Clock-out with incomplete delegated tasks
+  requires acknowledging every one (client modal AND server check), stores the ids on the punch,
+  and notifies every owner (`clock_out_incomplete`). Only owners edit punches; staff use "ask an
+  owner to correct it", which sends a delegated task.
+- **Morning Summary** (`MorningSummaryPanel.tsx`, RPC `owner_morning_summary(p_day)`, cron
+  `spas360-morning-summary` 12:30 UTC → notification `/dashboard?summary=open`): owner-only, prior
+  Central day: punches/hours per teammate, delegated done/open/overdue, deals created/won/lost +
+  stage moves, jobs completed + today's board, new customers, inbound texts, suggestions, Fix-It posts.
+- **Ari staff delegation**: tools `delegate_task`, `list_delegated_tasks`, `complete_delegated_task`
+  in `src/agent/toolFactory.ts` (Central-time aware via `centralInstant`). System prompt rule 9.
+- **Staff texts → Ari** (`api/sms-inbound.ts`, `api/_lib/staff-sms.ts`): a text from a number on a
+  teammate's `profiles.phone` (editable in Settings → Team & Permissions) is answered by Ari as that
+  user: magic-link `generateLink` → `verifyOtp` mints a session, `/api/agent/run` does the work,
+  reply goes out via Twilio (`waitUntil`, so Twilio's 15 s webhook limit is respected).
+  **BLOCKED:** the Twilio credentials in Vercel (and `.env.local`) return HTTP 401 as of 9/3 — the
+  account is dead or rotated. Until Andrew fixes Twilio (+ A2P 10DLC), no text in or out works.
+  Staff phones are also all NULL — fill them in Settings before testing.
+- **Suggestion Box → Fix-It**: owners with Fix-It membership get "Send to Fix-It Feed" (creates an
+  owner-authored `fix_it_posts` row crediting the employee; suggestion → `promoted`,
+  `fix_it_post_id`). Author is notified on any status change. Icon now visible on phones.
+- **Owners Corner print**: "Print sheet" prints only the open worksheet (`src/lib/workbookPrint.ts`).
+- **Fix-It automation note**: the Codex automation stalled on 9/3 01:51 UTC — its keeper process held
+  `run.lock` for 12 h after the worker died. If `.current-run-id`'s keeper PID is a bare `sleep`
+  loop older than ~1 h with no matching Codex thread, kill it and move `run.lock` to `lock-history/`.

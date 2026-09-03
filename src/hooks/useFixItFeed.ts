@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
+import { signFixItAttachmentUrls, type SignedUrlCacheEntry } from '@/lib/fixItAttachmentUrls';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Profile } from '@/types/database';
 
@@ -158,20 +159,9 @@ function sanitizeName(name: string) {
   return (name || 'upload').replace(/[^\w.!@()+,=\-\s]/g, '_');
 }
 
-// Signed URLs are valid for an hour — re-signing every attachment on every
-// realtime refetch was one storage API call per file per event per client.
-const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
-
-async function signedUrl(path: string | null) {
-  if (!path) return '';
-  const cached = signedUrlCache.get(path);
-  if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.url;
-  const { data, error } = await supabase.storage.from('fix-it-files').createSignedUrl(path, 60 * 60);
-  if (error) return '';
-  const url = data?.signedUrl ?? '';
-  if (url) signedUrlCache.set(path, { url, expiresAt: Date.now() + 60 * 60 * 1000 });
-  return url;
-}
+// Signed URLs are valid for an hour. Resolve them in bounded batches so a
+// large feed does not fan out one simultaneous Storage request per attachment.
+const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 
 /**
  * Just the badge number — safe to run on every page. The full feed
@@ -255,8 +245,14 @@ export function useFixItFeed(enabled = true): UseFixItFeedResult {
 
     const attachmentRows = ((attachmentRes.data ?? []) as DbFixItAttachment[]);
     const commentRows = ((commentRes.data ?? []) as DbFixItComment[]);
-    const attachments = await Promise.all(attachmentRows.map(async file => {
-      const url = file.storage_path ? await signedUrl(file.storage_path) : (file.url ?? '');
+    const storage = supabase.storage.from('fix-it-files');
+    const signedUrls = await signFixItAttachmentUrls(
+      attachmentRows.map(file => file.storage_path),
+      storage,
+      signedUrlCache,
+    );
+    const attachments = attachmentRows.map(file => {
+      const url = file.storage_path ? signedUrls.get(file.storage_path) ?? '' : (file.url ?? '');
       return {
         id: file.id,
         postId: file.post_id,
@@ -271,7 +267,7 @@ export function useFixItFeed(enabled = true): UseFixItFeedResult {
         url,
         ts: file.created_at,
       } satisfies FixItAttachment;
-    }));
+    });
 
     const attachmentsByPost = attachments.reduce<Record<string, FixItAttachment[]>>((acc, file) => {
       (acc[file.postId] = acc[file.postId] ?? []).push(file);

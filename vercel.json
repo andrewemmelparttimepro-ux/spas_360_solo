@@ -7,6 +7,7 @@
     "api/agent/run.ts": { "maxDuration": 300 },
     "api/sms-inbound.ts": { "maxDuration": 180 },
     "api/owners/morning-narration.ts": { "maxDuration": 90 },
+    "api/owners/morning-email.ts": { "maxDuration": 120 },
     "api/chat.ts": { "maxDuration": 90 }
   },
   "headers": [

@@ -130,6 +130,14 @@ export interface TimeEntry {
   created_at: string;
 }
 
+export interface StaffTimeEntry {
+  id: string; org_id: string; user_id: string;
+  clock_in: string; clock_out: string | null;
+  clock_out_reason: 'lunch' | 'end_day' | 'owner_edit' | null;
+  edited_by: string | null; edited_at: string | null;
+  created_at: string; updated_at: string;
+}
+
 export interface Notification {
   id: string; user_id: string; type: string; title: string;
   body: string | null; read: boolean; link: string | null;
@@ -194,7 +202,7 @@ export interface Database {
       [K in 'organizations' | 'locations' | 'profiles' | 'contacts' | 'properties' |
        'pipeline_stages' | 'deals' | 'jobs' | 'job_assignments' | 'parts' |
        'inventory_items' | 'communication_threads' | 'messages' | 'tasks' |
-       'notes' | 'time_entries' | 'notifications' | 'audit_log' |
+       'notes' | 'time_entries' | 'staff_time_entries' | 'notifications' | 'audit_log' |
        'agent_threads' | 'agent_messages' | 'fix_it_posts' |
        'fix_it_comments' | 'fix_it_attachments' | 'app_invites' |
        'push_subscriptions' | 'suggestions' | 'paid_commissions']: {

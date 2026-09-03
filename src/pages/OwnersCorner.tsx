@@ -22,6 +22,7 @@ import {
 import { salespersonGrossRanking, viewOwnersReportPdf, type OwnersReportPdfInput } from '@/lib/ownersReportPdf';
 import { PaidCommissionsTracker } from '@/components/PaidCommissionsTracker';
 import { OwnerWorkbookLibrary } from '@/components/OwnerWorkbookLibrary';
+import StaffTimeReport from '@/components/StaffTimeReport';
 
 const OWNER_DESTINATIONS = [
   {
@@ -67,6 +68,7 @@ export default function OwnersCorner() {
           </div>
           <OwnerWorkbookLibrary />
           <PaidCommissionsTracker />
+          <StaffTimeReport />
           <OwnersPerformanceReport />
           <section aria-label="Owner destinations" className="grid gap-4 md:grid-cols-3">
             {OWNER_DESTINATIONS.map(destination => (

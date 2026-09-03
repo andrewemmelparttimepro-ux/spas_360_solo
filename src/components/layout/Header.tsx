@@ -10,6 +10,7 @@ import SearchPalette from '@/components/SearchPalette';
 import { pushSupported, pushPermission, enablePush } from '@/lib/push';
 import SuggestionBox from '@/components/SuggestionBox';
 import { isServiceTechnician } from '@/lib/serviceTechAccess';
+import StaffTimeClockControl from '@/components/StaffTimeClockControl';
 
 // Hierarchy: the top bar carries the floor-operations destinations a
 // salesperson or tech touches every hour. Everything else (Inbox, Citadel,
@@ -252,6 +253,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </div>
         )}
       </div>
+
+      <StaffTimeClockControl />
 
       {/* Notifications */}
       {!technician && <div className="relative shrink-0" ref={notifRef}>

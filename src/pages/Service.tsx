@@ -19,6 +19,7 @@ import DealInventorySelector from '@/components/DealInventorySelector';
 import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
 import JobContactDetails from '@/components/JobContactDetails';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
 import { canManageServiceSchedule, isServiceTechnician } from '@/lib/serviceTechAccess';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -459,6 +460,12 @@ export default function Service() {
       <div className="mb-4 shrink-0 overflow-x-auto" aria-label="Schedule store selector">
         <StoreSwitcher countSource="scheduledJobs" />
       </div>
+
+      {technician && (
+        <div className="mb-4 shrink-0">
+          <DelegatedTasksPanel />
+        </div>
+      )}
 
       {/* Color legend = working filter (Brandon's color language) */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4 shrink-0">

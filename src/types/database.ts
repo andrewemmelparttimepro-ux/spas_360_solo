@@ -113,6 +113,7 @@ export interface Task {
   title: string; description: string | null; due_at: string;
   priority: DealPriority; status: TaskStatus;
   task_type: string | null; created_by: string;
+  assignee_notes: string | null; completed_at: string | null;
   created_at: string; updated_at: string;
 }
 

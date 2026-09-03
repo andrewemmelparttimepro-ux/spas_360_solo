@@ -16,6 +16,7 @@ import {
 } from '@/lib/dashboardRevenueFilters';
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
+import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -150,6 +151,8 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      <DelegatedTasksPanel />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="dashboard-panel lg:col-span-2 bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">

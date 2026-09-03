@@ -25,6 +25,7 @@ import {
   type DashboardRevenueFilterOption,
   type DashboardRevenueFilters,
 } from '@/lib/dashboardRevenueFilters';
+import { DELEGATED_TASK_TYPE } from '@/lib/delegatedTasks';
 
 export { PERIOD_LABELS, type DashboardPeriod } from '@/lib/dashboardPeriods';
 
@@ -79,6 +80,7 @@ export function useDashboardStats(
         .from('tasks')
         .select('id, title, status, due_at, deal_id, contact_id, job_id, assigned_to, assigned:assigned_to(id, first_name, last_name)')
         .eq('org_id', profile.org_id)
+        .or(`task_type.is.null,task_type.neq.${DELEGATED_TASK_TYPE}`)
         .in('status', ['Pending', 'In Progress', 'Overdue'])
         .order('due_at', { ascending: true }),
       supabase

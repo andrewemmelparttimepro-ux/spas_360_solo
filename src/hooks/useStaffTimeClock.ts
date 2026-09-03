@@ -81,11 +81,11 @@ export function useStaffTimeClock() {
     return () => { void supabase.removeChannel(channel); };
   }, [profile, refresh]);
 
-  const runClockAction = useCallback(async (action: 'in' | 'out', reason?: 'lunch' | 'end_day') => {
+  const runClockAction = useCallback(async (action: 'in' | 'out', reason?: 'lunch' | 'end_day', acknowledgedTaskIds?: string[]) => {
     setIsSaving(true);
     const result = action === 'in'
       ? await supabase.rpc('staff_clock_in')
-      : await supabase.rpc('staff_clock_out', { p_reason: reason });
+      : await supabase.rpc('staff_clock_out', { p_reason: reason, p_acknowledged_task_ids: acknowledgedTaskIds ?? null });
     setIsSaving(false);
     setError(result.error?.message ?? null);
     if (!result.error) await refresh();
@@ -99,7 +99,7 @@ export function useStaffTimeClock() {
     isSaving,
     error,
     clockIn: () => runClockAction('in'),
-    clockOut: (reason: 'lunch' | 'end_day') => runClockAction('out', reason),
+    clockOut: (reason: 'lunch' | 'end_day', acknowledgedTaskIds?: string[]) => runClockAction('out', reason, acknowledgedTaskIds),
     refresh,
   };
 }

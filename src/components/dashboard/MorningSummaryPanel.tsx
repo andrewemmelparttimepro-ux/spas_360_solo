@@ -1,0 +1,184 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Sunrise } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMorningSummary } from '@/hooks/useMorningSummary';
+import {
+  centralDateKey,
+  defaultSummaryDay,
+  formatSummaryMinutes,
+  shiftDateKey,
+  staffAttentionFlags,
+  summaryDayLabel,
+  summaryHeadline,
+  summaryMoney,
+} from '@/lib/morningSummary';
+import { cn } from '@/lib/utils';
+
+const OPEN_KEY = 'spas360.morningSummary.open';
+
+function readOpen(): boolean {
+  try { return window.localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
+}
+
+const timeLabel = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
+
+export default function MorningSummaryPanel() {
+  const { profile } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(readOpen);
+  const [day, setDay] = useState(defaultSummaryDay);
+  const isOwner = profile?.role === 'owner_manager';
+  const { summary, isLoading, error, refresh } = useMorningSummary(day, Boolean(isOwner));
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('summary') === 'open') {
+      setOpen(true);
+      document.getElementById('morning-summary-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* ignore */ }
+  }, [open]);
+
+  const today = centralDateKey();
+  const canGoForward = day < today;
+  const headline = useMemo(() => summary ? summaryHeadline(summary) : '', [summary]);
+
+  if (!isOwner) return null;
+
+  return (
+    <section className="dashboard-panel overflow-hidden rounded-xl border border-amber-500/30 bg-ink-900" aria-labelledby="morning-summary-heading">
+      <div className="flex flex-col gap-3 border-b border-ink-700 bg-amber-500/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <button type="button" onClick={() => setOpen(value => !value)} className="flex min-w-0 items-start gap-3 text-left" aria-expanded={open} aria-controls="morning-summary-body">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-500"><Sunrise className="h-5 w-5" /></span>
+          <span className="min-w-0">
+            <span className="flex items-center gap-2">
+              <h2 id="morning-summary-heading" className="text-base font-semibold text-ink-100">Morning Summary</h2>
+              <ChevronDown className={cn('h-4 w-4 text-ink-500 transition-transform', open && 'rotate-180')} />
+            </span>
+            <span className="block text-xs text-ink-500">
+              {summaryDayLabel(day)}{day === today ? ' (today so far)' : ''}
+              {headline ? ` · ${headline}` : isLoading ? ' · Loading…' : ''}
+            </span>
+          </span>
+        </button>
+        <div className="flex items-center gap-1 self-start sm:self-auto">
+          <button type="button" aria-label="Previous day" onClick={() => setDay(current => shiftDateKey(current, -1))} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"><ChevronLeft className="h-4 w-4" /></button>
+          <input aria-label="Summary day" type="date" value={day} max={today} onChange={event => { if (event.target.value) setDay(event.target.value); }} className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs font-medium text-ink-200" />
+          <button type="button" aria-label="Next day" disabled={!canGoForward} onClick={() => setDay(current => shiftDateKey(current, 1))} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+          <button type="button" aria-label="Refresh summary" onClick={() => void refresh()} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"><RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} /></button>
+        </div>
+      </div>
+
+      {open && (
+        <div id="morning-summary-body" className="space-y-5 p-5">
+          {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">Summary couldn't load. ({error})</p>}
+          {!summary && isLoading && <p className="text-sm text-ink-500">Pulling yesterday together…</p>}
+          {summary && (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: 'Clocked in', value: summary.activity.clocked_in_count },
+                  { label: 'Tasks completed', value: summary.delegated.completed },
+                  { label: 'Tasks still open', value: summary.delegated.open, warn: summary.delegated.overdue > 0 ? `${summary.delegated.overdue} overdue` : null },
+                  { label: 'Deals won', value: summary.deals.won.length, sub: summaryMoney(summary.deals.won.reduce((total, deal) => total + (deal.amount ?? 0), 0)) },
+                ].map(stat => (
+                  <div key={stat.label} className="rounded-lg border border-ink-700 bg-ink-850/70 px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ink-500">{stat.label}</p>
+                    <p className="mt-1 text-xl font-bold text-ink-100">{stat.value}</p>
+                    {'sub' in stat && stat.sub && <p className="text-xs text-ink-500">{stat.sub}</p>}
+                    {'warn' in stat && stat.warn && <p className="text-xs font-semibold text-red-400">{stat.warn}</p>}
+                  </div>
+                ))}
+              </div>
+
+              <section aria-label="Staff activity">
+                <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-400">Everyone's day</h3>
+                <div className="overflow-x-auto rounded-lg border border-ink-700">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="bg-ink-850 text-[10px] font-bold uppercase tracking-wider text-ink-500">
+                      <tr>
+                        <th className="px-3 py-2">Teammate</th>
+                        <th className="px-3 py-2">Clock</th>
+                        <th className="px-3 py-2">Hours</th>
+                        <th className="px-3 py-2">Tasks done</th>
+                        <th className="px-3 py-2">Still open</th>
+                        <th className="px-3 py-2">Flags</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.staff.map(person => {
+                        const flags = staffAttentionFlags(person);
+                        return (
+                          <tr key={person.id} className="border-t border-ink-800 align-top">
+                            <td className="px-3 py-2 font-semibold text-ink-100">{person.name}<span className="block text-[11px] font-normal text-ink-500">{person.delegated_sent > 0 ? `Sent ${person.delegated_sent}` : ''}</span></td>
+                            <td className="px-3 py-2 text-xs text-ink-300">
+                              {person.punches.length === 0 ? <span className="text-ink-500">No punch</span> : person.punches.map((punch, index) => (
+                                <span key={index} className="block">{timeLabel(punch.clock_in)} – {timeLabel(punch.clock_out)}{punch.reason === 'lunch' ? ' (lunch)' : ''}</span>
+                              ))}
+                            </td>
+                            <td className="px-3 py-2 text-ink-200">{person.minutes_total > 0 ? formatSummaryMinutes(person.minutes_total) : '—'}</td>
+                            <td className="px-3 py-2 text-xs text-ink-300">
+                              {person.delegated_completed.length === 0 ? <span className="text-ink-500">—</span> : person.delegated_completed.map((task, index) => <span key={index} className="block">✓ {task.title}</span>)}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-ink-300">
+                              {person.delegated_open.length === 0 ? <span className="text-ink-500">—</span> : person.delegated_open.map((task, index) => (
+                                <span key={index} className={cn('block', task.overdue && 'font-semibold text-red-400')}>{task.title}</span>
+                              ))}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              {flags.length === 0 ? <span className="text-emerald-400">Clear</span> : flags.map(flag => <span key={flag} className="block font-semibold text-amber-400">{flag}</span>)}
+                              {person.punches.filter(punch => punch.acknowledged_titles.length > 0).map((punch, index) => (
+                                <span key={`ack-${index}`} className="block text-ink-500">Left open: {punch.acknowledged_titles.join(', ')}</span>
+                              ))}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <section aria-label="Deals" className="rounded-lg border border-ink-700 p-3">
+                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-brand-400">Deals</h3>
+                  <ul className="space-y-1 text-sm text-ink-300">
+                    {summary.deals.won.map((deal, index) => <li key={`won-${index}`}><span className="font-semibold text-emerald-400">Won</span> {deal.title} · {summaryMoney(deal.amount)}{deal.owner ? ` · ${deal.owner}` : ''}</li>)}
+                    {summary.deals.lost.map((deal, index) => <li key={`lost-${index}`}><span className="font-semibold text-red-400">Lost</span> {deal.title}{deal.reason ? ` · ${deal.reason}` : ''}</li>)}
+                    {summary.deals.created.map((deal, index) => <li key={`new-${index}`}><span className="font-semibold text-ink-200">New</span> {deal.title}{deal.owner ? ` · ${deal.owner}` : ''}</li>)}
+                    <li className="text-xs text-ink-500">{summary.deals.stage_changes} stage move{summary.deals.stage_changes === 1 ? '' : 's'}</li>
+                  </ul>
+                </section>
+                <section aria-label="Service" className="rounded-lg border border-ink-700 p-3">
+                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-emerald-400">Service</h3>
+                  <ul className="space-y-1 text-sm text-ink-300">
+                    {summary.jobs.completed.map((job, index) => <li key={`done-${index}`}><span className="font-semibold text-emerald-400">Done</span> {job.title} · {job.job_type}</li>)}
+                    {summary.jobs.completed.length === 0 && <li className="text-xs text-ink-500">No jobs completed.</li>}
+                    <li className="pt-1 text-xs font-bold uppercase tracking-wider text-ink-500">On the board today</li>
+                    {summary.jobs.scheduled_today.length === 0 && <li className="text-xs text-ink-500">Nothing scheduled.</li>}
+                    {summary.jobs.scheduled_today.map((job, index) => <li key={`today-${index}`}>{job.all_day ? 'All day' : timeLabel(job.scheduled_at)} · {job.title} · {job.job_type}</li>)}
+                  </ul>
+                </section>
+                <section aria-label="Activity" className="rounded-lg border border-ink-700 p-3">
+                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-violet-400">Activity</h3>
+                  <ul className="space-y-1 text-sm text-ink-300">
+                    <li>{summary.activity.new_customers} new customer{summary.activity.new_customers === 1 ? '' : 's'}</li>
+                    <li>{summary.activity.inbound_texts} inbound text{summary.activity.inbound_texts === 1 ? '' : 's'}</li>
+                    <li>{summary.delegated.created} task{summary.delegated.created === 1 ? '' : 's'} delegated</li>
+                    <li>{summary.jobs.created} job{summary.jobs.created === 1 ? '' : 's'} created</li>
+                    <li>{summary.activity.suggestions} suggestion{summary.activity.suggestions === 1 ? '' : 's'} · {summary.activity.fix_it_posts} Fix-It post{summary.activity.fix_it_posts === 1 ? '' : 's'}</li>
+                  </ul>
+                </section>
+              </div>
+              <p className="text-[11px] text-ink-500">Covers {summaryDayLabel(summary.day)} in Minot time. Generated {new Date(summary.generated_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</p>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

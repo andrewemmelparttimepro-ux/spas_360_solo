@@ -17,6 +17,7 @@ import {
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
+import MorningSummaryPanel from '@/components/dashboard/MorningSummaryPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -132,6 +133,8 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      <MorningSummaryPanel />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statMeta.map((meta) => {

@@ -81,6 +81,19 @@ function TeamPanel() {
     fetchTeam();
   };
 
+  // Staff text Ari from their own phones; the number on file is how the
+  // inbound-SMS webhook recognises a teammate instead of filing a lead.
+  const setMobile = async (member: Profile, raw: string) => {
+    const digits = raw.replace(/\D/g, '');
+    const phone = digits ? (digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits.startsWith('1') ? `+${digits}` : null) : null;
+    if (digits && !phone) { toast('Enter a 10-digit US mobile number', 'error'); return; }
+    if ((member.phone ?? null) === phone) return;
+    const { error } = await supabase.from('profiles').update({ phone }).eq('id', member.id);
+    if (error) { toast(`Couldn't update mobile: ${error.message}`, 'error'); return; }
+    toast(phone ? `${member.first_name} can now text Ari from ${phone}` : `${member.first_name}'s mobile cleared`, 'success');
+    fetchTeam();
+  };
+
   const setHomeStore = async (member: Profile, locationId: string) => {
     const { error } = await supabase.from('profiles').update({ location_id: locationId || null }).eq('id', member.id);
     if (error) { toast(`Couldn't update store: ${error.message}`, 'error'); return; }
@@ -157,6 +170,18 @@ function TeamPanel() {
                 </p>
                 <p className="text-xs text-ink-500 truncate">{member.email}</p>
               </div>
+              <input
+                type="tel"
+                inputMode="tel"
+                defaultValue={member.phone ?? ''}
+                key={`${member.id}:${member.phone ?? ''}`}
+                onBlur={e => setMobile(member, e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                placeholder="Mobile for Ari texts"
+                aria-label={`Mobile number for ${member.first_name} ${member.last_name}`}
+                title="Mobile number — lets this teammate text Ari to delegate tasks"
+                className="w-40 bg-ink-900 border border-ink-700 text-xs text-ink-300 rounded-lg px-2 py-1.5 outline-none focus:border-brand-500 placeholder:text-ink-600"
+              />
               <select
                 value={member.location_id ?? ''}
                 onChange={e => setHomeStore(member, e.target.value)}

@@ -5,6 +5,7 @@
     "api/migrations/callback-hubspot.ts": { "maxDuration": 30 },
     "api/migrations/callback-jobber.ts": { "maxDuration": 30 },
     "api/agent/run.ts": { "maxDuration": 300 },
+    "api/sms-inbound.ts": { "maxDuration": 180 },
     "api/chat.ts": { "maxDuration": 90 }
   },
   "headers": [

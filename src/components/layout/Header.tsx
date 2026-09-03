@@ -192,12 +192,12 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex-1 lg:hidden" />
 
-      {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. */}
+      {/* Human-authored product suggestions — quiet icon; it's a side door, not a destination. Visible on phones too. */}
       {!technician && (
         <>
           <button
             onClick={() => setSuggestionOpen(true)}
-            className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors hidden sm:block"
+            className="shrink-0 p-2 text-ink-500 hover:text-brand-300 rounded-full hover:bg-ink-800 transition-colors"
             aria-label="Open Suggestion Box"
             title="Suggestion Box"
           >
@@ -257,7 +257,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       <StaffTimeClockControl />
 
       {/* Notifications */}
-      {!technician && <div className="relative shrink-0" ref={notifRef}>
+      <div className="relative shrink-0" ref={notifRef}>
         <button
           onClick={() => setNotifOpen(o => !o)}
           className="relative p-2 text-ink-500 hover:text-ink-300 transition-colors rounded-full hover:bg-ink-800"
@@ -314,7 +314,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             </div>
           </div>
         )}
-      </div>}
+      </div>
 
       {/* User Menu */}
       <div className="relative shrink-0" ref={userRef}>

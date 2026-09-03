@@ -14,6 +14,58 @@ const localDayBounds = (d = new Date()) => {
 };
 const localInstant = (s: string) => new Date(s.includes('T') ? s : `${s}T09:00:00`).toISOString();
 
+const DEALERSHIP_TIME_ZONE = 'America/Chicago';
+
+/** Convert a dealership wall-clock time ("2026-09-03T16:00") to a UTC instant, DST-correct. */
+export function centralInstant(local: string): string | null {
+  const match = String(local ?? '').trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?$/);
+  if (!match) return null;
+  const [, year, month, day, hour = '9', minute = '00'] = match;
+  const wall = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+  const offsetAt = (instant: number) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: DEALERSHIP_TIME_ZONE, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    }).formatToParts(new Date(instant));
+    const get = (type: string) => Number(parts.find(part => part.type === type)?.value ?? 0);
+    return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute')) - instant;
+  };
+  let utc = wall - offsetAt(wall);
+  utc = wall - offsetAt(utc);
+  const date = new Date(utc);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export function centralNowLabel(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: DEALERSHIP_TIME_ZONE, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  }).format(now);
+}
+
+export interface Teammate { id: string; first_name: string | null; last_name: string | null; role?: string | null }
+
+/** Resolve "Alex", "alex b", or "Alex Burckhard" against the roster; ambiguity is reported, never guessed. */
+export function matchTeammate<T extends Teammate>(roster: T[], query: string): { match: T } | { error: string } {
+  const needle = String(query ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!needle) return { error: 'Say who the task is for.' };
+  const full = (person: T) => `${person.first_name ?? ''} ${person.last_name ?? ''}`.trim().toLowerCase();
+  const exact = roster.filter(person => full(person) === needle || (person.first_name ?? '').toLowerCase() === needle);
+  if (exact.length === 1) return { match: exact[0] };
+  const candidates = exact.length > 1 ? exact : roster.filter(person => full(person).startsWith(needle) || (person.first_name ?? '').toLowerCase().startsWith(needle));
+  if (candidates.length === 1) return { match: candidates[0] };
+  if (candidates.length === 0) return { error: `No teammate named "${query}". Team: ${roster.map(full).filter(Boolean).join(', ')}.` };
+  return { error: `"${query}" could mean ${candidates.map(full).join(' or ')}. Which one?` };
+}
+
+const splitDelegatedText = (text: string): { title: string; description: string | null } => {
+  const lines = String(text ?? '').replace(/\r/g, '').split('\n').map(line => line.trim());
+  const first = lines.findIndex(Boolean);
+  if (first < 0) return { title: '', description: null };
+  const title = lines[first].slice(0, 200);
+  const rest = [lines[first].slice(200), ...lines.slice(first + 1)].join('\n').trim();
+  return { title, description: rest ? rest.slice(0, 4000) : null };
+};
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -380,6 +432,153 @@ export function createAgentTools(
         .single();
       if (error) return { error: error.message };
       return { success: true, id: data?.id };
+    },
+  },
+  {
+    name: 'delegate_task',
+    description: `Delegate a STAFF task from the signed-in teammate to another teammate (human-to-human work like "email Bob Johnson a quote for the HM44 sauna" or "pull the Covana cover for delivery"). Any teammate may delegate to any teammate. The recipient sees it under Delegated Tasks and checks it complete; the sender is told when it is done. A due time is optional. This is NOT for product/app changes. Current dealership time: ${centralNowLabel()} (${DEALERSHIP_TIME_ZONE}).`,
+    parameters: {
+      type: 'object',
+      properties: {
+        assignee_name: { type: 'string', description: 'Teammate first name or full name, e.g. "Alex" or "Alex Burckhard". Use "me" for the signed-in user.' },
+        task: { type: 'string', description: 'What needs to be done. First line is the task; add details on following lines.' },
+        due_at: { type: 'string', description: 'Optional due date/time in dealership local time, formatted YYYY-MM-DDTHH:mm (24h). Omit when no deadline was given.' },
+      },
+      required: ['assignee_name', 'task'],
+    },
+    execute: async (args) => {
+      const me = await currentProfile(client, getUserId);
+      if (!me) return { error: 'Not signed in.' };
+      const { title, description } = splitDelegatedText(args.task ?? '');
+      if (!title) return { error: 'Describe what needs to be done.' };
+      const { data: roster, error: rosterError } = await client
+        .from('profiles')
+        .select('id, first_name, last_name, role, email')
+        .eq('org_id', me.org_id);
+      if (rosterError) return { error: rosterError.message };
+      const people = ((roster ?? []) as (Teammate & { email?: string | null })[]).filter(person => (person.email ?? '').toLowerCase() !== 'thrawn@ndai.pro');
+      const wantsSelf = /^(me|myself|self)$/i.test(String(args.assignee_name ?? '').trim());
+      const resolved = wantsSelf
+        ? { match: people.find(person => person.id === me.userId) ?? null }
+        : matchTeammate(people, args.assignee_name ?? '');
+      if ('error' in resolved) return { error: resolved.error };
+      if (!resolved.match) return { error: 'Could not find your own profile.' };
+      let dueAt: string | null = null;
+      if (args.due_at) {
+        dueAt = centralInstant(args.due_at);
+        if (!dueAt) return { error: 'due_at must look like YYYY-MM-DDTHH:mm in dealership local time.' };
+      }
+      const { data, error } = await client
+        .from('tasks')
+        .insert({
+          org_id: me.org_id,
+          assigned_to: resolved.match.id,
+          title,
+          description,
+          due_at: dueAt,
+          priority: 'Medium',
+          status: 'Pending',
+          task_type: 'Delegated',
+          created_by: me.userId,
+        })
+        .select('id, title, due_at')
+        .single();
+      if (error) return { error: error.message };
+      return {
+        success: true,
+        task_id: data?.id,
+        assigned_to: `${resolved.match.first_name ?? ''} ${resolved.match.last_name ?? ''}`.trim(),
+        title,
+        due_local: dueAt ? new Intl.DateTimeFormat('en-US', { timeZone: DEALERSHIP_TIME_ZONE, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(dueAt)) : 'no due time',
+      };
+    },
+  },
+  {
+    name: 'list_delegated_tasks',
+    description: `List delegated staff tasks: the signed-in user's own open tasks ("mine"), tasks they sent ("sent"), or everything visible to them ("all"; owners see the whole team). Current dealership time: ${centralNowLabel()}.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        scope: { type: 'string', enum: ['mine', 'sent', 'all'] },
+        include_completed: { type: 'string', enum: ['yes', 'no'], description: 'Default no.' },
+      },
+    },
+    execute: async (args) => {
+      const me = await currentProfile(client, getUserId);
+      if (!me) return { error: 'Not signed in.' };
+      let query = client
+        .from('tasks')
+        .select('id, title, description, due_at, status, completed_at, assigned_to, created_by, assigned:assigned_to(first_name, last_name), sender:created_by(first_name, last_name)')
+        .eq('org_id', me.org_id)
+        .eq('task_type', 'Delegated')
+        .order('due_at', { ascending: true, nullsFirst: false })
+        .limit(40);
+      const scope = args.scope || 'mine';
+      if (scope === 'mine') query = query.eq('assigned_to', me.userId);
+      if (scope === 'sent') query = query.eq('created_by', me.userId);
+      if (args.include_completed !== 'yes') query = query.neq('status', 'Completed');
+      const { data, error } = await query;
+      if (error) return { error: error.message };
+      const name = (person: unknown) => {
+        const row = Array.isArray(person) ? person[0] : person;
+        return row ? `${(row as Teammate).first_name ?? ''} ${(row as Teammate).last_name ?? ''}`.trim() : '';
+      };
+      return {
+        tasks: (data ?? []).map(row => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          status: row.status === 'Completed' ? 'Completed' : 'Incomplete',
+          due_local: row.due_at ? new Intl.DateTimeFormat('en-US', { timeZone: DEALERSHIP_TIME_ZONE, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(row.due_at as string)) : null,
+          assigned_to: name(row.assigned),
+          sent_by: name(row.sender),
+          completed_at: row.completed_at,
+        })),
+      };
+    },
+  },
+  {
+    name: 'complete_delegated_task',
+    description: 'Mark one delegated staff task complete. Identify it by task_id from list_delegated_tasks, or by a distinctive phrase from its title. Only the assignee, the sender, or an owner may complete it.',
+    parameters: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        title_contains: { type: 'string', description: 'Used when task_id is unknown; must match exactly one open task.' },
+        notes: { type: 'string', description: 'Optional completion note for the sender.' },
+      },
+    },
+    execute: async (args) => {
+      const me = await currentProfile(client, getUserId);
+      if (!me) return { error: 'Not signed in.' };
+      let taskId = args.task_id || '';
+      if (!taskId) {
+        const phrase = cleanTerm(args.title_contains ?? '');
+        if (!phrase) return { error: 'Give a task_id or a phrase from the task title.' };
+        const { data, error } = await client
+          .from('tasks')
+          .select('id, title')
+          .eq('org_id', me.org_id)
+          .eq('task_type', 'Delegated')
+          .neq('status', 'Completed')
+          .ilike('title', `%${phrase}%`)
+          .limit(5);
+        if (error) return { error: error.message };
+        if (!data || data.length === 0) return { error: `No open delegated task matches "${phrase}".` };
+        if (data.length > 1) return { error: `Several open tasks match: ${data.map(row => row.title).join(' | ')}. Which one?` };
+        taskId = data[0].id as string;
+      }
+      const updates: Record<string, unknown> = { status: 'Completed' };
+      if (args.notes) updates.assignee_notes = String(args.notes).slice(0, 4000);
+      const { data, error } = await client
+        .from('tasks')
+        .update(updates)
+        .eq('id', taskId)
+        .eq('task_type', 'Delegated')
+        .select('id, title, completed_at')
+        .single();
+      if (error) return { error: error.message };
+      return { success: true, task_id: data?.id, title: data?.title, completed_at: data?.completed_at };
     },
   },
   {

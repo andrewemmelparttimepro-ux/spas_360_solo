@@ -1,37 +1,64 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { DELEGATED_TASK_TYPE } from '@/lib/delegatedTasks';
+import { DELEGATED_TASK_TYPE, parseDelegatedRequest } from '@/lib/delegatedTasks';
 import { supabase } from '@/lib/supabase';
 import { THRAWN_PROFILE_ID } from '@/lib/upcomingTasks';
 import type { Profile, Task, TaskStatus } from '@/types/database';
 
+export type DelegatedPerson = Pick<Profile, 'id' | 'first_name' | 'last_name'> & { role?: Profile['role'] };
+
 export interface DelegatedTask extends Task {
   assignee_notes: string | null;
   completed_at: string | null;
-  assigned: Pick<Profile, 'id' | 'first_name' | 'last_name'> | null;
+  assigned: DelegatedPerson | null;
+  sender: DelegatedPerson | null;
 }
 
-export type DelegatedTaskDraft = Pick<Task, 'assigned_to' | 'due_at'> & {
-  titles: string[];
-};
+export interface DelegatedTaskDraft {
+  assigned_to: string;
+  due_at: string | null;
+  request: string;
+}
 
-const SELECT = 'id, org_id, assigned_to, deal_id, contact_id, job_id, title, description, due_at, priority, status, task_type, created_by, created_at, updated_at, assignee_notes, completed_at, assigned:assigned_to(id, first_name, last_name)';
+export interface DelegatedTaskEdit {
+  assigned_to?: string;
+  due_at?: string | null;
+  request?: string;
+  status?: TaskStatus;
+  assignee_notes?: string | null;
+}
+
+const SELECT = [
+  'id, org_id, assigned_to, deal_id, contact_id, job_id, title, description, due_at, priority, status,',
+  'task_type, created_by, assignee_notes, completed_at, created_at, updated_at,',
+  'assigned:assigned_to(id, first_name, last_name, role),',
+  'sender:created_by(id, first_name, last_name, role)',
+].join(' ');
+
+function one<T>(value: T | T[] | null | undefined): T | null {
+  return (Array.isArray(value) ? value[0] : value) ?? null;
+}
 
 function normalizeTask(row: Record<string, unknown>): DelegatedTask {
-  const relation = Array.isArray(row.assigned) ? row.assigned[0] : row.assigned;
-  return { ...row, assigned: relation ?? null } as unknown as DelegatedTask;
+  return {
+    ...row,
+    assigned: one(row.assigned as DelegatedPerson | DelegatedPerson[] | null),
+    sender: one(row.sender as DelegatedPerson | DelegatedPerson[] | null),
+  } as unknown as DelegatedTask;
 }
 
-export function useDelegatedTasks() {
+type Result = { ok: boolean; message: string };
+
+export function useDelegatedTasks(enabled = true) {
   const { profile } = useAuth();
   const [tasks, setTasks] = useState<DelegatedTask[]>([]);
-  const [staff, setStaff] = useState<Pick<Profile, 'id' | 'first_name' | 'last_name'>[]>([]);
+  const [staff, setStaff] = useState<DelegatedPerson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchSequence = useRef(0);
 
   const fetchTasks = useCallback(async () => {
-    if (!profile) {
+    if (!profile || !enabled) {
       setTasks([]);
       setStaff([]);
       setIsLoading(false);
@@ -40,38 +67,35 @@ export function useDelegatedTasks() {
 
     const sequence = ++fetchSequence.current;
     setIsLoading(true);
-    const canDelegate = profile.role === 'owner_manager';
     const [tasksRes, staffRes] = await Promise.all([
       supabase
         .from('tasks')
         .select(SELECT)
         .eq('org_id', profile.org_id)
         .eq('task_type', DELEGATED_TASK_TYPE)
-        .order('due_at', { ascending: true }),
-      canDelegate
-        ? supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .eq('org_id', profile.org_id)
-            .in('role', ['owner_manager', 'service_manager', 'salesperson', 'technician'])
-            .neq('id', THRAWN_PROFILE_ID)
-            .order('first_name', { ascending: true })
-            .order('last_name', { ascending: true })
-        : Promise.resolve({ data: [], error: null }),
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role')
+        .eq('org_id', profile.org_id)
+        .neq('id', THRAWN_PROFILE_ID)
+        .order('first_name', { ascending: true })
+        .order('last_name', { ascending: true }),
     ]);
     if (sequence !== fetchSequence.current) return;
 
     const firstError = tasksRes.error ?? staffRes.error;
     setError(firstError?.message ?? null);
-    if (!tasksRes.error) setTasks((tasksRes.data ?? []).map(row => normalizeTask(row as Record<string, unknown>)));
-    if (!staffRes.error) setStaff((staffRes.data ?? []) as Pick<Profile, 'id' | 'first_name' | 'last_name'>[]);
+    if (!tasksRes.error) setTasks(((tasksRes.data ?? []) as unknown as Record<string, unknown>[]).map(normalizeTask));
+    if (!staffRes.error) setStaff((staffRes.data ?? []) as DelegatedPerson[]);
     setIsLoading(false);
-  }, [profile]);
+  }, [profile, enabled]);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { void fetchTasks(); }, [fetchTasks]);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !enabled) return;
     const channel = supabase
       .channel(`delegated-tasks:${profile.org_id}:${profile.id}`)
       .on(
@@ -81,33 +105,41 @@ export function useDelegatedTasks() {
       )
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [profile, fetchTasks]);
+  }, [profile, enabled, fetchTasks]);
 
-  const createChecklist = useCallback(async ({ assigned_to, due_at, titles }: DelegatedTaskDraft) => {
-    if (!profile || profile.role !== 'owner_manager' || titles.length === 0) {
-      return { ok: false, message: 'Owner access, an assignee, a due time, and at least one item are required.' };
-    }
-    const { error: insertError } = await supabase.from('tasks').insert(titles.map(title => ({
+  const createTask = useCallback(async ({ assigned_to, due_at, request }: DelegatedTaskDraft): Promise<Result> => {
+    if (!profile) return { ok: false, message: 'Sign in to delegate a task.' };
+    const parsed = parseDelegatedRequest(request);
+    if (!assigned_to || !parsed) return { ok: false, message: 'Choose who this is for and describe what needs to be done.' };
+    const { error: insertError } = await supabase.from('tasks').insert({
       org_id: profile.org_id,
       assigned_to,
-      title,
-      description: null,
+      title: parsed.title,
+      description: parsed.description,
       due_at,
       priority: 'Medium',
       status: 'Pending',
       task_type: DELEGATED_TASK_TYPE,
       created_by: profile.id,
-    })));
+    });
     if (insertError) return { ok: false, message: insertError.message };
     await fetchTasks();
-    return { ok: true, message: titles.length === 1 ? 'Task assigned.' : `${titles.length} checklist items assigned.` };
+    return { ok: true, message: 'Task delegated.' };
   }, [profile, fetchTasks]);
 
-  const updateTask = useCallback(async (
-    id: string,
-    updates: { status?: TaskStatus; assignee_notes?: string | null },
-  ) => {
+  const updateTask = useCallback(async (id: string, edit: DelegatedTaskEdit): Promise<Result> => {
     if (!profile) return { ok: false, message: 'Sign in to update this task.' };
+    const updates: Record<string, unknown> = {};
+    if (edit.status) updates.status = edit.status;
+    if ('assignee_notes' in edit) updates.assignee_notes = edit.assignee_notes ?? null;
+    if (edit.assigned_to) updates.assigned_to = edit.assigned_to;
+    if ('due_at' in edit) updates.due_at = edit.due_at ?? null;
+    if (typeof edit.request === 'string') {
+      const parsed = parseDelegatedRequest(edit.request);
+      if (!parsed) return { ok: false, message: 'Describe what needs to be done.' };
+      updates.title = parsed.title;
+      updates.description = parsed.description;
+    }
     const { data, error: updateError } = await supabase
       .from('tasks')
       .update(updates)
@@ -116,10 +148,40 @@ export function useDelegatedTasks() {
       .select(SELECT)
       .single();
     if (updateError) return { ok: false, message: updateError.message };
-    const updated = normalizeTask(data as Record<string, unknown>);
+    const updated = normalizeTask(data as unknown as Record<string, unknown>);
     setTasks(current => current.map(task => task.id === id ? updated : task));
-    return { ok: true, message: updates.status ? 'Task status updated.' : 'Notes saved.' };
+    return {
+      ok: true,
+      message: edit.status === 'Completed' ? 'Marked complete.' : edit.status ? 'Marked incomplete.' : 'assignee_notes' in edit ? 'Notes saved.' : 'Task updated.',
+    };
   }, [profile]);
 
-  return { tasks, staff, isLoading, error, createChecklist, updateTask, refresh: fetchTasks };
+  const deleteTask = useCallback(async (id: string): Promise<Result> => {
+    if (!profile) return { ok: false, message: 'Sign in to delete this task.' };
+    const { error: deleteError, count } = await supabase
+      .from('tasks')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+      .eq('task_type', DELEGATED_TASK_TYPE);
+    if (deleteError) return { ok: false, message: deleteError.message };
+    if (!count) return { ok: false, message: 'Only the person who sent this task can delete it.' };
+    setTasks(current => current.filter(task => task.id !== id));
+    return { ok: true, message: 'Task deleted.' };
+  }, [profile]);
+
+  return { tasks, staff, isLoading, error, createTask, updateTask, deleteTask, refresh: fetchTasks };
+}
+
+/** The signed-in person's own incomplete delegated tasks (the clock-out gate). */
+export async function fetchMyIncompleteDelegatedTasks(userId: string): Promise<Pick<DelegatedTask, 'id' | 'title' | 'due_at'>[]> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('id, title, due_at')
+    .eq('assigned_to', userId)
+    .eq('task_type', DELEGATED_TASK_TYPE)
+    .neq('status', 'Completed')
+    .order('due_at', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Pick<DelegatedTask, 'id' | 'title' | 'due_at'>[];
 }

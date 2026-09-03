@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Clock3, Inbox, Loader2, MessageSquarePlus, Send, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, Hammer, Inbox, Loader2, MessageSquarePlus, Send, X, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFixItAccess } from '@/hooks/useFixItAccess';
 import { useToast } from '@/components/ui/Toast';
 import {
+  canPromoteSuggestion,
   canReviewSuggestions,
+  fixItPostBodyForSuggestion,
   normalizeSuggestionBody,
   SUGGESTION_MAX_LENGTH,
   SUGGESTION_STATUS,
@@ -38,6 +41,8 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<SuggestionStatus | 'all'>('all');
   const isManager = canReviewSuggestions(profile?.role);
+  const { canUseFixIt } = useFixItAccess();
+  const canPromote = canPromoteSuggestion(profile?.role, canUseFixIt);
 
   const loadSuggestions = useCallback(async () => {
     if (!profile) return;
@@ -45,7 +50,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
     const { data, error } = await supabase
       .from('suggestions')
       .select(`
-        id, org_id, body, created_by, status, reviewed_by, reviewed_at, created_at, updated_at,
+        id, org_id, body, created_by, status, reviewed_by, reviewed_at, fix_it_post_id, created_at, updated_at,
         author:profiles!suggestions_created_by_fkey(first_name, last_name)
       `)
       .order('created_at', { ascending: false });
@@ -136,6 +141,42 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
     toast(`Suggestion marked ${SUGGESTION_STATUS[status].label.toLowerCase()}.`);
   }
 
+  // One human click moves an accepted idea onto the Fix-It wall. The owner is
+  // the card's author (Fix-It RLS requires it); the employee is credited in the body.
+  async function promoteToFixIt(suggestion: SuggestionRow) {
+    if (!profile || !canPromote || updatingId) return;
+    setUpdatingId(suggestion.id);
+    const authorName = suggestion.author ? `${suggestion.author.first_name} ${suggestion.author.last_name}`.trim() : '';
+    const { data: post, error: postError } = await supabase
+      .from('fix_it_posts')
+      .insert({ org_id: profile.org_id, body: fixItPostBodyForSuggestion(authorName, suggestion.body), created_by: profile.id, status: 'open' })
+      .select('id')
+      .single();
+    if (postError || !post) {
+      setUpdatingId(null);
+      toast('The Fix-It post could not be created.', 'error');
+      return;
+    }
+    const reviewedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from('suggestions')
+      .update({ status: 'promoted', reviewed_by: profile.id, reviewed_at: reviewedAt, fix_it_post_id: post.id })
+      .eq('id', suggestion.id)
+      .select('id')
+      .single();
+    setUpdatingId(null);
+    if (error) {
+      toast('Posted to Fix-It, but the suggestion status could not be saved.', 'error');
+      return;
+    }
+    setSuggestions(current => current.map(item => (
+      item.id === suggestion.id
+        ? { ...item, status: 'promoted', reviewed_by: profile.id, reviewed_at: reviewedAt, fix_it_post_id: post.id, updated_at: reviewedAt }
+        : item
+    )));
+    toast('Sent to the Fix-It Feed. The author has been notified.');
+  }
+
   if (!open) return null;
 
   return (
@@ -157,7 +198,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
             <div>
               <h2 id="suggestion-box-title" className="text-lg font-bold text-ink-100">Suggestion Box</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-ink-400 sm:text-sm">
-                Share an improvement for Brandon and the management team to review.
+                Share an improvement for Brandon and the management team to review. Approved ideas get built.
               </p>
             </div>
           </div>
@@ -209,7 +250,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
               </div>
               {isManager && (
                 <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-ink-850 p-1" aria-label="Filter suggestions">
-                  {(['all', 'pending', 'reviewed', 'declined'] as const).map(value => (
+                  {(['all', 'pending', 'promoted', 'reviewed', 'declined'] as const).map(value => (
                     <button
                       key={value}
                       type="button"
@@ -256,6 +297,20 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
 
                       {isManager && (
                         <div className="mt-4 flex flex-wrap gap-2 border-t border-ink-700 pt-3" aria-label="Review status">
+                          {canPromote && suggestion.status !== 'promoted' && (
+                            <button
+                              type="button"
+                              disabled={updatingId === suggestion.id}
+                              onClick={() => void promoteToFixIt(suggestion)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-500/40 bg-brand-500/10 px-2.5 py-1.5 text-xs font-semibold text-brand-300 hover:bg-brand-500/20 disabled:cursor-default"
+                            >
+                              {updatingId === suggestion.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Hammer className="h-3.5 w-3.5" />}
+                              Send to Fix-It Feed
+                            </button>
+                          )}
+                          {suggestion.status === 'promoted' && (
+                            <span className="inline-flex items-center gap-1.5 px-1 text-xs font-medium text-brand-300"><Hammer className="h-3.5 w-3.5" /> On the Fix-It wall</span>
+                          )}
                           {reviewActions.map(action => {
                             const Icon = action.icon;
                             const selected = suggestion.status === action.status;

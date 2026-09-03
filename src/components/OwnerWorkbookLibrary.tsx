@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Workbook } from 'exceljs';
-import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Printer, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { printWorksheetDocument, worksheetPrintDocument } from '@/lib/workbookPrint';
 import { supabase } from '@/lib/supabase';
 import {
   INVENTORY_PROFITS_FOLDER,
@@ -701,6 +702,30 @@ export function OwnerWorkbookLibrary() {
   );
   const fitScale = worksheet ? sheetZoomById[worksheet.id] ?? autoFitScale : autoFitScale;
 
+  // Print exactly the open sheet (Brandon: "just the summary, not the tabs to the right").
+  const printActiveSheet = () => {
+    if (!active || !worksheet || !grid) return;
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=800');
+    if (!printWindow) {
+      setError('Your browser blocked the print window. Allow pop-ups for SPAS 360 and try again.');
+      return;
+    }
+    const html = worksheetPrintDocument({
+      workbookName: active.display_name.replace(/\.xlsx$/i, ''),
+      sheetName: worksheet.name,
+      columns: Array.from({ length: grid.columns }, (_, index) => index + 1),
+      rows: Array.from({ length: grid.rows }, (_, index) => index + 1),
+      columnLabel,
+      columnWidthPx: column => worksheetColumnWidthPx(worksheet, column),
+      cellText: (row, column) => {
+        const cell = worksheet.getCell(row, column);
+        return active.folder_key === INVENTORY_PROFITS_FOLDER ? inventoryProfitsCellText(worksheet, cell) : cell.text;
+      },
+      cellStyle: (row, column) => cellStyle(worksheet.getCell(row, column)),
+    });
+    printWorksheetDocument(html, printWindow);
+  };
+
   const changeWorksheetZoom = (direction: -1 | 1) => {
     if (!worksheet) return;
     setSheetZoomById(current => ({
@@ -879,6 +904,15 @@ export function OwnerWorkbookLibrary() {
                 <ZoomIn className="h-3.5 w-3.5" />Zoom In
               </button>
             </div>
+            <button
+              type="button"
+              aria-label={`Print sheet ${worksheet.name}`}
+              title={`Print only the ${worksheet.name} sheet`}
+              onClick={printActiveSheet}
+              className="inline-flex items-center gap-1 rounded-lg border border-ink-700 bg-ink-950 px-2.5 py-2 text-xs font-bold text-ink-300 hover:border-amber-500 hover:text-ink-100"
+            >
+              <Printer className="h-3.5 w-3.5" />Print sheet
+            </button>
             {selection && selectedCell && selectedWorksheetCell ? (
               <>
                 <p className="self-center text-xs font-bold text-ink-300">Selected {selectionLabel}</p>

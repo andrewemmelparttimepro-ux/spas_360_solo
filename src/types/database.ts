@@ -16,7 +16,7 @@ export type InventoryStockState = 'Need To Order' | 'On Order' | 'Stock';
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 export type MessageSender = 'system' | 'customer' | 'agent';
 export type FixItStatus = 'open' | 'in_progress' | 'fixed' | 'agent_done' | 'archived';
-export type SuggestionStatus = 'pending' | 'reviewed' | 'declined';
+export type SuggestionStatus = 'pending' | 'reviewed' | 'declined' | 'promoted';
 
 // Row types (what you get back from queries)
 export interface Organization { id: string; name: string; created_at: string; }
@@ -110,7 +110,7 @@ export interface Message {
 export interface Task {
   id: string; org_id: string; assigned_to: string;
   deal_id: string | null; contact_id: string | null; job_id: string | null;
-  title: string; description: string | null; due_at: string;
+  title: string; description: string | null; due_at: string | null;
   priority: DealPriority; status: TaskStatus;
   task_type: string | null; created_by: string;
   assignee_notes: string | null; completed_at: string | null;
@@ -135,6 +135,7 @@ export interface StaffTimeEntry {
   clock_in: string; clock_out: string | null;
   clock_out_reason: 'lunch' | 'end_day' | 'owner_edit' | null;
   edited_by: string | null; edited_at: string | null;
+  acknowledged_task_ids: string[]; acknowledged_incomplete_count: number;
   created_at: string; updated_at: string;
 }
 
@@ -182,6 +183,7 @@ export interface FixItAttachment {
 export interface Suggestion {
   id: string; org_id: string; body: string; created_by: string;
   status: SuggestionStatus; reviewed_by: string | null; reviewed_at: string | null;
+  fix_it_post_id: string | null;
   created_at: string; updated_at: string;
 }
 

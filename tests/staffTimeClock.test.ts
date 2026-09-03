@@ -10,6 +10,7 @@ import {
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 const migrationPath = 'supabase/migrations/20260903021301_staff_attendance_time_clock.sql';
+const ackMigrationPath = 'supabase/migrations/20260903150500_clock_out_acknowledgements.sql';
 
 describe('staff attendance time clock', () => {
   it('calculates multiple work segments for lunch and clock-back-in days', () => {
@@ -36,7 +37,7 @@ describe('staff attendance time clock', () => {
     ]);
     assert.ok(header.indexOf('<StaffTimeClockControl />') < header.indexOf('{/* Notifications */}'));
     assert.match(control, /aria-label="Clock In\/Out"/);
-    assert.match(control, /<span>Clock In\/Out<\/span>/);
+    assert.match(control, /Clock In\/Out<\/span>/);
     assert.match(control, /spas360:staff-clock-prompt:/);
     assert.match(control, /entries\.length > 0/);
     assert.match(control, /Clock Out for Lunch/);
@@ -44,9 +45,28 @@ describe('staff attendance time clock', () => {
     assert.match(control, /Clock Out for Day/);
     assert.match(control, /Dismiss time clock/);
     assert.match(hook, /rpc\('staff_clock_in'\)/);
-    assert.match(hook, /rpc\('staff_clock_out', \{ p_reason: reason \}\)/);
+    assert.match(hook, /rpc\('staff_clock_out', \{ p_reason: reason, p_acknowledged_task_ids: acknowledgedTaskIds \?\? null \}\)/);
     assert.match(hook, /\.is\('clock_out', null\)[\s\S]*\.maybeSingle\(\)/);
     assert.match(hook, /postgres_changes/);
+  });
+
+  it('blocks clock-out behind a per-task acknowledgement of incomplete delegated work and tells the owner', async () => {
+    const [control, migration] = await Promise.all([read('src/components/StaffTimeClockControl.tsx'), read(ackMigrationPath)]);
+    assert.match(control, /fetchMyIncompleteDelegatedTasks\(profile\.id\)/);
+    assert.match(control, /You still have incomplete delegated tasks/);
+    assert.match(control, /Acknowledge \$\{task\.title\} is incomplete/);
+    assert.match(control, /disabled=\{!allAcknowledged \|\| isSaving\}/);
+    assert.match(control, /I acknowledge — clock out anyway/);
+    assert.match(control, /Go finish them first/);
+    assert.match(control, /Ask an owner to correct it/);
+    assert.match(control, /task_type: DELEGATED_TASK_TYPE/);
+    assert.match(migration, /add column if not exists acknowledged_task_ids uuid\[\]/);
+    assert.match(migration, /drop function if exists public\.staff_clock_out\(text\)/);
+    assert.match(migration, /v_incomplete <@ coalesce\(p_acknowledged_task_ids/);
+    assert.match(migration, /Acknowledge each incomplete delegated task before clocking out/);
+    assert.match(migration, /role = 'owner_manager'/);
+    assert.match(migration, /'clock_out_incomplete'/);
+    assert.match(migration, /'\/dashboard\?delegated=open&staff=' \|\| v_user_id::text/);
   });
 
   it('adds owner-only custom-range reporting with all/specific employee filters and missed-hours edits', async () => {

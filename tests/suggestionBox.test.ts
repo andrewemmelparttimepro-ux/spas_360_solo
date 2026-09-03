@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
+  canPromoteSuggestion,
   canReviewSuggestions,
+  fixItPostBodyForSuggestion,
   normalizeSuggestionBody,
   SUGGESTION_MAX_LENGTH,
   SUGGESTION_STATUS,
@@ -35,7 +37,7 @@ describe('Suggestion Box access model', () => {
   it('normalizes human input to the database length boundary', () => {
     assert.equal(normalizeSuggestionBody('  Better mobile filters  '), 'Better mobile filters');
     assert.equal(normalizeSuggestionBody('x'.repeat(SUGGESTION_MAX_LENGTH + 10)).length, SUGGESTION_MAX_LENGTH);
-    assert.deepEqual(Object.keys(SUGGESTION_STATUS), ['pending', 'reviewed', 'declined']);
+    assert.deepEqual(Object.keys(SUGGESTION_STATUS), ['pending', 'reviewed', 'declined', 'promoted']);
   });
 
   it('uses a separate human-authored table with organization and ownership RLS', async () => {
@@ -60,11 +62,32 @@ describe('Suggestion Box access model', () => {
 
     assert.match(header, /aria-label="Open Suggestion Box"/);
     // 2026-08-08: the header entry point is a quiet icon (title + aria-label),
-    // not a labeled pill — hierarchy pass per Andrew.
+    // not a labeled pill — hierarchy pass per Andrew. 2026-09-03: visible on phones too.
     assert.match(header, /title="Suggestion Box"/);
+    assert.doesNotMatch(header, /hover:bg-ink-800 transition-colors hidden sm:block"\n\s+aria-label="Open Suggestion Box"/);
     assert.match(component, /from\('suggestions'\)\.insert/);
     assert.match(component, /isManager && \(/);
     assert.match(component, /role="dialog"/);
     assert.match(component, /sm:items-center/);
+  });
+
+  it('lets an owner send an accepted suggestion to the Fix-It Feed with one human click and tells the author', async () => {
+    const [component, migration] = await Promise.all([
+      read('src/components/SuggestionBox.tsx'),
+      read('supabase/migrations/20260903151500_suggestion_promotion.sql'),
+    ]);
+    assert.equal(canPromoteSuggestion('owner_manager', true), true);
+    assert.equal(canPromoteSuggestion('owner_manager', false), false);
+    assert.equal(canPromoteSuggestion('service_manager', true), false);
+    assert.match(fixItPostBodyForSuggestion('Ben Magnuson', '  Add a parts reorder button  '), /^Suggestion from Ben Magnuson \(via the Suggestion Box\):\n\nAdd a parts reorder button$/);
+    assert.match(component, /from\('fix_it_posts'\)/);
+    assert.match(component, /status: 'promoted'/);
+    assert.match(component, /Send to Fix-It Feed/);
+    assert.match(component, /canPromote && suggestion\.status !== 'promoted'/);
+    assert.match(migration, /status in \('pending', 'reviewed', 'declined', 'promoted'\)/);
+    assert.match(migration, /fix_it_post_id uuid references public\.fix_it_posts\(id\)/);
+    assert.match(migration, /create trigger suggestions_notify_author/);
+    assert.match(migration, /'Your suggestion is being built'/);
+    assert.doesNotMatch(migration, /\b(insert into|update|delete from)\s+public\.fix_it_/i);
   });
 });

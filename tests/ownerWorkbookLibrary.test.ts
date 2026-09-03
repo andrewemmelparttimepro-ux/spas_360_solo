@@ -47,6 +47,19 @@ function formulaCount(workbook: ExcelJS.Workbook): number {
 }
 
 describe('owner workbook library', () => {
+  it('keeps complete workbook names visible beside compact management actions', async () => {
+    const component = (await read('src/components/OwnerWorkbookLibrary.tsx')).toString('utf8');
+
+    assert.match(component, /className="min-w-0 break-words text-sm font-bold leading-snug text-ink-100 \[overflow-wrap:anywhere\]">\{record\.display_name\}/);
+    assert.doesNotMatch(component, /truncate[^>]*>\{record\.display_name\}/);
+    assert.match(component, /aria-label=\{`Rename \$\{record\.display_name\}`\} title="Rename"/);
+    assert.match(component, /aria-label=\{`Duplicate \$\{record\.display_name\}`\} title="Duplicate"/);
+    assert.match(component, /aria-label=\{`Delete \$\{record\.display_name\}`\} title="Delete"/);
+    assert.match(component, /<Pencil className="h-3\.5 w-3\.5"/);
+    assert.match(component, /<Copy className="h-3\.5 w-3\.5"/);
+    assert.match(component, /<Trash2 className="h-3\.5 w-3\.5"/);
+  });
+
   it('scrolls the complete pencil flow into view for rightmost sheets', async () => {
     const component = (await read('src/components/OwnerWorkbookLibrary.tsx')).toString('utf8');
 

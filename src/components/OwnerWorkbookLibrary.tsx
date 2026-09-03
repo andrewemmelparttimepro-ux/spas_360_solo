@@ -1147,19 +1147,19 @@ function WorkbookFolder({
         {records.map(record => {
           const recordBusy = busyId === record.id || busyId === `rename-${record.id}` || busyId === `duplicate-${record.id}` || busyId === `delete-${record.id}`;
           return (
-            <div key={record.id} className="flex items-stretch gap-2 rounded-lg border border-ink-700 bg-ink-900 p-1.5">
-              <button type="button" onClick={() => onOpen(record)} disabled={recordBusy} className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-md px-2 py-1 text-left hover:bg-ink-800 disabled:opacity-60">
-                <span className="min-w-0"><span className="block truncate text-sm font-bold text-ink-100">{record.display_name}</span></span>
-                {busyId === record.id ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 shrink-0 text-amber-500" />}
+            <div key={record.id} className="flex items-start gap-1.5 rounded-lg border border-ink-700 bg-ink-900 p-1.5">
+              <button type="button" onClick={() => onOpen(record)} disabled={recordBusy} className="flex min-w-0 flex-1 items-start justify-between gap-2 rounded-md px-2 py-1.5 text-left hover:bg-ink-800 disabled:opacity-60">
+                <span className="min-w-0 break-words text-sm font-bold leading-snug text-ink-100 [overflow-wrap:anywhere]">{record.display_name}</span>
+                {busyId === record.id ? <LoaderCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" /> : <FileSpreadsheet className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />}
               </button>
               {onRename && onDuplicate && onDelete && (
-                <div className="flex items-center gap-1 border-l border-ink-700 pl-1.5">
-                  <button type="button" aria-label={`Rename ${record.display_name}`} title="Rename" onClick={() => onRename(record)} disabled={recordBusy} className="rounded-md p-2 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
-                  <button type="button" aria-label={`Duplicate ${record.display_name}`} title="Duplicate" onClick={() => onDuplicate(record)} disabled={recordBusy} className="rounded-md p-2 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50">
-                    {busyId === `duplicate-${record.id}` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                <div className="flex shrink-0 items-center gap-0.5 self-stretch border-l border-ink-700 pl-1">
+                  <button type="button" aria-label={`Rename ${record.display_name}`} title="Rename" onClick={() => onRename(record)} disabled={recordBusy} className="rounded-md p-1.5 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" aria-label={`Duplicate ${record.display_name}`} title="Duplicate" onClick={() => onDuplicate(record)} disabled={recordBusy} className="rounded-md p-1.5 text-ink-400 hover:bg-ink-800 hover:text-amber-500 disabled:opacity-50">
+                    {busyId === `duplicate-${record.id}` ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
                   </button>
-                  <button type="button" onClick={() => onDelete(record)} disabled={recordBusy} className="inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 disabled:opacity-50">
-                    <Trash2 className="h-4 w-4" />Delete
+                  <button type="button" aria-label={`Delete ${record.display_name}`} title="Delete" onClick={() => onDelete(record)} disabled={recordBusy} className="rounded-md p-1.5 text-red-500 hover:bg-red-500/10 disabled:opacity-50">
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}

@@ -44,7 +44,7 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
   return (
     <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-ink-700 bg-ink-850/70">
-        <h2 className="text-base font-semibold text-ink-100">Upcoming Tasks</h2>
+        <h2 className="text-base font-semibold text-ink-100">Lead Follow Up Tasks</h2>
         <select
           aria-label="Filter upcoming tasks by owner"
           value={ownerFilter}

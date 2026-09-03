@@ -198,7 +198,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
             <div>
               <h2 id="suggestion-box-title" className="text-lg font-bold text-ink-100">Suggestion Box</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-ink-400 sm:text-sm">
-                Share an improvement for Brandon and the management team to review. Approved ideas get built.
+                Share an improvement for Brandon and Matt to review. Approved ideas get built.
               </p>
             </div>
           </div>

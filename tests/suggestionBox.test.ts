@@ -21,15 +21,18 @@ describe('Suggestion Box access model', () => {
     assert.equal(canReviewSuggestions(null), false);
   });
 
-  it('notifies Brandon through the in-app notification inbox after every submission', async () => {
+  it('notifies every owner through the in-app notification inbox after every submission', async () => {
     const [migration, header] = await Promise.all([
       read('supabase/migrations/20260831185000_limit_fix_it_and_route_suggestions.sql'),
       read('src/components/layout/Header.tsx'),
     ]);
 
     assert.match(migration, /create trigger suggestions_notify_brandon/i);
-    assert.match(migration, /lower\(profile\.email\) = 'brandon_solem@hotmail\.com'/i);
     assert.match(migration, /insert into public\.notifications/i);
+    // 2026-09-03: Matt and Brandon are both owners; every owner account is notified.
+    const owners = await read('supabase/migrations/20260903180000_suggestions_notify_all_owners.sql');
+    assert.match(owners, /role = 'owner_manager'/);
+    assert.doesNotMatch(owners, /brandon_solem@hotmail\.com/);
     assert.match(migration, /'\/dashboard\?suggestions=open'/);
     assert.match(header, /params\.get\('suggestions'\) === 'open'/);
   });

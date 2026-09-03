@@ -11,6 +11,7 @@ import {
   MIN_WORKSHEET_ZOOM_SCALE,
   OWNER_WORKBOOK_BUCKET,
   OWNER_WORKBOOK_MIME,
+  SPAS_ETC_MAJOR_UNIT_SALES_FOLDER,
   WORKSHEET_ROW_HEADER_WIDTH_PX,
   cellEditorValue,
   cellStyle,
@@ -26,6 +27,7 @@ import {
   renameDefaultWorksheetToCovana,
   renameWorksheet,
   resizeWorksheetBoundary,
+  ownerWorkbookFolderLabel,
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sha256Hex,
@@ -142,7 +144,10 @@ export function OwnerWorkbookLibrary() {
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
   const inventoryWorkbook = records.find(record => record.folder_key === INVENTORY_PROFITS_FOLDER);
-  const majorUnitWorkbooks = sortOwnerWorkbooks(
+  const spasEtcMajorUnitWorkbooks = sortOwnerWorkbooks(
+    records.filter(record => record.folder_key === SPAS_ETC_MAJOR_UNIT_SALES_FOLDER),
+  );
+  const mchlMajorUnitWorkbooks = sortOwnerWorkbooks(
     records.filter(record => record.folder_key === MCHL_MAJOR_UNIT_SALES_FOLDER),
   );
 
@@ -262,7 +267,8 @@ export function OwnerWorkbookLibrary() {
       setError('Owner access is required.');
       return;
     }
-    const displayName = duplicateWorkbookName(majorUnitWorkbooks.map(workbookRecord => workbookRecord.display_name), record.display_name);
+    const folderWorkbooks = records.filter(workbookRecord => workbookRecord.folder_key === record.folder_key);
+    const displayName = duplicateWorkbookName(folderWorkbooks.map(workbookRecord => workbookRecord.display_name), record.display_name);
     const path = storagePath(profile.org_id, record.folder_key);
     setBusyId(`duplicate-${record.id}`);
     setError(null);
@@ -731,7 +737,7 @@ export function OwnerWorkbookLibrary() {
       {isLoading ? (
         <div className="mt-5 flex items-center gap-2 text-sm text-ink-500"><LoaderCircle className="h-4 w-4 animate-spin" />Loading workbooks…</div>
       ) : !active ? (
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
           <WorkbookFolder
             title="Inventory Profits"
             description="The verified profitability workbook, kept editable with formulas and formatting intact."
@@ -743,9 +749,23 @@ export function OwnerWorkbookLibrary() {
             busyId={busyId}
           />
           <WorkbookFolder
+            title="Spas Etc Major Unit Sales"
+            description="Store Spas Etc major-unit sales workbooks here."
+            records={spasEtcMajorUnitWorkbooks}
+            emptyAction="Upload Excel workbook"
+            busy={busyId === 'upload'}
+            onEmptyAction={() => chooseUpload(SPAS_ETC_MAJOR_UNIT_SALES_FOLDER)}
+            onOpen={record => void openWorkbook(record)}
+            onUpload={() => chooseUpload(SPAS_ETC_MAJOR_UNIT_SALES_FOLDER)}
+            onRename={beginRename}
+            onDuplicate={record => void duplicateWorkbook(record)}
+            onDelete={record => { setError(null); setDeleteTarget(record); }}
+            busyId={busyId}
+          />
+          <WorkbookFolder
             title="MCHL Major Unit Sales"
             description="Store the 2020 Major Unit Deals workbook and future MCHL major-unit workbooks here."
-            records={majorUnitWorkbooks}
+            records={mchlMajorUnitWorkbooks}
             emptyAction="Upload Excel workbook"
             busy={busyId === 'upload'}
             onEmptyAction={() => chooseUpload(MCHL_MAJOR_UNIT_SALES_FOLDER)}
@@ -996,7 +1016,7 @@ export function OwnerWorkbookLibrary() {
             className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl"
           >
             <h3 id="rename-workbook-heading" className="text-lg font-bold text-ink-100">Rename workbook</h3>
-            <p className="mt-1 text-sm text-ink-500">The stored workbook stays in MCHL Major Unit Sales.</p>
+            <p className="mt-1 text-sm text-ink-500">The stored workbook stays in {ownerWorkbookFolderLabel(renameTarget.folder_key)}.</p>
             {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600">{error}</p>}
             <label className="mt-4 block text-xs font-bold text-ink-300">
               Workbook name
@@ -1039,7 +1059,7 @@ export function OwnerWorkbookLibrary() {
           <div className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl">
             <h3 id="delete-workbook-heading" className="text-lg font-bold text-ink-100">Delete workbook?</h3>
             <p className="mt-2 text-sm text-ink-400">
-              Confirm that you want to permanently delete <span className="font-bold text-ink-100">{deleteTarget.display_name}</span> from MCHL Major Unit Sales.
+              Confirm that you want to permanently delete <span className="font-bold text-ink-100">{deleteTarget.display_name}</span> from {ownerWorkbookFolderLabel(deleteTarget.folder_key)}.
             </p>
             {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500">{error}</p>}
             <div className="mt-5 flex justify-end gap-2">

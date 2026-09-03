@@ -10,10 +10,12 @@ import {
   duplicateWorkbookName,
   duplicateWorksheet,
   inventoryProfitsCellText,
+  MCHL_MAJOR_UNIT_SALES_FOLDER,
   markWorkbookForRecalculation,
   moveWorksheet,
   normalizeWorkbookName,
   normalizeWorksheetName,
+  ownerWorkbookFolderLabel,
   renameDefaultWorksheetToCovana,
   renameWorksheet,
   resizeWorksheetBoundary,
@@ -23,6 +25,8 @@ import {
   setCellEditorValue,
   setWorksheetSelectionBackground,
   sortOwnerWorkbooks,
+  SPAS_ETC_MAJOR_UNIT_SALES_FOLDER,
+  storagePath,
   stepWorksheetZoomScale,
   worksheetFitScale,
   worksheetColumnWidthPx,
@@ -52,8 +56,9 @@ describe('owner workbook library', () => {
   });
 
   it('defines an owner-only private bucket and tenant-scoped metadata policies', async () => {
-    const [migrationBytes, controlsMigrationBytes, deleteMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
+    const [migrationBytes, spasSalesMigrationBytes, controlsMigrationBytes, deleteMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
       read('supabase/migrations/20260831234029_add_owner_workbook_library.sql'),
+      read('supabase/migrations/20260903021348_add_spas_etc_major_unit_sales_folder.sql'),
       read('supabase/migrations/20260901000635_allow_owner_workbook_rename.sql'),
       read('supabase/migrations/20260901163251_allow_owner_workbook_delete.sql'),
       read('src/components/OwnerWorkbookLibrary.tsx'),
@@ -61,6 +66,7 @@ describe('owner workbook library', () => {
       read('api/_assets/Inventory Profits.xlsx'),
     ]);
     const migration = migrationBytes.toString('utf8');
+    const spasSalesMigration = spasSalesMigrationBytes.toString('utf8');
     const controlsMigration = controlsMigrationBytes.toString('utf8');
     const deleteMigration = deleteMigrationBytes.toString('utf8');
     const component = componentBytes.toString('utf8');
@@ -72,6 +78,8 @@ describe('owner workbook library', () => {
     assert.match(migration, /create table public\.owner_workbooks/);
     assert.match(migration, /'owner-workbooks',[\s\S]*false,[\s\S]*20971520/);
     assert.match(migration, /folder_key in \('inventory-profits', 'mchl-major-unit-sales'\)/);
+    assert.match(spasSalesMigration, /drop constraint owner_workbooks_folder_key_check/);
+    assert.match(spasSalesMigration, /'inventory-profits',[\s\S]*'spas-etc-major-unit-sales',[\s\S]*'mchl-major-unit-sales'/);
     assert.match(migration, /for select to authenticated[\s\S]*public\.auth_role\(\)\) = 'owner_manager'/);
     assert.match(migration, /for insert to authenticated[\s\S]*created_by = \(select auth\.uid\(\)\)/);
     assert.match(migration, /owner_workbooks_storage_update[\s\S]*for update to authenticated[\s\S]*with check/);
@@ -80,7 +88,11 @@ describe('owner workbook library', () => {
     assert.match(deleteMigration, /grant delete on table public\.owner_workbooks to authenticated/);
     assert.doesNotMatch(migration, /to anon/);
     assert.match(page, /profile\?\.role === 'owner_manager'[\s\S]*<OwnerWorkbookLibrary \/>/);
-    assert.match(component, /MCHL Major Unit Sales/);
+    assert.match(component, /title="Inventory Profits"[\s\S]*title="Spas Etc Major Unit Sales"[\s\S]*title="MCHL Major Unit Sales"/);
+    assert.match(component, /records=\{spasEtcMajorUnitWorkbooks\}[\s\S]*chooseUpload\(SPAS_ETC_MAJOR_UNIT_SALES_FOLDER\)/);
+    assert.match(component, /folderWorkbooks = records\.filter\(workbookRecord => workbookRecord\.folder_key === record\.folder_key\)/);
+    assert.match(component, /ownerWorkbookFolderLabel\(renameTarget\.folder_key\)/);
+    assert.match(component, /ownerWorkbookFolderLabel\(deleteTarget\.folder_key\)/);
     assert.match(component, /accept="\.xlsx,application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet"/);
     assert.match(component, /\.storage\.from\(OWNER_WORKBOOK_BUCKET\)\.upload/);
     assert.match(component, /\.storage[\s\S]*\.from\(OWNER_WORKBOOK_BUCKET\)[\s\S]*\.createSignedUrl\(record\.storage_path, 60\)/);
@@ -184,6 +196,13 @@ describe('owner workbook library', () => {
       ['2020 Major Unit Deals.xlsx', '2020 Major Unit Deals copy.xlsx'],
       '2020 Major Unit Deals.xlsx',
     ), '2020 Major Unit Deals copy 2.xlsx');
+  });
+
+  it('keeps Spas Etc and MCHL workbooks in independent destinations', () => {
+    assert.equal(ownerWorkbookFolderLabel(SPAS_ETC_MAJOR_UNIT_SALES_FOLDER), 'Spas Etc Major Unit Sales');
+    assert.equal(ownerWorkbookFolderLabel(MCHL_MAJOR_UNIT_SALES_FOLDER), 'MCHL Major Unit Sales');
+    assert.match(storagePath('org-1', SPAS_ETC_MAJOR_UNIT_SALES_FOLDER), /^org-1\/spas-etc-major-unit-sales\/[0-9a-f-]+\.xlsx$/);
+    assert.match(storagePath('org-1', MCHL_MAJOR_UNIT_SALES_FOLDER), /^org-1\/mchl-major-unit-sales\/[0-9a-f-]+\.xlsx$/);
   });
 
   it('formats Inventory Profits numbers to hundredths with only margin-ratio cells left non-currency', async () => {

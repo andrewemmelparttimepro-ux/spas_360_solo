@@ -5,6 +5,7 @@ export const OWNER_WORKBOOK_BUCKET = 'owner-workbooks';
 export const OWNER_WORKBOOK_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 export const INVENTORY_PROFITS_FOLDER = 'inventory-profits';
 export const MCHL_MAJOR_UNIT_SALES_FOLDER = 'mchl-major-unit-sales';
+export const SPAS_ETC_MAJOR_UNIT_SALES_FOLDER = 'spas-etc-major-unit-sales';
 export const INVENTORY_PROFITS_SOURCE_SHA = 'e18ee4ac7288dc0896a150fcaeb779273dab7e91ac7b44c833b2e69d5fa379a1';
 export const MAX_WORKBOOK_BYTES = 20 * 1024 * 1024;
 export const MAX_VISIBLE_ROWS = 250;
@@ -30,7 +31,10 @@ const USD_CELL_FORMATTER = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
-export type OwnerWorkbookFolder = typeof INVENTORY_PROFITS_FOLDER | typeof MCHL_MAJOR_UNIT_SALES_FOLDER;
+export type OwnerWorkbookFolder =
+  | typeof INVENTORY_PROFITS_FOLDER
+  | typeof SPAS_ETC_MAJOR_UNIT_SALES_FOLDER
+  | typeof MCHL_MAJOR_UNIT_SALES_FOLDER;
 
 export type WorkbookSelection =
   | { kind: 'cell'; row: number; column: number }
@@ -64,6 +68,12 @@ export async function sha256Hex(bytes: ArrayBuffer | Uint8Array): Promise<string
 
 export function storagePath(orgId: string, folder: OwnerWorkbookFolder): string {
   return `${orgId}/${folder}/${crypto.randomUUID()}.xlsx`;
+}
+
+export function ownerWorkbookFolderLabel(folder: OwnerWorkbookFolder): string {
+  if (folder === INVENTORY_PROFITS_FOLDER) return 'Inventory Profits';
+  if (folder === SPAS_ETC_MAJOR_UNIT_SALES_FOLDER) return 'Spas Etc Major Unit Sales';
+  return 'MCHL Major Unit Sales';
 }
 
 export function normalizeWorkbookName(value: string): string {

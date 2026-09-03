@@ -31,7 +31,7 @@ QuickBooks, which stays as the accounting source (sync is a future milestone).
 | Vercel | project `spas_360_solo`, team `nd-ai` (`team_3svaJtFI5ngHwbDDVoL07grT`) |
 | Supabase | **dedicated** project `spas-360`, ref **`kxyqgkimcdxvfkceoixs`**, us-east-1 ($10/mo) |
 | Storage | Supabase bucket `job-photos` (public read, authenticated write) |
-| Twilio | number **+1 701 929 9194** (trial account — see §8 blocked items) |
+| Twilio | NDAI account `AC4cebcf…` (shared with cO.). SPAS 360 line **+1 701 929 9284** (bought 2026-09-03), in the cO. A2P messaging service `MG57ac1551…` / campaign `QE2c6890…` (VERIFIED). `+1 701 929 9194` is now **Ellis (cO.)**, `+1 701 515 0418` is the other cO. line — never send SPAS traffic from them. Service uses per-number inbound webhooks; SPAS inbound = `/api/sms-inbound`. Staff texts from a `profiles.phone` mobile go to Ari (`api/_lib/staff-sms.ts`). |
 | Dev server | preview name `spas360`, port 3000 (`npm run dev`), defined in `~/Desktop/.claude/launch.json` |
 | Accounts | Andrew (andrew@ndai.pro) + Brandon (brandon_solem@hotmail.com) — both **owner_manager**, verified in DB |
 
@@ -225,11 +225,9 @@ through `AI_PROVIDER`.
 
 ## 8. Blocked on Andrew (in priority order)
 
-1. **Texting activation** — add to Vercel prod env: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
-   `TWILIO_FROM=+17019299194`, `SUPABASE_SERVICE_ROLE_KEY`; redeploy; point the Twilio number's
-   "A message comes in" webhook at `https://spas360solo.vercel.app/api/sms-inbound` (POST).
-   Trial = verified numbers only; **A2P 10DLC registration + account upgrade** required before texting
-   real customers (register MCHL as the brand).
+1. ~~Texting activation~~ — **DONE 2026-09-03.** Live on `+1 701 929 9284` under the NDAI A2P campaign;
+   end-to-end verified (signed inbound staff text → Ari → delegated task → delivered SMS reply).
+   Remaining: enter each teammate's mobile in Settings → Team & Permissions so their texts reach Ari.
 2. **Bismarck inventory tab** — not yet imported (screenshots only covered Minot + Used).
 3. **Brand backfill** — Oslo/Tokyo/Maximus + Hekla/Trend/Pro 6 items imported with brand NULL.
 4. ~~Lock down open signup~~ — **DONE 2026-07-09.** Signups are invite-only, DB-enforced

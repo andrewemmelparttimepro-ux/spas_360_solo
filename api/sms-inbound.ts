@@ -16,8 +16,9 @@ import {
  *   • a text from a TEAMMATE's mobile (profiles.phone) is handed to Ari as
  *     that teammate — "Ari, delegate a task to Alex …" — and Ari's answer is
  *     texted back from the business number;
- *   • anything else is a customer text: matched to a contact by phone (or a
- *     new Unknown Lead), filed into their SMS thread, and staff are notified.
+ *   • anything else is a customer text: matched to a contact by phone and filed
+ *     into their SMS thread; an unknown number is quarantined until it texts
+ *     twice, then becomes a Lead with both texts. Staff are notified either way.
  * Writes use the service-role key — Twilio has no user session.
  *
  * Twilio console → phone number → Messaging → "A message comes in":
@@ -111,11 +112,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { ok, data } = await sb(`contacts?select=id,org_id,assigned_to&phone=ilike.*${last10.slice(0, 3)}*${last10.slice(3, 6)}*${last10.slice(6)}*&limit=1`);
     if (ok && Array.isArray(data) && data[0]) contact = data[0];
   }
+  let quarantinedFirstText: string | null = null;
   if (!contact) {
-    // Unknown number → create a Lead so no inbound text is ever lost
+    // Unknown number: never lost, never an instant contact either. The first
+    // text waits in quarantine (managers are told); a second text from the same
+    // number within 30 days proves it is a person and becomes a Lead with both texts.
     const { data: orgs } = await sb('organizations?select=id&limit=1');
     const orgId = Array.isArray(orgs) ? orgs[0]?.id : null;
     if (!orgId) return res.status(200).send('<Response/>');
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { ok: qOk, data: prior } = await sb(`sms_quarantine?select=id,body,created_at&org_id=eq.${orgId}&from_phone=eq.${encodeURIComponent(from)}&promoted_contact_id=is.null&created_at=gte.${since}&order=created_at.asc&limit=5`);
+    const earlier = qOk && Array.isArray(prior) ? prior as { id: string; body: string; created_at: string }[] : [];
+    if (earlier.length === 0) {
+      await sb('sms_quarantine', { method: 'POST', body: JSON.stringify({ org_id: orgId, from_phone: from, body }) });
+      const { ok: mgrOk, data: mgrs } = await sb(`profiles?select=id&org_id=eq.${orgId}&role=in.(owner_manager,service_manager)`);
+      if (mgrOk && Array.isArray(mgrs) && mgrs.length > 0) {
+        await sb('notifications', {
+          method: 'POST',
+          body: JSON.stringify((mgrs as { id: string }[]).map(m => ({
+            user_id: m.id, type: 'message',
+            title: `New text from unknown number ${from}`,
+            body: `${body.length > 100 ? body.slice(0, 100) + '…' : body} (held until they text again)`,
+            link: '/communication',
+          }))),
+        });
+      }
+      res.setHeader('Content-Type', 'text/xml');
+      return res.status(200).send('<Response/>');
+    }
     const { ok, data } = await sb('contacts', {
       method: 'POST',
       body: JSON.stringify({
@@ -123,7 +147,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         lead_source: 'Phone', customer_type: 'Lead',
       }),
     });
-    if (ok && Array.isArray(data) && data[0]) contact = data[0];
+    if (ok && Array.isArray(data) && data[0]) {
+      contact = data[0];
+      quarantinedFirstText = earlier.map(item => item.body).join('\n');
+      await sb(`sms_quarantine?id=in.(${earlier.map(item => item.id).join(',')})`, { method: 'PATCH', body: JSON.stringify({ promoted_contact_id: contact!.id }) });
+    }
   }
   if (!contact) return res.status(200).send('<Response/>');
 
@@ -142,7 +170,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!threadId) return res.status(200).send('<Response/>');
 
-  // 3. File the message + bump the thread
+  // 3. File the message (and any quarantined first text) + bump the thread
+  if (quarantinedFirstText) {
+    await sb('messages', { method: 'POST', body: JSON.stringify({ thread_id: threadId, sender_type: 'customer', body: quarantinedFirstText }) });
+  }
   await sb('messages', {
     method: 'POST',
     body: JSON.stringify({ thread_id: threadId, sender_type: 'customer', body }),

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Sunrise } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Sparkles, Sunrise } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMorningSummary } from '@/hooks/useMorningSummary';
 import {
@@ -17,8 +18,9 @@ import { cn } from '@/lib/utils';
 
 const OPEN_KEY = 'spas360.morningSummary.open';
 
+// Owners land on the summary open; it stays however they last left it.
 function readOpen(): boolean {
-  try { return window.localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; }
+  try { return window.localStorage.getItem(OPEN_KEY) !== '0'; } catch { return true; }
 }
 
 const timeLabel = (value: string | null) => value ? new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '—';
@@ -30,6 +32,33 @@ export default function MorningSummaryPanel() {
   const [day, setDay] = useState(defaultSummaryDay);
   const isOwner = profile?.role === 'owner_manager';
   const { summary, isLoading, error, refresh } = useMorningSummary(day, Boolean(isOwner));
+  const [narration, setNarration] = useState<{ day: string; text: string } | null>(null);
+  const [narrating, setNarrating] = useState(false);
+  const [narrationError, setNarrationError] = useState<string | null>(null);
+
+  // Ari's three-sentence read, fetched once per day and cached server-side.
+  useEffect(() => {
+    if (!isOwner || !open || !summary || narration?.day === summary.day) return;
+    let cancelled = false;
+    (async () => {
+      setNarrating(true);
+      setNarrationError(null);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Not signed in');
+        const response = await fetch(`/api/owners/morning-narration?day=${summary.day}`, { headers: { Authorization: `Bearer ${token}` } });
+        const payload = await response.json().catch(() => null) as { narration?: string; error?: string } | null;
+        if (!response.ok || !payload?.narration) throw new Error(payload?.error ?? 'Ari could not read the summary');
+        if (!cancelled) setNarration({ day: summary.day, text: payload.narration });
+      } catch (cause) {
+        if (!cancelled) setNarrationError(cause instanceof Error ? cause.message : 'Ari could not read the summary');
+      } finally {
+        if (!cancelled) setNarrating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOwner, open, summary, narration?.day]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -79,6 +108,13 @@ export default function MorningSummaryPanel() {
           {!summary && isLoading && <p className="text-sm text-ink-500">Pulling yesterday together…</p>}
           {summary && (
             <>
+              <div className="flex items-start gap-3 rounded-lg border border-brand-500/25 bg-brand-500/5 px-4 py-3" aria-label="Ari's read">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
+                <div className="min-w-0 text-sm text-ink-200">
+                  <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-brand-400">Ari's read</span>
+                  {narration?.day === summary.day ? narration.text : narrating ? 'Reading the day…' : narrationError ? `Ari couldn't read this one (${narrationError}).` : ''}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { label: 'Clocked in', value: summary.activity.clocked_in_count },

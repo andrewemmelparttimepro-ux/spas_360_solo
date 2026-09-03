@@ -12,7 +12,9 @@ const localDayBounds = (d = new Date()) => {
   const end = new Date(d); end.setHours(23, 59, 59, 999);
   return { start: start.toISOString(), end: end.toISOString() };
 };
-const localInstant = (s: string) => new Date(s.includes('T') ? s : `${s}T09:00:00`).toISOString();
+// Dates and times staff give Ari are dealership wall-clock (America/Chicago),
+// never the server's UTC. Defined below; hoisted here for the older tools.
+const localInstant = (s: string) => centralInstant(s) ?? new Date(s.includes('T') ? s : `${s}T09:00:00`).toISOString();
 
 const DEALERSHIP_TIME_ZONE = 'America/Chicago';
 

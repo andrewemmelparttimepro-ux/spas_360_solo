@@ -46,8 +46,10 @@ React 19 + TypeScript + Vite 6 + Tailwind v4 (CSS `@theme` tokens) + React Route
 
 ```
 api/
-  chat.ts          AI assistant proxy — provider-agnostic (gemini, glm, anthropic, openai handlers
-                   built in; frontend always speaks OpenAI message shape). Switch via AI_PROVIDER env.
+  chat.ts          AI assistant proxy — ONE route: xAI Grok (https://api.x.ai/v1, OpenAI-shaped
+                   in and out, no translation layer). Model = agent_config.model if it starts with
+                   "grok", else XAI_MODEL env, else hard default grok-4.6. Only credential: XAI_API_KEY.
+                   Staff prompt gets dealershipClock() appended so Ari knows the local date/time.
                    RAILS ARE ENFORCED HERE: system prompt injected server-side; any client-sent
                    system message is discarded — guardrails can't be stripped from the browser.
                    ESM runtime: api-relative imports need explicit .js extensions.
@@ -216,12 +218,11 @@ the salesperson. This is Brandon's "Wyant – Sundance – delivery" ritual, aut
 
 ## 7. Vercel environment (Production)
 
-Set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (dedicated project), `AI_PROVIDER=glm`,
-`GLM_API_KEY`, `GLM_MODEL=glm-5.2`, and `GLM_BASE_URL=https://api.z.ai/api/paas/v4`.
-For the reversible Muse Spark experiment, use `AI_PROVIDER=meta`, `MODEL_API_KEY`,
-`META_MODEL=muse-spark-1.1`, and `META_BASE_URL=https://api.meta.ai/v1`; retain the GLM variables for rollback.
-Documented in `.env.example`. Gemini, Anthropic, and OpenAI remain available fallback providers
-through `AI_PROVIDER`.
+Set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (dedicated project), `XAI_API_KEY`, and
+`XAI_MODEL=grok-4.6`. Since 2026-09-03 Ari has exactly one intelligence route (xAI Grok); the
+model is read from the `agent_config` row first (`model` starting with `grok`), then `XAI_MODEL`.
+`AI_PROVIDER` and the GLM / Gemini / Meta / Anthropic / OpenAI / Thrawn-gateway handlers are gone.
+Leftover keys (`GLM_API_KEY`, `GEMINI_API_KEY`, `THRAWN_GATEWAY_*`) are unused and can be removed.
 
 ## 8. Blocked on Andrew (in priority order)
 

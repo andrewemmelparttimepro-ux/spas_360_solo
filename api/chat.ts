@@ -1,12 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { SALES_AGENT_PROMPT, PUBLIC_CONCIERGE_PROMPT } from './_lib/system-prompt.js';
+import { SALES_AGENT_PROMPT, PUBLIC_CONCIERGE_PROMPT, dealershipClock } from './_lib/system-prompt.js';
 import { consumeRateLimit, clientIp } from './_lib/ratelimit.js';
 
-// Provider-agnostic: supports Gemini, Anthropic Claude, OpenAI, GLM via Z.AI,
-// or Muse Spark via Meta Model API.
-// The frontend always speaks the OpenAI message/tool shape; each handler translates
-// to/from its provider so the client never has to change.
-// Switch providers with AI_PROVIDER.
+// Ari runs on xAI Grok only. There is exactly one intelligence route: this
+// function → https://api.x.ai/v1/chat/completions. The frontend speaks the
+// OpenAI message/tool shape and xAI answers in that same shape, so no
+// translation layer lives here anymore.
+//
+// Which Grok model answers is resolved in this order:
+//   1. agent_config.model (org data, editable from Thrawn/admin) — when it starts with "grok"
+//   2. XAI_MODEL env on Vercel
+//   3. DEFAULT_XAI_MODEL below
+// The only credential is XAI_API_KEY. Changing providers is a code change on purpose.
 const envValue = (value: string | undefined, fallback = '') => (value || fallback).trim();
 
 // A hung provider must never hold the function until the platform kills it
@@ -21,41 +26,22 @@ function providerErrorResponse(res: VercelResponse, providerName: string, status
     : `The AI service (${providerName}) returned an error. Try again, and check the server logs if it persists.`;
   return res.status(502).json({ error: friendly });
 }
-const PROVIDER = envValue(process.env.AI_PROVIDER, 'gemini').toLowerCase();
-const ANTHROPIC_API_KEY = envValue(process.env.ANTHROPIC_API_KEY) || undefined;
-const GEMINI_API_KEY = envValue(process.env.GEMINI_API_KEY) || undefined;
-const OPENAI_API_KEY = envValue(process.env.OPENAI_API_KEY) || undefined;
-const GLM_API_KEY = envValue(process.env.GLM_API_KEY || process.env.ZAI_API_KEY) || undefined;
-const META_MODEL_API_KEY = envValue(process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY) || undefined;
-const XAI_API_KEY = envValue(process.env.XAI_API_KEY) || undefined;
-const XAI_MODEL = envValue(process.env.XAI_MODEL, 'grok-4.5');
-const THRAWN_GATEWAY_URL = envValue(process.env.THRAWN_GATEWAY_URL).replace(/\/$/, '') || undefined;
-const THRAWN_GATEWAY_KEY = envValue(process.env.THRAWN_GATEWAY_KEY) || undefined;
 
-// Is the Thrawn Gateway answering right now? One cheap unauthenticated GET
-// with a hard 1.5s ceiling. The gateway lives on a Mac that sleeps, travels,
-// and reboots — this preflight is what makes routing through it safe: when
-// the Mac is away, Ari silently takes the direct road and nobody notices.
-async function thrawnGatewayHealthy(): Promise<boolean> {
-  if (!THRAWN_GATEWAY_URL || !THRAWN_GATEWAY_KEY) return false;
-  try {
-    const r = await fetch(`${THRAWN_GATEWAY_URL}/health`, { signal: AbortSignal.timeout(1500) });
-    if (!r.ok) return false;
-    const body = await r.json() as { ok?: boolean };
-    return body.ok === true;
-  } catch {
-    return false;
-  }
-}
-const ANTHROPIC_MODEL = envValue(process.env.ANTHROPIC_MODEL, 'claude-sonnet-4-6');
-const GEMINI_MODEL = envValue(process.env.GEMINI_MODEL, 'gemini-2.0-flash');
-const OPENAI_MODEL = envValue(process.env.OPENAI_MODEL, 'gpt-4o-mini');
-const GLM_MODEL = envValue(process.env.GLM_MODEL, 'glm-5.2');
-const GLM_BASE_URL = envValue(process.env.GLM_BASE_URL, 'https://api.z.ai/api/paas/v4');
-const META_MODEL = envValue(process.env.META_MODEL, 'muse-spark-1.1');
-const META_BASE_URL = envValue(process.env.META_BASE_URL, 'https://api.meta.ai/v1');
+const XAI_PROVIDER_NAME = 'xAI Grok';
+const XAI_BASE_URL = 'https://api.x.ai/v1';
+const DEFAULT_XAI_MODEL = 'grok-4.6';
+const XAI_API_KEY = envValue(process.env.XAI_API_KEY) || undefined;
+const XAI_MODEL = envValue(process.env.XAI_MODEL, DEFAULT_XAI_MODEL);
 const ARI_FORWARD_SECRET = envValue(process.env.ARI_FORWARD_SECRET) || undefined;
 const SUPABASE_SERVICE_ROLE_KEY = envValue(process.env.SUPABASE_SERVICE_ROLE_KEY) || undefined;
+
+// agent_config.model wins only when it names a Grok model; anything else
+// (blank, a stale non-Grok id) falls through to the env, then the default.
+function resolveGrokModel(configured: string | null | undefined): string {
+  const fromConfig = (configured ?? '').trim();
+  if (fromConfig.toLowerCase().startsWith('grok')) return fromConfig;
+  return XAI_MODEL || DEFAULT_XAI_MODEL;
+}
 
 const FORWARD_FACE_PROMPT = `
 
@@ -149,11 +135,13 @@ ${JSON.stringify(p.facts ?? {})}`;
 }
 
 // Org-level intelligence config — the control plane.
-// Which provider and model run Ari is org DATA, editable from Thrawn (or by
-// any owner_manager), not a redeploy. Env vars remain the fallback: a missing
-// row, a failed fetch, or a misconfigured value can never take Ari down, it
-// just means yesterday's behavior. RLS scopes the read to the caller's org.
-type AgentConfig = { enabled: boolean; provider: string | null; model: string | null };
+// `enabled` is the kill switch and `model` picks the Grok model; both are org
+// DATA, editable from Thrawn (or by any owner_manager), not a redeploy. A
+// missing row, a failed fetch, or a misconfigured value can never take Ari
+// down — it just means the env/default model answers. RLS scopes the read to
+// the caller's org. (`provider` is still stored on the row but no longer read:
+// Grok is the only route.)
+type AgentConfig = { enabled: boolean; model: string | null };
 
 async function fetchAgentConfig(authHeader: string, apiKeyOverride?: string): Promise<AgentConfig | null> {
   const supabaseUrl = envValue(process.env.VITE_SUPABASE_URL);
@@ -161,7 +149,7 @@ async function fetchAgentConfig(authHeader: string, apiKeyOverride?: string): Pr
   if (!supabaseUrl || !apiKey) return null;
   try {
     const r = await fetch(
-      `${supabaseUrl}/rest/v1/agent_config?select=enabled,provider,model&limit=1`,
+      `${supabaseUrl}/rest/v1/agent_config?select=enabled,model&limit=1`,
       { headers: { apikey: apiKey, Authorization: authHeader, Accept: 'application/json' } }
     );
     if (!r.ok) return null;
@@ -427,93 +415,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Shoppers get the concierge subset — the internal staff prompt (discount
     // authority, commission policy, playbooks) never leaves the building.
+    // Staff Ari is told the dealership's current local date/time so "today",
+    // "this week", and follow-up dates are anchored to a real clock.
     const systemPrompt = isForwardFace
       ? `${PUBLIC_CONCIERGE_PROMPT}${profileBlock}${FORWARD_FACE_PROMPT}${forwardFaceContext}`
-      : `${SALES_AGENT_PROMPT}${profileBlock}`;
+      : `${SALES_AGENT_PROMPT}${profileBlock}\n\n${dealershipClock()}`;
     const messages = [
       { role: 'system', content: systemPrompt },
       ...safeClientMessages,
     ];
     const allowedTools = isForwardFace ? [] : tools;
-    const provider = (agentConfig?.provider || PROVIDER).toLowerCase();
-    const modelOverride = agentConfig?.model || undefined;
 
-    if (provider === 'anthropic') {
-      return await handleClaude(messages, allowedTools, res, modelOverride);
-    } else if (provider === 'gemini') {
-      return await handleGemini(messages, allowedTools, res, modelOverride);
-    } else if (provider === 'thrawn') {
-      // Same brain, routed through Andrew's gateway for observability. The
-      // model name decides the actual mind (grok-4.5, glm-5.2, ollama/…).
-      // Preflight failure = direct road; a mid-call gateway error surfaces
-      // loudly rather than retrying twice (the caller can just resend).
-      const gatewayModel = modelOverride || XAI_MODEL;
-      if (await thrawnGatewayHealthy()) {
-        return await handleOpenAICompatible({
-          providerName: 'Thrawn Gateway',
-          apiKey: THRAWN_GATEWAY_KEY,
-          model: gatewayModel,
-          baseUrl: `${THRAWN_GATEWAY_URL}/v1`,
-          messages,
-          tools: allowedTools,
-          res,
-        });
-      }
-      // Direct fallback by model family — grok-4.5 still answers as
-      // grok-4.5, just without the gateway hop.
-      if (gatewayModel.startsWith('grok') && XAI_API_KEY) {
-        return await handleOpenAICompatible({
-          providerName: 'xAI Grok (gateway fallback)', apiKey: XAI_API_KEY,
-          model: gatewayModel, baseUrl: 'https://api.x.ai/v1',
-          messages, tools: allowedTools, res,
-        });
-      }
-      if (gatewayModel.startsWith('glm') && GLM_API_KEY) {
-        return await handleOpenAICompatible({
-          providerName: 'GLM (gateway fallback)', apiKey: GLM_API_KEY,
-          model: gatewayModel, baseUrl: GLM_BASE_URL,
-          messages, tools: allowedTools, res,
-        });
-      }
-      if (gatewayModel.startsWith('gemini')) {
-        return await handleGemini(messages, allowedTools, res, gatewayModel);
-      }
-      return res.status(503).json({
-        error: `The Thrawn Gateway is unreachable and no direct fallback exists for "${gatewayModel}".`,
-      });
-    } else if (provider === 'grok' || provider === 'xai') {
-      return await handleOpenAICompatible({
-        providerName: 'xAI Grok',
-        apiKey: XAI_API_KEY,
-        model: modelOverride || XAI_MODEL,
-        baseUrl: 'https://api.x.ai/v1',
-        messages,
-        tools: allowedTools,
-        res,
-      });
-    } else if (provider === 'glm' || provider === 'zai') {
-      return await handleOpenAICompatible({
-        providerName: 'GLM',
-        apiKey: GLM_API_KEY,
-        model: modelOverride || GLM_MODEL,
-        baseUrl: GLM_BASE_URL,
-        messages,
-        tools: allowedTools,
-        res,
-      });
-    } else if (provider === 'meta' || provider === 'spark' || provider === 'muse') {
-      return await handleOpenAICompatible({
-        providerName: 'Meta Model API',
-        apiKey: META_MODEL_API_KEY,
-        model: modelOverride || META_MODEL,
-        baseUrl: META_BASE_URL,
-        messages,
-        tools: allowedTools,
-        res,
-      });
-    } else {
-      return await handleOpenAI(messages, allowedTools, res, modelOverride);
-    }
+    return await handleGrok({
+      model: resolveGrokModel(agentConfig?.model),
+      messages,
+      tools: allowedTools,
+      res,
+    });
   } catch (err) {
     const e = err as Error;
     console.error('chat handler error:', e);
@@ -524,267 +442,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// ─── Anthropic Claude (default) ─────────────────────────────
-type OAIMessage = {
-  role: string;
-  content: string | null;
-  tool_calls?: { id: string; function: { name: string; arguments: string } }[];
-  tool_call_id?: string;
-};
-type OAITool = { type: string; function: { name: string; description: string; parameters: Record<string, unknown> } };
-
-async function handleClaude(messages: OAIMessage[], tools: OAITool[], res: VercelResponse, modelOverride?: string) {
-  if (!ANTHROPIC_API_KEY) {
-    // Fail loudly — never silently degrade (reliability-first).
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured. Set it in your environment or switch AI_PROVIDER.' });
-  }
-
-  const system = messages.find(m => m.role === 'system')?.content || undefined;
-  const anthropicMessages = convertMessagesToAnthropic(messages);
-  const anthropicTools = tools?.length > 0
-    ? tools.map(t => ({ name: t.function.name, description: t.function.description, input_schema: t.function.parameters }))
-    : undefined;
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: modelOverride || ANTHROPIC_MODEL,
-      max_tokens: 4096,
-      temperature: 0.7,
-      system,
-      messages: anthropicMessages,
-      tools: anthropicTools,
-    }),
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    return providerErrorResponse(res, 'Anthropic', response.status, await response.text());
-  }
-
-  const data = await response.json();
-  const blocks: { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[] = data.content || [];
-
-  const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('\n') || null;
-  const toolUses = blocks.filter(b => b.type === 'tool_use');
-
-  // Convert Anthropic response → OpenAI shape the frontend expects.
-  // Preserve Anthropic's native tool_use ids so they round-trip on the follow-up call.
-  return res.status(200).json({
-    choices: [{
-      message: {
-        role: 'assistant',
-        content: text,
-        tool_calls: toolUses.length > 0
-          ? toolUses.map(b => ({
-              id: b.id,
-              type: 'function',
-              function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) },
-            }))
-          : undefined,
-      },
-    }],
-  });
-}
-
-function convertMessagesToAnthropic(messages: OAIMessage[]) {
-  const out: { role: 'user' | 'assistant'; content: unknown[] }[] = [];
-
-  for (const msg of messages) {
-    if (msg.role === 'system') continue; // handled via top-level `system`
-
-    if (msg.role === 'user') {
-      out.push({ role: 'user', content: [{ type: 'text', text: msg.content ?? '' }] });
-    } else if (msg.role === 'assistant') {
-      const content: unknown[] = [];
-      if (msg.content) content.push({ type: 'text', text: msg.content });
-      for (const tc of msg.tool_calls ?? []) {
-        content.push({ type: 'tool_use', id: tc.id, name: tc.function.name, input: safeParse(tc.function.arguments) });
-      }
-      if (content.length > 0) out.push({ role: 'assistant', content });
-    } else if (msg.role === 'tool') {
-      // Anthropic requires tool_result blocks inside a user message, immediately after the
-      // matching assistant tool_use. Merge consecutive tool results into one user message.
-      const block = { type: 'tool_result', tool_use_id: msg.tool_call_id, content: msg.content ?? '' };
-      const last = out[out.length - 1];
-      if (last && last.role === 'user' && (last.content[0] as { type?: string })?.type === 'tool_result') {
-        last.content.push(block);
-      } else {
-        out.push({ role: 'user', content: [block] });
-      }
-    }
-  }
-
-  return out;
-}
-
-function safeParse(s: string): Record<string, unknown> {
-  try { return JSON.parse(s); } catch { return {}; }
-}
-
-// ─── Gemini ─────────────────────────────────────────────────
-async function handleGemini(
-  messages: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[],
-  tools: { type: string; function: { name: string; description: string; parameters: Record<string, unknown> } }[],
-  res: VercelResponse,
-  modelOverride?: string
-) {
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
-
-  // Convert OpenAI message format → Gemini format
-  const geminiContents = convertMessagesToGemini(messages);
-  const geminiTools = tools?.length > 0 ? [{
-    functionDeclarations: tools.map(t => ({
-      name: t.function.name,
-      description: t.function.description,
-      parameters: t.function.parameters,
-    })),
-  }] : undefined;
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelOverride || GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: geminiContents,
-        tools: geminiTools,
-        systemInstruction: messages.find(m => m.role === 'system')
-          ? { parts: [{ text: messages.find(m => m.role === 'system')!.content }] }
-          : undefined,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-      }),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    }
-  );
-
-  if (!response.ok) {
-    return providerErrorResponse(res, 'Gemini', response.status, await response.text());
-  }
-
-  const data = await response.json();
-
-  // Convert Gemini response → OpenAI format (so frontend doesn't change)
-  const candidate = data.candidates?.[0];
-  if (!candidate) return res.status(500).json({ error: 'No response from Gemini' });
-
-  const parts = candidate.content?.parts || [];
-  const textParts = parts.filter((p: Record<string, unknown>) => p.text);
-  const funcParts = parts.filter((p: Record<string, unknown>) => p.functionCall);
-
-  const openAIFormat = {
-    choices: [{
-      message: {
-        role: 'assistant',
-        content: textParts.map((p: { text: string }) => p.text).join('\n') || null,
-        tool_calls: funcParts.length > 0
-          ? funcParts.map((p: { functionCall: { name: string; args: Record<string, unknown> } }, i: number) => ({
-              id: `call_${Date.now()}_${i}`,
-              type: 'function',
-              function: {
-                name: p.functionCall.name,
-                arguments: JSON.stringify(p.functionCall.args),
-              },
-            }))
-          : undefined,
-      },
-    }],
-  };
-
-  return res.status(200).json(openAIFormat);
-}
-
-function convertMessagesToGemini(messages: { role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }[]) {
-  const contents: { role: string; parts: Record<string, unknown>[] }[] = [];
-
-  // Build a map of tool_call_id → function name from assistant messages
-  const toolCallNames: Record<string, string> = {};
-  for (const msg of messages) {
-    if (msg.role === 'assistant' && msg.tool_calls) {
-      for (const tc of msg.tool_calls as { id: string; function: { name: string; arguments: string } }[]) {
-        toolCallNames[tc.id] = tc.function.name;
-      }
-    }
-  }
-
-  for (const msg of messages) {
-    if (msg.role === 'system') continue; // Handled via systemInstruction
-
-    if (msg.role === 'user') {
-      contents.push({ role: 'user', parts: [{ text: msg.content }] });
-    } else if (msg.role === 'assistant') {
-      const parts: Record<string, unknown>[] = [];
-      if (msg.content) parts.push({ text: msg.content });
-      if (msg.tool_calls) {
-        for (const tc of msg.tool_calls as { function: { name: string; arguments: string } }[]) {
-          parts.push({
-            functionCall: { name: tc.function.name, args: safeParse(tc.function.arguments) },
-          });
-        }
-      }
-      if (parts.length > 0) contents.push({ role: 'model', parts });
-    } else if (msg.role === 'tool') {
-      // Use the actual function name from the corresponding tool_call_id
-      const funcName = msg.tool_call_id ? toolCallNames[msg.tool_call_id] : undefined;
-      contents.push({
-        role: 'user',
-        parts: [{ functionResponse: { name: funcName || 'tool_result', response: { result: msg.content } } }],
-      });
-    }
-  }
-
-  return contents;
-}
-
-// ─── OpenAI (fallback) ──────────────────────────────────────
-async function handleOpenAI(
-  messages: { role: string; content: string }[],
-  tools: unknown[],
-  res: VercelResponse,
-  modelOverride?: string
-) {
-  if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
-
-  return handleOpenAICompatible({
-    providerName: 'OpenAI',
-    apiKey: OPENAI_API_KEY,
-    model: modelOverride || OPENAI_MODEL,
-    baseUrl: 'https://api.openai.com/v1',
-    messages,
-    tools,
-    res,
-  });
-}
-
-async function handleOpenAICompatible({
-  providerName,
-  apiKey,
+// ─── xAI Grok — the only route ──────────────────────────────
+// xAI's chat/completions endpoint is OpenAI-shaped end to end: the frontend's
+// messages + tools go up as-is and `choices[0].message` (with `tool_calls`)
+// comes back as-is, so the body is forwarded without translation.
+async function handleGrok({
   model,
-  baseUrl,
   messages,
   tools,
   res,
 }: {
-  providerName: string;
-  apiKey?: string;
   model: string;
-  baseUrl: string;
   messages: unknown[];
   tools: unknown[];
   res: VercelResponse;
 }) {
-  if (!apiKey) return res.status(500).json({ error: `${providerName} API key not configured` });
+  if (!XAI_API_KEY) {
+    // Fail loudly — never silently degrade (reliability-first).
+    return res.status(500).json({ error: `${XAI_PROVIDER_NAME} API key not configured` });
+  }
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+  const response = await fetch(`${XAI_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${XAI_API_KEY}`,
       'Accept-Language': 'en-US,en',
     },
     body: JSON.stringify({
@@ -801,7 +483,7 @@ async function handleOpenAICompatible({
   });
 
   if (!response.ok) {
-    return providerErrorResponse(res, providerName, response.status, await response.text());
+    return providerErrorResponse(res, XAI_PROVIDER_NAME, response.status, await response.text());
   }
 
   const data = await response.json();

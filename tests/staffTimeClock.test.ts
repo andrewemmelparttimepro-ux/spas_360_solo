@@ -4,6 +4,8 @@ import { describe, it } from 'node:test';
 import {
   formatClockMinutes,
   localDateRange,
+  payrollFileName,
+  staffHoursCsv,
   timeEntriesMinutes,
   toLocalDateTimeInput,
 } from '../src/lib/staffTimeClock.ts';
@@ -44,7 +46,7 @@ describe('staff attendance time clock', () => {
     assert.match(control, /Clock Back In/);
     assert.match(control, /Clock Out for Day/);
     assert.match(control, /Dismiss time clock/);
-    assert.match(hook, /rpc\('staff_clock_in'\)/);
+    assert.match(hook, /rpc\('staff_clock_in', await punchStamp\(\)\)/);
     assert.match(hook, /rpc\('staff_clock_out', \{ p_reason: reason, p_acknowledged_task_ids: acknowledgedTaskIds \?\? null \}\)/);
     assert.match(hook, /\.is\('clock_out', null\)[\s\S]*\.maybeSingle\(\)/);
     assert.match(hook, /postgres_changes/);
@@ -105,5 +107,35 @@ describe('staff attendance time clock', () => {
     assert.match(migration, /revoke all on table public\.staff_time_entries from public, anon, authenticated/);
     assert.match(migration, /grant select on table public\.staff_time_entries to authenticated/);
     assert.doesNotMatch(migration, /grant (insert|update|delete) on table public\.staff_time_entries to authenticated/i);
+  });
+
+  it('exports a payroll CSV with decimal hours and per-employee totals', () => {
+    const csv = staffHoursCsv([
+      { employee: { first_name: 'Alex', last_name: 'Burckhard' }, clock_in: '2026-09-01T14:00:00Z', clock_out: '2026-09-01T18:15:00Z', clock_out_reason: 'lunch', clock_in_ip: '174.1.2.3' },
+      { employee: { first_name: 'Alex', last_name: 'Burckhard' }, clock_in: '2026-09-01T19:00:00Z', clock_out: '2026-09-01T22:00:00Z', clock_out_reason: 'end_day', acknowledged_incomplete_count: 1 },
+    ], '2026-09-01', '2026-09-15');
+    const lines = csv.split('\n');
+    assert.equal(lines[0], 'Employee,Date,Clock in,Clock out,Reason,Minutes,Hours,Owner adjusted,Open tasks at clock-out,Clock-in IP,Clock-in location');
+    assert.match(lines[1], /^Alex Burckhard,.*,lunch,255,4\.25,,0,174\.1\.2\.3,$/);
+    assert.match(lines[2], /,end_day,180,3\.00,,1,,$/);
+    assert.equal(lines[lines.length - 1], 'Alex Burckhard,2026-09-01 to 2026-09-15,435,7.25');
+    assert.equal(payrollFileName('2026-09-01', '2026-09-15', 'Alex Burckhard'), 'staff-hours-alex-burckhard-2026-09-01-to-2026-09-15.csv');
+  });
+
+  it('stamps every clock-in with where it came from and lets owners export', async () => {
+    const [hook, report, migration, whoami] = await Promise.all([
+      read('src/hooks/useStaffTimeClock.ts'),
+      read('src/components/StaffTimeReport.tsx'),
+      read('supabase/migrations/20260903170000_staff_ops_round_two.sql'),
+      read('api/whoami.ts'),
+    ]);
+    assert.match(hook, /rpc\('staff_clock_in', await punchStamp\(\)\)/);
+    assert.match(hook, /navigator\.geolocation\.getCurrentPosition/);
+    assert.match(hook, /fetch\('\/api\/whoami'/);
+    assert.match(whoami, /x-forwarded-for/);
+    assert.match(migration, /add column if not exists clock_in_ip text/);
+    assert.match(migration, /p_ip text default null, p_lat double precision default null/);
+    assert.match(report, /Export payroll CSV/);
+    assert.match(report, /No location shared/);
   });
 });

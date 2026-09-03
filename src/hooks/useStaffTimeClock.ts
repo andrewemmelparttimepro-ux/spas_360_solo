@@ -11,6 +11,33 @@ export interface StaffTimeEntry extends StaffTimeEntryRow {
 
 const REPORT_PAGE_SIZE = 1000;
 
+/**
+ * Where did this punch come from? Best effort, never blocking: the public IP
+ * from our own edge and, if the phone allows it within 4 s, a GPS fix.
+ */
+export async function punchStamp(): Promise<{ p_ip: string | null; p_lat: number | null; p_lng: number | null; p_accuracy_m: number | null }> {
+  const ipPromise = fetch('/api/whoami', { cache: 'no-store' })
+    .then(response => response.ok ? response.json() as Promise<{ ip?: string | null }> : null)
+    .then(payload => payload?.ip ?? null)
+    .catch(() => null);
+  const geoPromise = new Promise<GeolocationPosition | null>(resolve => {
+    if (!('geolocation' in navigator)) { resolve(null); return; }
+    const timer = setTimeout(() => resolve(null), 4000);
+    navigator.geolocation.getCurrentPosition(
+      position => { clearTimeout(timer); resolve(position); },
+      () => { clearTimeout(timer); resolve(null); },
+      { enableHighAccuracy: false, timeout: 3500, maximumAge: 120_000 },
+    );
+  });
+  const [ip, position] = await Promise.all([ipPromise, geoPromise]);
+  return {
+    p_ip: ip,
+    p_lat: position ? Number(position.coords.latitude.toFixed(6)) : null,
+    p_lng: position ? Number(position.coords.longitude.toFixed(6)) : null,
+    p_accuracy_m: position ? Math.round(position.coords.accuracy) : null,
+  };
+}
+
 async function fetchStaffTimeEntries(
   orgId: string,
   start: string,
@@ -84,7 +111,7 @@ export function useStaffTimeClock() {
   const runClockAction = useCallback(async (action: 'in' | 'out', reason?: 'lunch' | 'end_day', acknowledgedTaskIds?: string[]) => {
     setIsSaving(true);
     const result = action === 'in'
-      ? await supabase.rpc('staff_clock_in')
+      ? await supabase.rpc('staff_clock_in', await punchStamp())
       : await supabase.rpc('staff_clock_out', { p_reason: reason, p_acknowledged_task_ids: acknowledgedTaskIds ?? null });
     setIsSaving(false);
     setError(result.error?.message ?? null);

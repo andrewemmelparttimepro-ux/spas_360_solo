@@ -114,6 +114,8 @@ export interface Task {
   priority: DealPriority; status: TaskStatus;
   task_type: string | null; created_by: string;
   assignee_notes: string | null; completed_at: string | null;
+  proof_required: boolean; proof_photo_path: string | null;
+  escalated_at: string | null; nudged_at: string | null;
   created_at: string; updated_at: string;
 }
 
@@ -136,6 +138,14 @@ export interface StaffTimeEntry {
   clock_out_reason: 'lunch' | 'end_day' | 'owner_edit' | null;
   edited_by: string | null; edited_at: string | null;
   acknowledged_task_ids: string[]; acknowledged_incomplete_count: number;
+  clock_in_ip: string | null; clock_in_lat: number | null; clock_in_lng: number | null; clock_in_accuracy_m: number | null;
+  created_at: string; updated_at: string;
+}
+
+export interface DelegatedChecklistTemplate {
+  id: string; org_id: string; name: string; assigned_to: string; created_by: string;
+  location_id: string | null; items: string[]; weekdays: number[]; due_time: string;
+  proof_required: boolean; active: boolean; last_generated_on: string | null;
   created_at: string; updated_at: string;
 }
 
@@ -204,7 +214,7 @@ export interface Database {
       [K in 'organizations' | 'locations' | 'profiles' | 'contacts' | 'properties' |
        'pipeline_stages' | 'deals' | 'jobs' | 'job_assignments' | 'parts' |
        'inventory_items' | 'communication_threads' | 'messages' | 'tasks' |
-       'notes' | 'time_entries' | 'staff_time_entries' | 'notifications' | 'audit_log' |
+       'notes' | 'time_entries' | 'staff_time_entries' | 'delegated_checklist_templates' | 'notifications' | 'audit_log' |
        'agent_threads' | 'agent_messages' | 'fix_it_posts' |
        'fix_it_comments' | 'fix_it_attachments' | 'app_invites' |
        'push_subscriptions' | 'suggestions' | 'paid_commissions']: {

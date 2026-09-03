@@ -120,4 +120,26 @@ describe('Delegated Tasks v2', () => {
     assert.match(migration, /create policy profile_read on public\.profiles[\s\S]*using \(org_id = \(select public\.auth_org\(\)\)\)/);
     assert.doesNotMatch(migration, /grant .* to anon/i);
   });
+
+  it('adds photo proof, owner nudges, and due-time escalation on top of v2', async () => {
+    const [migration, panel, hook] = await Promise.all([
+      read('supabase/migrations/20260903170000_staff_ops_round_two.sql'),
+      read('src/components/dashboard/DelegatedTasksPanel.tsx'),
+      read('src/hooks/useDelegatedTasks.ts'),
+    ]);
+    assert.match(migration, /add column if not exists proof_required boolean not null default false/);
+    assert.match(migration, /Add a photo to complete this task/);
+    assert.match(migration, /insert into storage\.buckets \(id, name, public[\s\S]*'task-proofs', 'task-proofs', false/);
+    assert.match(migration, /split_part\(name, '\/', 1\) = \(select public\.auth_org\(\)\)::text/);
+    assert.match(migration, /create or replace function public\.escalate_overdue_delegated_tasks\(\)/);
+    assert.match(migration, /'Overdue now: ' \|\| left\(v_task\.title, 120\)/);
+    assert.match(migration, /cron\.schedule\('spas360-delegated-escalation', '\*\/10 \* \* \* \*'/);
+    assert.match(panel, /Require a photo to complete/);
+    assert.match(panel, /capture="environment"/);
+    assert.match(panel, /task\.proof_required && !task\.proof_photo_path/);
+    assert.match(panel, /Nudge \$\{personName\(task\.assigned\)\}/);
+    assert.match(hook, /from\(TASK_PROOF_BUCKET\)\.upload/);
+    assert.match(hook, /Already nudged in the last hour/);
+    assert.match(hook, /createSignedUrl\(path, 60 \* 60\)/);
+  });
 });

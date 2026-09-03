@@ -49,3 +49,64 @@ export function localDateTimeToIso(value: string): string | null {
   const date = new Date(value);
   return value && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 }
+
+export interface PayrollEntry extends StaffTimeRangeEntry {
+  employee?: { first_name: string; last_name: string } | null;
+  clock_out_reason?: string | null;
+  edited_at?: string | null;
+  acknowledged_incomplete_count?: number;
+  clock_in_ip?: string | null;
+  clock_in_lat?: number | null;
+  clock_in_lng?: number | null;
+}
+
+function csvCell(value: string | number | null | undefined): string {
+  const text = value == null ? '' : String(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/**
+ * Payroll export: one row per punch plus a total row per employee, hours as
+ * decimals (7.25) so it drops straight into a payroll sheet.
+ */
+export function staffHoursCsv(entries: PayrollEntry[], startDate: string, endDate: string, now: Date = new Date()): string {
+  const rows: string[][] = [[
+    'Employee', 'Date', 'Clock in', 'Clock out', 'Reason', 'Minutes', 'Hours', 'Owner adjusted', 'Open tasks at clock-out', 'Clock-in IP', 'Clock-in location',
+  ]];
+  const totals = new Map<string, number>();
+  const byEmployee = [...entries].sort((a, b) => {
+    const nameA = a.employee ? `${a.employee.first_name} ${a.employee.last_name}` : '';
+    const nameB = b.employee ? `${b.employee.first_name} ${b.employee.last_name}` : '';
+    return nameA.localeCompare(nameB) || a.clock_in.localeCompare(b.clock_in);
+  });
+  for (const entry of byEmployee) {
+    const employee = entry.employee ? `${entry.employee.first_name} ${entry.employee.last_name}`.trim() : 'Unknown';
+    const minutes = timeEntryMinutes(entry, now);
+    totals.set(employee, (totals.get(employee) ?? 0) + minutes);
+    const start = new Date(entry.clock_in);
+    rows.push([
+      employee,
+      start.toLocaleDateString('en-US'),
+      start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      entry.clock_out ? new Date(entry.clock_out).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'still clocked in',
+      entry.clock_out_reason ?? '',
+      String(minutes),
+      (minutes / 60).toFixed(2),
+      entry.edited_at ? 'yes' : '',
+      String(entry.acknowledged_incomplete_count ?? 0),
+      entry.clock_in_ip ?? '',
+      entry.clock_in_lat != null && entry.clock_in_lng != null ? `${entry.clock_in_lat},${entry.clock_in_lng}` : '',
+    ]);
+  }
+  rows.push([]);
+  rows.push(['Employee', 'Period', 'Total minutes', 'Total hours']);
+  for (const [employee, minutes] of [...totals.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    rows.push([employee, `${startDate} to ${endDate}`, String(minutes), (minutes / 60).toFixed(2)]);
+  }
+  return rows.map(row => row.map(csvCell).join(',')).join('\n');
+}
+
+export function payrollFileName(startDate: string, endDate: string, employee?: string): string {
+  const who = employee ? employee.replace(/[^a-z0-9]+/gi, '-').toLowerCase() : 'all-employees';
+  return `staff-hours-${who}-${startDate}-to-${endDate}.csv`;
+}

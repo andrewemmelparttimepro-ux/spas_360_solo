@@ -63,4 +63,19 @@ describe('staff text → Ari', () => {
     assert.match(prompt, /DELEGATED STAFF TASKS are different from Fix-It/);
     assert.match(settings, /Mobile for Ari texts/);
   });
+
+  it('quarantines an unknown number until it texts twice, then files both texts on a new Lead', async () => {
+    const [inbound, migration] = await Promise.all([read('api/sms-inbound.ts'), read('supabase/migrations/20260903170000_staff_ops_round_two.sql')]);
+    assert.match(inbound, /sms_quarantine\?select=id,body,created_at/);
+    assert.match(inbound, /held until they text again/);
+    assert.match(inbound, /promoted_contact_id: contact!\.id/);
+    assert.match(inbound, /if \(quarantinedFirstText\) \{/);
+    assert.match(migration, /create table if not exists public\.sms_quarantine/);
+    assert.match(migration, /sms_quarantine_managers_read/);
+  });
+
+  it('gives Ari dealership-local dates in the older task and scheduling tools too', async () => {
+    const factory = await read('src/agent/toolFactory.ts');
+    assert.match(factory, /const localInstant = \(s: string\) => centralInstant\(s\) \?\?/);
+  });
 });

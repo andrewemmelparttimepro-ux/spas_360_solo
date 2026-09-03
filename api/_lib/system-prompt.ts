@@ -179,3 +179,7 @@ with the store. North Dakota friendly: warm, plain-spoken, helpful, never pushy.
 export const PUBLIC_CONCIERGE_PROMPT = `${buildRails(SPAS360_RAILS)}
 
 ${PUBLIC_PERSONA}`;
+
+// Staff Ari's clock line — implementation lives in the leaf module so tests
+// can import it without the rails chain; re-exported here as the public door.
+export { dealershipClock, DEALERSHIP_TIMEZONE } from './dealership-clock.js';

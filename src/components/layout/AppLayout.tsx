@@ -8,6 +8,7 @@ import ChatWidget from '../ChatWidget';
 import WidgetBoundary from '../ui/WidgetBoundary';
 import { CustomerDragProvider } from '@/contexts/CustomerDragContext';
 import ActivityTracker from '../ActivityTracker';
+import PushNudgeBanner from '../PushNudgeBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { isServiceTechnician } from '@/lib/serviceTechAccess';
 
@@ -32,6 +33,7 @@ export default function AppLayout() {
         {!technician && <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
         <div className="flex flex-1 overflow-hidden">
           <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">
+            <WidgetBoundary><PushNudgeBanner /></WidgetBoundary>
             <Outlet />
           </main>
           <WidgetBoundary>

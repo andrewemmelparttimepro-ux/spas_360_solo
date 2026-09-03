@@ -60,4 +60,20 @@ describe('Owner Morning Summary', () => {
     assert.match(hook, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
     assert.ok(dashboard.indexOf('<MorningSummaryPanel />') < dashboard.indexOf('<DelegatedTasksPanel />'));
   });
+
+  it('opens by default for owners and reads Ari\'s narration from a cached, owner-only endpoint', async () => {
+    const [panel, api, migration] = await Promise.all([
+      read('src/components/dashboard/MorningSummaryPanel.tsx'),
+      read('api/owners/morning-narration.ts'),
+      read('supabase/migrations/20260903170000_staff_ops_round_two.sql'),
+    ]);
+    assert.match(panel, /getItem\(OPEN_KEY\) !== '0'/);
+    assert.match(panel, /\/api\/owners\/morning-narration\?day=/);
+    assert.match(panel, /Ari's read/);
+    assert.match(api, /profile\.role !== 'owner_manager'/);
+    assert.match(api, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
+    assert.match(api, /at most three short sentences/);
+    assert.match(api, /onConflict: 'org_id,day'/);
+    assert.match(migration, /create table if not exists public\.morning_summary_narrations/);
+  });
 });

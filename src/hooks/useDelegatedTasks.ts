@@ -18,6 +18,7 @@ export interface DelegatedTaskDraft {
   assigned_to: string;
   due_at: string | null;
   request: string;
+  proof_required?: boolean;
 }
 
 export interface DelegatedTaskEdit {
@@ -26,11 +27,13 @@ export interface DelegatedTaskEdit {
   request?: string;
   status?: TaskStatus;
   assignee_notes?: string | null;
+  proof_required?: boolean;
+  proof_photo_path?: string | null;
 }
 
 const SELECT = [
   'id, org_id, assigned_to, deal_id, contact_id, job_id, title, description, due_at, priority, status,',
-  'task_type, created_by, assignee_notes, completed_at, created_at, updated_at,',
+  'task_type, created_by, assignee_notes, completed_at, proof_required, proof_photo_path, escalated_at, nudged_at, created_at, updated_at,',
   'assigned:assigned_to(id, first_name, last_name, role),',
   'sender:created_by(id, first_name, last_name, role)',
 ].join(' ');
@@ -107,7 +110,7 @@ export function useDelegatedTasks(enabled = true) {
     return () => { void supabase.removeChannel(channel); };
   }, [profile, enabled, fetchTasks]);
 
-  const createTask = useCallback(async ({ assigned_to, due_at, request }: DelegatedTaskDraft): Promise<Result> => {
+  const createTask = useCallback(async ({ assigned_to, due_at, request, proof_required = false }: DelegatedTaskDraft): Promise<Result> => {
     if (!profile) return { ok: false, message: 'Sign in to delegate a task.' };
     const parsed = parseDelegatedRequest(request);
     if (!assigned_to || !parsed) return { ok: false, message: 'Choose who this is for and describe what needs to be done.' };
@@ -121,6 +124,7 @@ export function useDelegatedTasks(enabled = true) {
       status: 'Pending',
       task_type: DELEGATED_TASK_TYPE,
       created_by: profile.id,
+      proof_required,
     });
     if (insertError) return { ok: false, message: insertError.message };
     await fetchTasks();
@@ -134,6 +138,8 @@ export function useDelegatedTasks(enabled = true) {
     if ('assignee_notes' in edit) updates.assignee_notes = edit.assignee_notes ?? null;
     if (edit.assigned_to) updates.assigned_to = edit.assigned_to;
     if ('due_at' in edit) updates.due_at = edit.due_at ?? null;
+    if (typeof edit.proof_required === 'boolean') updates.proof_required = edit.proof_required;
+    if ('proof_photo_path' in edit) updates.proof_photo_path = edit.proof_photo_path ?? null;
     if (typeof edit.request === 'string') {
       const parsed = parseDelegatedRequest(edit.request);
       if (!parsed) return { ok: false, message: 'Describe what needs to be done.' };
@@ -169,7 +175,45 @@ export function useDelegatedTasks(enabled = true) {
     return { ok: true, message: 'Task deleted.' };
   }, [profile]);
 
-  return { tasks, staff, isLoading, error, createTask, updateTask, deleteTask, refresh: fetchTasks };
+  /** Upload the completion photo into the private task-proofs bucket; returns its storage path. */
+  const uploadProof = useCallback(async (taskId: string, file: File): Promise<{ ok: true; path: string } | { ok: false; message: string }> => {
+    if (!profile) return { ok: false, message: 'Sign in first.' };
+    const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = `${profile.org_id}/${taskId}/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from(TASK_PROOF_BUCKET).upload(path, file, { contentType: file.type || 'image/jpeg', upsert: false });
+    if (uploadError) return { ok: false, message: uploadError.message };
+    return { ok: true, path };
+  }, [profile]);
+
+  /** A gentle reminder from the sender or an owner; at most one per hour per task. */
+  const nudgeTask = useCallback(async (task: DelegatedTask): Promise<Result> => {
+    if (!profile) return { ok: false, message: 'Sign in first.' };
+    if (task.nudged_at && Date.now() - new Date(task.nudged_at).getTime() < 60 * 60 * 1000) {
+      return { ok: false, message: 'Already nudged in the last hour.' };
+    }
+    const sender = `${profile.first_name} ${profile.last_name}`.trim();
+    const { error: notifyError } = await supabase.from('notifications').insert({
+      user_id: task.assigned_to,
+      type: 'delegated_task',
+      title: `Nudge from ${sender}: ${task.title.slice(0, 110)}`,
+      body: task.due_at ? `Still open. ${new Date(task.due_at) < new Date() ? 'It was due' : 'Due'} ${new Date(task.due_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.` : 'Still open. Check it complete when it is done.',
+      link: task.assigned?.role === 'technician' ? '/service?delegated=open' : '/dashboard?delegated=open',
+    });
+    if (notifyError) return { ok: false, message: notifyError.message };
+    const stamp = new Date().toISOString();
+    await supabase.from('tasks').update({ nudged_at: stamp }).eq('id', task.id);
+    setTasks(current => current.map(item => item.id === task.id ? { ...item, nudged_at: stamp } : item));
+    return { ok: true, message: `Nudged ${task.assigned?.first_name ?? 'them'}.` };
+  }, [profile]);
+
+  return { tasks, staff, isLoading, error, createTask, updateTask, deleteTask, uploadProof, nudgeTask, refresh: fetchTasks };
+}
+
+export const TASK_PROOF_BUCKET = 'task-proofs';
+
+export async function signedProofUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from(TASK_PROOF_BUCKET).createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? null;
 }
 
 /** The signed-in person's own incomplete delegated tasks (the clock-out gate). */

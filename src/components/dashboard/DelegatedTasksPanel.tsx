@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Pencil, Save, Send, Trash2, X } from 'lucide-react';
+import { AlertTriangle, BellRing, Camera, CheckCircle2, ClipboardCheck, Pencil, Save, Send, Trash2, X } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDelegatedTasks, type DelegatedPerson, type DelegatedTask } from '@/hooks/useDelegatedTasks';
+import { signedProofUrl, useDelegatedTasks, type DelegatedPerson, type DelegatedTask } from '@/hooks/useDelegatedTasks';
 import {
   DELEGATED_NOTES_MAX,
   DELEGATED_STATUS_LABELS,
@@ -32,7 +32,7 @@ export default function DelegatedTasksPanel() {
   const { profile } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
-  const { tasks, staff, isLoading, error, createTask, updateTask, deleteTask, refresh } = useDelegatedTasks();
+  const { tasks, staff, isLoading, error, createTask, updateTask, deleteTask, uploadProof, nudgeTask, refresh } = useDelegatedTasks();
   const isOwner = profile?.role === 'owner_manager';
   const viewer = profile ? { id: profile.id, role: profile.role } : null;
 
@@ -48,6 +48,10 @@ export default function DelegatedTasksPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState({ assigned_to: '', due_at: '', request: '' });
   const [deleteTarget, setDeleteTarget] = useState<DelegatedTask | null>(null);
+  const [proofRequired, setProofRequired] = useState(false);
+  const [proofUrls, setProofUrls] = useState<Record<string, string>>({});
+  const proofInputRef = useRef<HTMLInputElement>(null);
+  const [proofTarget, setProofTarget] = useState<DelegatedTask | null>(null);
 
   useEffect(() => { setView(defaultDelegatedView(profile?.role)); }, [profile?.role]);
 
@@ -71,6 +75,18 @@ export default function DelegatedTasksPanel() {
     });
   }, [tasks]);
 
+  // Completed photo proofs are private; resolve one signed URL per task on demand.
+  useEffect(() => {
+    const missing = tasks.filter(task => task.proof_photo_path && !proofUrls[task.id]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void Promise.all(missing.map(async task => [task.id, await signedProofUrl(task.proof_photo_path!)] as const)).then(pairs => {
+      if (cancelled) return;
+      setProofUrls(current => ({ ...current, ...Object.fromEntries(pairs.filter(([, url]) => url) as [string, string][]) }));
+    });
+    return () => { cancelled = true; };
+  }, [tasks, proofUrls]);
+
   const visibleTasks = useMemo(() => {
     if (!profile) return [];
     return filterDelegatedTasks(tasks, { view, userId: profile.id, assignedTo: staffFilter || undefined, status: statusFilter });
@@ -92,17 +108,42 @@ export default function DelegatedTasksPanel() {
       return;
     }
     setSubmitting(true);
-    const result = await createTask({ assigned_to: assignedTo, due_at: delegatedTaskDueAt(dueAt), request });
+    const result = await createTask({ assigned_to: assignedTo, due_at: delegatedTaskDueAt(dueAt), request, proof_required: proofRequired });
     setSubmitting(false);
     toast(result.message, result.ok ? 'success' : 'error');
-    if (result.ok) { setRequest(''); setDueAt(''); }
+    if (result.ok) { setRequest(''); setDueAt(''); setProofRequired(false); }
   };
 
   const toggleComplete = async (task: DelegatedTask, completed: boolean) => {
+    // A task that demands a photo opens the camera first; completion follows the upload.
+    if (completed && task.proof_required && !task.proof_photo_path) {
+      setProofTarget(task);
+      proofInputRef.current?.click();
+      return;
+    }
     setSavingId(task.id);
     const result = await updateTask(task.id, { status: completed ? 'Completed' : 'Pending' });
     setSavingId(null);
     toast(result.message, result.ok ? 'success' : 'error');
+  };
+
+  const completeWithPhoto = async (file: File | undefined) => {
+    const task = proofTarget;
+    setProofTarget(null);
+    if (!task || !file) return;
+    setSavingId(task.id);
+    const upload = await uploadProof(task.id, file);
+    if (!('path' in upload)) { setSavingId(null); toast(upload.message, 'error'); return; }
+    const result = await updateTask(task.id, { status: 'Completed', proof_photo_path: upload.path });
+    setSavingId(null);
+    toast(result.ok ? 'Photo saved and task completed.' : result.message, result.ok ? 'success' : 'error');
+  };
+
+  const nudge = async (task: DelegatedTask) => {
+    setSavingId(task.id);
+    const result = await nudgeTask(task);
+    setSavingId(null);
+    toast(result.message, result.ok ? 'success' : 'warning');
   };
 
   const saveNotes = async (task: DelegatedTask) => {
@@ -210,6 +251,7 @@ export default function DelegatedTasksPanel() {
                     {' · '}
                     <span className={cn(overdue && 'font-semibold text-red-400')}>{formatDelegatedDue(task.due_at)}</span>
                     {' · Sent '}{new Date(task.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    {task.proof_required && !completed && <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-400"><Camera className="h-3 w-3" /> Photo required</span>}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 self-start">
@@ -220,6 +262,9 @@ export default function DelegatedTasksPanel() {
                     {completed ? <CheckCircle2 className="h-3 w-3" /> : overdue ? <AlertTriangle className="h-3 w-3" /> : null}
                     {completed ? DELEGATED_STATUS_LABELS.completed : overdue ? 'Overdue' : DELEGATED_STATUS_LABELS.incomplete}
                   </span>
+                  {canEdit && !completed && (
+                    <button type="button" aria-label={`Nudge ${personName(task.assigned)} about ${task.title}`} title="Send a reminder" disabled={busy} onClick={() => void nudge(task)} className="rounded-md p-1.5 text-ink-500 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"><BellRing className="h-3.5 w-3.5" /></button>
+                  )}
                   {canEdit && (
                     <>
                       <button type="button" aria-label={`Edit ${task.title}`} title="Edit task" disabled={busy} onClick={() => beginEdit(task)} className="rounded-md p-1.5 text-ink-500 hover:bg-ink-800 hover:text-ink-100 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
@@ -231,6 +276,11 @@ export default function DelegatedTasksPanel() {
             )}
             {completed && task.completed_at && !editing && (
               <p className="mt-1 text-xs text-emerald-400">Completed {new Date(task.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>
+            )}
+            {task.proof_photo_path && !editing && (
+              proofUrls[task.id]
+                ? <a href={proofUrls[task.id]} target="_blank" rel="noreferrer" className="mt-2 inline-block"><img src={proofUrls[task.id]} alt={`Photo proof for ${task.title}`} className="h-20 w-28 rounded-md border border-ink-700 object-cover" /></a>
+                : <p className="mt-2 text-xs text-ink-500">Loading photo…</p>
             )}
             {!editing && (canAnnotate || task.assignee_notes) && (
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -328,10 +378,17 @@ export default function DelegatedTasksPanel() {
             className={cn(fieldClass, 'resize-y')}
           />
         </label>
-        <button type="submit" disabled={submitting} className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">
-          <Send className="h-4 w-4" /> {submitting ? 'Sending…' : 'Delegate task'}
-        </button>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink-400">
+            <input type="checkbox" checked={proofRequired} onChange={event => setProofRequired(event.target.checked)} className="h-4 w-4 rounded border-ink-600 text-brand-500 focus:ring-brand-500" />
+            Require a photo to complete
+          </label>
+          <button type="submit" disabled={submitting} className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">
+            <Send className="h-4 w-4" /> {submitting ? 'Sending…' : 'Delegate task'}
+          </button>
+        </div>
       </form>
+      <input ref={proofInputRef} type="file" accept="image/*" capture="environment" className="hidden" aria-label="Photo proof" onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ''; void completeWithPhoto(file); }} />
 
       {error && (
         <div className="m-4 flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">

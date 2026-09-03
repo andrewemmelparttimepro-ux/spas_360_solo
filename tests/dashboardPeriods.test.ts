@@ -111,6 +111,7 @@ describe('dashboard date periods', () => {
     assert.match(dashboardHook, /if \(sequence !== fetchSequence\.current\) return/);
     assert.match(reports, /Object\.keys\(PERIOD_LABELS\)/);
     assert.doesNotMatch(reports, /DASHBOARD_PERIOD_LABELS/);
+    assert.match(reports, /Period filters closed revenue only; pipeline, jobs, and inventory show current totals\./);
   });
 
   it('keeps the date range and custom controls inside Revenue Overview instead of beside New', async () => {

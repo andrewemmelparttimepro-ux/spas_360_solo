@@ -26,7 +26,7 @@ const statMeta = [
   { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
   // A neutral count, not an alarm — red implied something was wrong at 0 parts
-  { key: 'overduePartsCount', title: 'Parts On Order', icon: Package, color: 'text-violet-400', bg: 'bg-violet-500/15', format: (v: number) => String(v), link: '/inventory' },
+  { key: 'overduePartsCount', title: 'Overdue Parts', icon: Package, color: 'text-violet-400', bg: 'bg-violet-500/15', format: (v: number) => String(v), link: '/knowledge' },
 ] as const;
 
 export default function Dashboard() {

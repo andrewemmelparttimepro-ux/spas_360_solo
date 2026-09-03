@@ -96,7 +96,8 @@ describe('Brandon composite UI contract', () => {
       read('src/pages/DealDetail.tsx'),
     ]);
 
-    assert.match(dashboard, /title: 'Parts On Order'/);
+    assert.match(dashboard, /title: 'Overdue Parts'/);
+    assert.match(dashboard, /link: '\/knowledge'/);
     assert.match(customers, /useState<CustomerSort>\('recent'\)/);
     assert.match(customers, /localStorage\.getItem\(VIEW_KEY\) === 'cards' \? 'cards' : 'list'/);
     assert.match(salesBoard, /label: 'Active Deals'/);

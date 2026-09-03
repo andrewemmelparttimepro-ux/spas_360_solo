@@ -60,6 +60,8 @@ export default function Reports() {
         <select
           value={period}
           onChange={(e) => setPeriod(e.target.value as DashboardPeriod)}
+          aria-label="Closed revenue period"
+          title="This period filters closed revenue; pipeline, jobs, and inventory are current totals."
           className="bg-ink-900 border border-ink-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-brand-500"
         >
           {(Object.keys(PERIOD_LABELS) as DashboardPeriod[]).map((p) => (
@@ -67,6 +69,8 @@ export default function Reports() {
           ))}
         </select>
       </div>
+
+      <p className="-mt-4 text-right text-[11px] text-ink-500">Period filters closed revenue only; pipeline, jobs, and inventory show current totals.</p>
 
       {readinessIssues.length > 0 && (
         <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4" aria-label="Data readiness">

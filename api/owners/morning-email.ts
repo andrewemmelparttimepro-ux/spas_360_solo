@@ -29,11 +29,11 @@ function secretOk(req: VercelRequest): boolean {
   return mismatch === 0;
 }
 
-async function sendViaResend(to: string, subject: string, html: string, text: string): Promise<{ id: string } | { error: string }> {
+async function sendViaResend(to: string, subject: string, html: string, text: string, from: string = FROM): Promise<{ id: string } | { error: string }> {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json', 'User-Agent': 'spas360-morning-summary' },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html, text, tags: [{ name: 'app', value: 'spas360' }, { name: 'kind', value: 'morning-summary' }] }),
+    body: JSON.stringify({ from, to: [to], subject, html, text, tags: [{ name: 'app', value: 'spas360' }, { name: 'kind', value: 'morning-summary' }] }),
     signal: AbortSignal.timeout(20_000),
   });
   const payload = await response.json().catch(() => null) as { id?: string; message?: string; name?: string } | null;
@@ -81,6 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const query = req.query as Record<string, string | string[] | undefined>;
   const test = query.test === '1';
   const testTo = typeof query.to === 'string' ? query.to : null;
+  // Test sends may use Resend's onboarding sender until spas360.ndai.pro is verified.
+  const testFrom = test && typeof query.from === 'string' && /^[^<>\s]+@[^<>\s]+$/.test(query.from) ? query.from : FROM;
   const day = typeof query.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(query.day) ? query.day : null;
 
   const { data: orgs } = callerOrg
@@ -111,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (test) {
       const to = testTo ?? callerEmail;
       if (!to) { results.push({ org: orgId, error: 'test needs ?to=' }); continue; }
-      const sent = await sendViaResend(to, `[TEST] ${subject}`, html, text);
+      const sent = await sendViaResend(to, `[TEST] ${subject}`, html, text, testFrom);
       results.push({ org: orgId, test: true, to, ...sent });
       continue;
     }

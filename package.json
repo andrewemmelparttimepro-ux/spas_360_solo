@@ -17,7 +17,7 @@
     "test:dashboard-revenue": "node --experimental-strip-types --test tests/dashboardRevenueFilters.test.ts",
     "test:customer-notes": "node --experimental-strip-types --test tests/customerNotes.test.ts",
     "test:suggestions": "node --experimental-strip-types --test tests/suggestionBox.test.ts",
-    "test:staff": "node --experimental-strip-types --test tests/delegatedTasks.test.ts tests/staffTimeClock.test.ts tests/morningSummary.test.ts tests/staffSms.test.ts tests/workbookPrint.test.ts tests/recurringChecklists.test.ts tests/suggestionBox.test.ts tests/upcomingTasks.test.ts tests/agent-fix-it-authorship.test.ts tests/ownerWorkbookLibrary.test.ts",
+    "test:staff": "node --experimental-strip-types --test tests/delegatedTasks.test.ts tests/staffTimeClock.test.ts tests/morningSummary.test.ts tests/staffSms.test.ts tests/workbookPrint.test.ts tests/recurringChecklists.test.ts tests/morningEmail.test.ts tests/suggestionBox.test.ts tests/upcomingTasks.test.ts tests/agent-fix-it-authorship.test.ts tests/ownerWorkbookLibrary.test.ts",
     "test:knowledge": "node --experimental-strip-types --test tests/knowledgeAndHardening.test.ts",
     "test:media": "node --experimental-strip-types --test tests/mediaLibrary.test.ts",
     "knowledge:dry-run": "node scripts/knowledge/ingest.mjs --dry-run",

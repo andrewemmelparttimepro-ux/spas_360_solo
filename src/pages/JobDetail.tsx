@@ -385,7 +385,9 @@ export default function JobDetail() {
     isSaving: inventorySaving,
     replaceInventory,
   } = useJobInventory(id, job?.location_id, canEditJob);
-  const { notes, createNote } = useNotes({ jobId: id });
+  const { notes, createNote, updateNote } = useNotes({ jobId: id });
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteBody, setEditingNoteBody] = useState('');
   const { tasks, createTask, completeTask } = useTasks({ jobId: id }, !technician);
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
@@ -568,7 +570,6 @@ export default function JobDetail() {
             {canEditJob && property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
             {canEditJob ? <ScheduleDateRangeEditor job={job} onSave={saveJob} /> : <ScheduleSummary job={job} />}
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
-            {job.description && <div className="text-sm text-ink-300 bg-ink-950 p-3 rounded-lg">{job.description}</div>}
             {canEditJob
               ? <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
               : job.amount_to_collect != null && <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />Collect ${Number(job.amount_to_collect).toLocaleString()}</div>}
@@ -580,6 +581,52 @@ export default function JobDetail() {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
+          {/* Job Notes first: the most important thing on the job. Enter adds a line; only Add submits. */}
+          <div data-job-notes className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
+            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Job Notes</h2>
+            <div className="flex items-start space-x-3 mb-4">
+              <textarea
+                value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                rows={3}
+                placeholder="Add a note… (Enter starts a new line; click Add to save)"
+                aria-label="New job note"
+                className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-y"
+              />
+              <button onClick={handleAddNote} disabled={!newNote.trim()} className="px-4 py-2 bg-brand-500 text-white text-sm rounded-lg font-medium hover:bg-brand-600 disabled:opacity-50">Add</button>
+            </div>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {notes.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => {
+                const canEditNote = profile?.id === n.created_by || profile?.role === 'owner_manager' || profile?.role === 'service_manager';
+                const editing = editingNoteId === n.id;
+                return (
+                  <div key={n.id} className="p-3 bg-ink-950 rounded-lg border border-ink-800">
+                    {editing ? (
+                      <div className="space-y-2">
+                        <textarea value={editingNoteBody} onChange={e => setEditingNoteBody(e.target.value)} rows={3} aria-label="Edit job note" className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 resize-y" />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={async () => { const result = await updateNote(n.id, editingNoteBody); toast(result.message, result.ok ? 'success' : 'error'); if (result.ok) setEditingNoteId(null); }} className="px-3 py-1.5 bg-brand-500 text-white text-xs rounded-lg font-semibold hover:bg-brand-600">Save note</button>
+                          <button type="button" onClick={() => setEditingNoteId(null)} className="px-3 py-1.5 border border-ink-600 text-xs rounded-lg font-semibold text-ink-300 hover:bg-ink-800">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-ink-100 whitespace-pre-wrap">{n.body}</p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="text-xs text-ink-500">
+                            {n.author_name} · {new Date(n.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                            {n.edited_at ? ` · edited ${new Date(n.edited_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : ''}
+                          </p>
+                          {canEditNote && <button type="button" aria-label="Edit note" onClick={() => { setEditingNoteId(n.id); setEditingNoteBody(n.body); }} className="text-xs font-semibold text-brand-400 hover:text-brand-300">Edit</button>}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div data-job-inventory className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -614,20 +661,6 @@ export default function JobDetail() {
 
           {/* Photos: proof of delivery, damage, serials */}
           <PhotoCard jobId={job.id} allowDelete={!technician} />
-
-          {/* Notes */}
-          <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Job Notes</h2>
-            <div className="flex space-x-3 mb-4">
-              <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddNote()} placeholder="Add a note..." className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
-              <button onClick={handleAddNote} className="px-4 py-2 bg-brand-500 text-white text-sm rounded-lg font-medium hover:bg-brand-600">Add</button>
-            </div>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {notes.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => (
-                <div key={n.id} className="p-3 bg-ink-950 rounded-lg border border-ink-800"><p className="text-sm text-ink-100">{n.body}</p><p className="text-xs text-ink-500 mt-1">{n.author_name} · {new Date(n.created_at).toLocaleDateString()}</p></div>
-              ))}
-            </div>
-          </div>
 
           {/* Tasks */}
           {!technician && <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">

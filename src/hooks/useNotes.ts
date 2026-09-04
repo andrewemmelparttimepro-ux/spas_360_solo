@@ -56,5 +56,19 @@ export function useNotes(filters?: { dealId?: string; contactId?: string; jobId?
     return data;
   }, [profile, fetchNotes]);
 
-  return { notes, isLoading, createNote, refresh: fetchNotes };
+  /** Edit a submitted note. RLS allows the author or a manager; the edit is stamped. */
+  const updateNote = useCallback(async (id: string, body: string) => {
+    if (!profile) return { ok: false, message: 'Sign in first.' };
+    const clean = body.trim();
+    if (!clean) return { ok: false, message: 'A note cannot be empty.' };
+    const { error } = await supabase
+      .from('notes')
+      .update({ body: clean, edited_at: new Date().toISOString(), edited_by: profile.id })
+      .eq('id', id);
+    if (error) return { ok: false, message: error.message };
+    await fetchNotes();
+    return { ok: true, message: 'Note updated.' };
+  }, [profile, fetchNotes]);
+
+  return { notes, isLoading, createNote, updateNote, refresh: fetchNotes };
 }

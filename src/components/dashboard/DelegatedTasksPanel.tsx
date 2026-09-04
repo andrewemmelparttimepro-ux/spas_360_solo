@@ -15,6 +15,7 @@ import {
   filterDelegatedTasks,
   formatDelegatedDue,
   groupDelegatedTasksByAssignee,
+  prioritizeOwnAssigneeGroups,
   isDelegatedTaskOverdue,
   splitDelegatedSections,
   toDelegatedDueInput,
@@ -94,9 +95,9 @@ export default function DelegatedTasksPanel() {
   }, [tasks, view, profile, staffFilter, statusFilter]);
   const sections = useMemo(() => splitDelegatedSections(visibleTasks), [visibleTasks]);
   const groupedSections = useMemo(() => ({
-    incomplete: groupDelegatedTasksByAssignee(sections.incomplete),
-    completed: groupDelegatedTasksByAssignee(sections.completed),
-  }), [sections]);
+    incomplete: prioritizeOwnAssigneeGroups(groupDelegatedTasksByAssignee(sections.incomplete), profile?.id),
+    completed: prioritizeOwnAssigneeGroups(groupDelegatedTasksByAssignee(sections.completed), profile?.id),
+  }), [sections, profile?.id]);
   const myOpenCount = useMemo(
     () => profile ? tasks.filter(task => task.assigned_to === profile.id && task.status !== 'Completed').length : 0,
     [tasks, profile],

@@ -118,6 +118,18 @@ export function groupDelegatedTasksByAssignee<T extends Pick<DelegatedTaskFilter
   return Array.from(groups, ([assignedTo, groupedTasks]) => ({ assignedTo, tasks: groupedTasks }));
 }
 
+/**
+ * Owners see everyone; their own tasks must never hide down the list. With
+ * "All Staff" selected, the viewer's group comes first, then everyone else in
+ * the order splitDelegatedSections already established.
+ */
+export function prioritizeOwnAssigneeGroups<T extends { assignedTo: string }>(groups: T[], viewerId: string | null | undefined): T[] {
+  if (!viewerId) return groups;
+  const own = groups.filter(group => group.assignedTo === viewerId);
+  if (own.length === 0) return groups;
+  return [...own, ...groups.filter(group => group.assignedTo !== viewerId)];
+}
+
 export function delegatedTaskDueAt(localDateTime: string): string | null {
   if (!localDateTime) return null;
   const dueAt = new Date(localDateTime);

@@ -8,6 +8,7 @@ import { useServiceJobs, jobTypeCardColors, jobTypeChipColors, jobTypeDotColors,
 import { useContacts } from '@/hooks/useContacts';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import type { Job, JobStatus, JobType, ScheduleJobType } from '@/types/database';
 import { availableInventoryForJob, calendarJobTitleClass, jobOccursOnCalendarDay, jobOverlapsCalendarRange, jobScheduleDraft, jobScheduleUpdatesFromDraft, moveJobScheduleToDay, scheduleDateRangeError, scheduleJobType, unscheduledJobStatusLabel, unscheduledJobVisualStatus } from '@/lib/jobSchedule';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
@@ -421,6 +422,14 @@ export default function Service() {
       toast(message, 'error');
       setCreatingJob(false);
       return;
+    }
+    // The description typed at creation becomes the first Job Note, stamped
+    // with who wrote it and when (Brandon: notes are the most important part).
+    if (newJob.description.trim() && profile) {
+      const { error: noteError } = await supabase.from('notes').insert({
+        job_id: result.id, body: newJob.description.trim(), created_by: profile.id,
+      });
+      if (noteError) console.error('Job note could not be saved:', noteError);
     }
     await refreshInventory();
     toast('Job created', 'success');

@@ -11,6 +11,7 @@ import {
   groupDelegatedTasksByAssignee,
   isDelegatedTaskOverdue,
   parseDelegatedRequest,
+  prioritizeOwnAssigneeGroups,
   splitDelegatedSections,
 } from '../src/lib/delegatedTasks.ts';
 
@@ -157,5 +158,12 @@ describe('Delegated Tasks v2', () => {
     assert.match(hook, /from\(TASK_PROOF_BUCKET\)\.upload/);
     assert.match(hook, /Already nudged in the last hour/);
     assert.match(hook, /createSignedUrl\(path, 60 \* 60\)/);
+  });
+
+  it('keeps an owner\'s own tasks at the top of the All Staff view', () => {
+    const groups = [{ assignedTo: 'alex' }, { assignedTo: 'brandon' }, { assignedTo: 'ben' }];
+    assert.deepEqual(prioritizeOwnAssigneeGroups(groups, 'brandon').map(g => g.assignedTo), ['brandon', 'alex', 'ben']);
+    assert.deepEqual(prioritizeOwnAssigneeGroups(groups, 'grace').map(g => g.assignedTo), ['alex', 'brandon', 'ben']);
+    assert.deepEqual(prioritizeOwnAssigneeGroups(groups, null).map(g => g.assignedTo), ['alex', 'brandon', 'ben']);
   });
 });

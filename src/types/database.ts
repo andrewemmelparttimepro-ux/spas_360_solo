@@ -129,7 +129,7 @@ export interface Task {
 export interface Note {
   id: string; contact_id: string | null; deal_id: string | null;
   job_id: string | null; body: string; created_by: string;
-  created_at: string;
+  created_at: string; edited_at?: string | null; edited_by?: string | null;
 }
 
 export interface TimeEntry {

@@ -68,6 +68,13 @@ describe('client telemetry privacy', () => {
   });
 });
 
+describe('Microsoft Clarity content security policy', () => {
+  it('allows the loader host and the script host Clarity actually serves', async () => {
+    const vercel = await readFile(new URL('../vercel.json', import.meta.url), 'utf8');
+    assert.match(vercel, /script-src 'self' https:\/\/www\.clarity\.ms https:\/\/scripts\.clarity\.ms/);
+  });
+});
+
 describe('Ari answer rendering', () => {
   it('renders assistant Markdown structurally instead of exposing table syntax', async () => {
     const chat = await readFile(repoFile('src/components/ChatWidget.tsx'), 'utf8');

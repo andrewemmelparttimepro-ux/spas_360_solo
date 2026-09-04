@@ -17,6 +17,12 @@ export interface SummaryStaff {
   delegated_completed: { title: string; completed_at: string }[];
   delegated_open: { title: string; due_at: string | null; overdue: boolean }[];
   delegated_sent: number;
+  leads_followed_up: number;
+  tasks_set: number;
+  deals_created: number;
+  deals_won: number;
+  deals_lost: number;
+  must_dos: { title: string; due_at: string | null; priority: string; task_type: string | null; overdue: boolean }[];
 }
 
 export interface MorningSummary {
@@ -24,6 +30,8 @@ export interface MorningSummary {
   window_start: string;
   window_end: string;
   generated_at: string;
+  viewer_id: string;
+  owner_view: boolean;
   staff: SummaryStaff[];
   delegated: { created: number; completed: number; open: number; overdue: number };
   deals: {
@@ -65,6 +73,11 @@ export function defaultSummaryDay(now: Date = new Date()): string {
   return shiftDateKey(centralDateKey(now), -1);
 }
 
+/** The daily card is dated for the day ahead and evaluates the prior day. */
+export function defaultDailySummaryDay(now: Date = new Date()): string {
+  return centralDateKey(now);
+}
+
 export function summaryDayLabel(dateKey: string): string {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
@@ -104,4 +117,27 @@ export function staffAttentionFlags(staff: SummaryStaff): string[] {
   if (overdue > 0) flags.push(`${overdue} overdue`);
   if (staff.punches.some(punch => punch.owner_adjusted)) flags.push('Time card adjusted');
   return flags;
+}
+
+/** Deterministic coaching copy: candid, encouraging, and entirely sourced from counts. */
+export function personalPerformanceRead(staff: SummaryStaff): string {
+  const activity = staff.leads_followed_up + staff.tasks_set + staff.deals_created + staff.deals_won + staff.deals_lost;
+  const opening = activity === 0 ? 'Yesterday was quiet in SPAS 360.' : [
+    `${staff.leads_followed_up} lead${staff.leads_followed_up === 1 ? '' : 's'} followed up`,
+    `${staff.tasks_set} task${staff.tasks_set === 1 ? '' : 's'} set`,
+    `${staff.deals_created} new deal${staff.deals_created === 1 ? '' : 's'}`,
+    `${staff.deals_won} won`,
+    `${staff.deals_lost} lost`,
+  ].join(' · ');
+  const encouragement = activity === 0
+    ? ''
+    : staff.deals_won > 0
+      ? ' Nice work — keep that momentum going.'
+      : staff.leads_followed_up + staff.tasks_set + staff.deals_created > 0
+        ? ' Good foundation — keep the customer momentum going.'
+        : ' Today is a fresh chance to follow up and rebuild momentum.';
+  const performance = `${opening}${activity === 0 ? '' : '.'}${encouragement}`;
+  if (staff.must_dos.length === 0) return `${performance} You have no must-dos carried into this day.`;
+  const overdue = staff.must_dos.filter(task => task.overdue).length;
+  return `${performance} You have ${staff.must_dos.length} must-do${staff.must_dos.length === 1 ? '' : 's'} for this day${overdue ? `, including ${overdue} overdue` : ''}.`;
 }

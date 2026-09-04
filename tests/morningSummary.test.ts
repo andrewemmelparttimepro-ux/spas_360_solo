@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   defaultSummaryDay,
+  defaultDailySummaryDay,
   formatSummaryMinutes,
+  personalPerformanceRead,
   shiftDateKey,
   staffAttentionFlags,
   summaryDayLabel,
@@ -15,6 +17,7 @@ const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, im
 describe('Owner Morning Summary', () => {
   it('defaults to yesterday in dealership time and moves by whole days', () => {
     assert.equal(defaultSummaryDay(new Date('2026-09-03T13:30:00Z')), '2026-09-02');
+    assert.equal(defaultDailySummaryDay(new Date('2026-09-03T13:30:00Z')), '2026-09-03');
     // 11:30 PM Central on the 2nd is already the 3rd in UTC — the summary must still say the 2nd was "yesterday" only after Central midnight.
     assert.equal(defaultSummaryDay(new Date('2026-09-03T04:30:00Z')), '2026-09-01');
     assert.equal(shiftDateKey('2026-09-01', -1), '2026-08-31');
@@ -35,56 +38,61 @@ describe('Owner Morning Summary', () => {
     const flags = staffAttentionFlags({
       id: 'x', name: 'Alex', role: 'service_manager', minutes_total: 480, delegated_sent: 0, delegated_completed: [],
       delegated_open: [{ title: 'Quote', due_at: '2026-09-02T21:00:00Z', overdue: true }],
+      leads_followed_up: 0, tasks_set: 0, deals_created: 0, deals_won: 0, deals_lost: 0, must_dos: [],
       punches: [{ clock_in: '2026-09-02T14:00:00Z', clock_out: '2026-09-02T22:00:00Z', reason: 'end_day', minutes: 480, acknowledged_incomplete_count: 1, acknowledged_titles: ['Quote'], owner_adjusted: false }],
     });
     assert.deepEqual(flags, ['Clocked out with open tasks (1)', '1 overdue']);
   });
 
-  it('is owner-only in the database, sits at the top of the dashboard, and pings owners at 7:30 AM Central', async () => {
+  it('serves each teammate safely, sits above Delegated Tasks, and keeps owner-wide totals owner-only', async () => {
     const [migration, panel, dashboard, hook] = await Promise.all([
-      read('supabase/migrations/20260903151000_owner_morning_summary.sql'),
+      read('supabase/migrations/20260904030000_daily_summary_for_everyone.sql'),
       read('src/components/dashboard/MorningSummaryPanel.tsx'),
       read('src/pages/Dashboard.tsx'),
       read('src/hooks/useMorningSummary.ts'),
     ]);
     assert.match(migration, /create or replace function public\.owner_morning_summary\(p_day date default null\)/);
-    assert.match(migration, /'Owner access required'/);
+    assert.match(migration, /'Signed-in access required'/);
     assert.match(migration, /at time zone 'America\/Chicago'/);
-    assert.match(migration, /acknowledged_incomplete_count/);
-    assert.match(migration, /s\.is_won/);
-    assert.match(migration, /cron\.schedule\('spas360-morning-summary', '30 12 \* \* \*'/);
-    assert.match(migration, /'\/dashboard\?summary=open'/);
-    assert.match(panel, /Morning Summary/);
+    assert.match(migration, /and \(v_is_owner or p\.id = v_user\)/);
+    assert.match(migration, /if v_is_owner then/);
+    assert.match(migration, /task_type = 'Sales Follow-Up'/);
+    assert.match(migration, /as leads_followed_up/);
+    assert.match(migration, /as tasks_set/);
+    assert.match(migration, /as deals_created/);
+    assert.match(migration, /as deals_won/);
+    assert.match(migration, /as deals_lost/);
+    assert.match(migration, /as must_dos/);
+    assert.match(panel, /Daily Summary/);
     assert.match(panel, /params\.get\('summary'\) === 'open'/);
-    assert.match(panel, /Everyone's Day/);
-    assert.match(hook, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
+    assert.match(panel, /Staff-wide totals/);
+    assert.match(panel, /Your individual summary/);
+    assert.match(panel, /Must-dos for this day/);
+    assert.match(hook, /p_day: shiftDateKey\(day, -1\)/);
     const summaryIndex = dashboard.indexOf('<MorningSummaryPanel />');
     const delegatedIndex = dashboard.indexOf('<DelegatedTasksPanel />');
     const followUpIndex = dashboard.indexOf('<UpcomingTasksPanel');
     const revenueIndex = dashboard.indexOf('Revenue Overview');
-    const everyoneIndex = dashboard.indexOf('<EveryonesDayPanel />');
     assert.ok(summaryIndex < delegatedIndex);
     assert.ok(delegatedIndex < followUpIndex);
     assert.ok(followUpIndex < revenueIndex);
-    assert.ok(revenueIndex < everyoneIndex);
+    assert.equal(dashboard.includes('<EveryonesDayPanel />'), false);
   });
 
-  it('keeps Ari\'s read visible while Everyone\'s Day starts as a one-line disclosure', async () => {
-    const [panel, api, migration] = await Promise.all([
-      read('src/components/dashboard/MorningSummaryPanel.tsx'),
-      read('api/owners/morning-narration.ts'),
-      read('supabase/migrations/20260903170000_staff_ops_round_two.sql'),
-    ]);
-    assert.match(panel, /\/api\/owners\/morning-narration\?day=/);
-    assert.match(panel, /Ari's read/);
+  it('uses one compact disclosure and deterministic personalized coaching', async () => {
+    const panel = await read('src/components/dashboard/MorningSummaryPanel.tsx');
     assert.match(panel, /const \[open, setOpen\] = useState\(false\)/);
-    assert.match(panel, /aria-controls="everyones-day-body"/);
+    assert.match(panel, /aria-controls="morning-summary-body"/);
     assert.match(panel, /aria-expanded=\{open\}/);
     assert.match(panel, /\{open && \(/);
-    assert.match(api, /profile\.role !== 'owner_manager'/);
-    assert.match(api, /rpc\('owner_morning_summary', \{ p_day: day \}\)/);
-    assert.match(api, /at most three short sentences/);
-    assert.match(api, /onConflict: 'org_id,day'/);
-    assert.match(migration, /create table if not exists public\.morning_summary_narrations/);
+    assert.doesNotMatch(panel, /morning-narration/);
+
+    const prose = personalPerformanceRead({
+      id: 'x', name: 'Alex', role: 'salesperson', punches: [], minutes_total: 0,
+      delegated_completed: [], delegated_open: [], delegated_sent: 0,
+      leads_followed_up: 3, tasks_set: 2, deals_created: 1, deals_won: 1, deals_lost: 0,
+      must_dos: [{ title: 'Call Pat', due_at: '2026-09-03T15:00:00Z', priority: 'High', task_type: 'Sales Follow-Up', overdue: true }],
+    });
+    assert.equal(prose, '3 leads followed up · 2 tasks set · 1 new deal · 1 won · 0 lost. Nice work — keep that momentum going. You have 1 must-do for this day, including 1 overdue.');
   });
 });

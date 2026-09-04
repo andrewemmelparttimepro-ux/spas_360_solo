@@ -17,7 +17,7 @@ import {
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
-import MorningSummaryPanel, { EveryonesDayPanel, MorningSummaryProvider } from '@/components/dashboard/MorningSummaryPanel';
+import MorningSummaryPanel, { MorningSummaryProvider } from '@/components/dashboard/MorningSummaryPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -306,7 +306,6 @@ export default function Dashboard() {
           </div>
       </div>
 
-      <EveryonesDayPanel />
     </div>
     </MorningSummaryProvider>
   );

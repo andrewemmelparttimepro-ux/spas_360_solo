@@ -12,7 +12,7 @@ describe('Brandon, Sep 4 afternoon cards', () => {
 
   it('stamps who marked a unit paid off and when', async () => {
     const [migration, hook, component] = await Promise.all([
-      read('supabase/migrations/20260904200000_flooring_paid_off_stamp.sql'),
+      read('supabase/migrations/20260904201619_flooring_paid_off_stamp.sql'),
       read('src/hooks/useInventoryFlooringReport.ts'),
       read('src/components/InventoryFlooringStatusReport.tsx'),
     ]);

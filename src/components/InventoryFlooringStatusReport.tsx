@@ -102,6 +102,28 @@ export function InventoryFlooringStatusReport() {
               </label>
             </div>
 
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label="Filtered inventory flooring amount summary"
+              className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-700 bg-amber-500/10 px-4 py-3 sm:px-6"
+            >
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-500">Total amount owed</p>
+                <p className="mt-0.5 text-sm text-ink-400">
+                  {selectedStore || 'All Stores'} · {selectedFlooring || 'All flooring designations'} · {visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'}
+                </p>
+                {!report.isLoading && amountSummary.missingCount > 0 && (
+                  <p className="mt-1 text-xs text-amber-400">
+                    {amountSummary.missingCount} blank; total includes {amountSummary.recordedCount} entered {amountSummary.recordedCount === 1 ? 'amount' : 'amounts'} only.
+                  </p>
+                )}
+              </div>
+              <p className="text-2xl font-bold tabular-nums text-ink-100">
+                {report.isLoading ? 'Loading total…' : currency.format(amountSummary.total)}
+              </p>
+            </div>
+
             <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-5">
               {report.error ? (
                 <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-3 text-sm text-red-300">

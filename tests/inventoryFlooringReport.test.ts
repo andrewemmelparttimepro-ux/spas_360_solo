@@ -54,6 +54,14 @@ describe('Inventory Flooring Status report', () => {
       recordedCount: 1,
       missingCount: 0,
     });
+    assert.deepEqual(
+      inventoryFlooringAmountSummary(inventoryForFlooring(inventoryForStore(items, 'Minot'), 'Wells Fargo Minot')),
+      { total: 10000, recordedCount: 1, missingCount: 0 },
+    );
+    assert.deepEqual(
+      inventoryFlooringAmountSummary(inventoryForFlooring(inventoryForStore(items, 'Bismarck'), 'Wells Fargo Bismarck')),
+      { total: 0, recordedCount: 0, missingCount: 1 },
+    );
   });
 
   it('keeps blank amounts distinct from a real zero-dollar value', () => {
@@ -87,6 +95,8 @@ describe('Inventory Flooring Status report', () => {
     assert.match(hook, /\.range\(from, from \+ PAGE_SIZE - 1\)/);
     assert.match(component, /Store[\s\S]*All Stores[\s\S]*Minot[\s\S]*Bismarck/);
     assert.match(component, /Flooring designation[\s\S]*All flooring designations/);
+    assert.match(component, /aria-label="Filtered inventory flooring amount summary"[\s\S]*Total amount owed[\s\S]*currency\.format\(amountSummary\.total\)[\s\S]*min-h-0 flex-1 overflow-auto/);
+    assert.match(component, /selectedStore \|\| 'All Stores'[\s\S]*selectedFlooring \|\| 'All flooring designations'/);
     assert.match(component, /Flooring status for/);
     assert.match(component, />Amount<[\s\S]*total Amount/);
     assert.match(hook, /update\(\{ flooring_amount: flooringAmount \}\)/);

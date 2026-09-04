@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { FileSpreadsheet, LoaderCircle, Palette, RotateCcw, Trash2, X } from 'lucide-react';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useInventoryFlooringReport } from '@/hooks/useInventoryFlooringReport';
@@ -17,6 +17,12 @@ import {
   type InventoryFlooringStore,
 } from '@/lib/inventoryFlooringReport';
 import { splitSerialAndFlooring } from '@/lib/inventoryFields';
+import {
+  INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS,
+  INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT,
+  resizedInventoryFlooringColumnWidth,
+  resizedInventoryFlooringRowHeight,
+} from '@/lib/inventoryFlooringGrid';
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -27,6 +33,16 @@ export function InventoryFlooringStatusReport() {
   const [showRemoved, setShowRemoved] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [rowActionError, setRowActionError] = useState<string | null>(null);
+  const [columnWidths, setColumnWidths] = useState<number[]>(() => [...INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS]);
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const resizeGestureRef = useRef<{
+    kind: 'column' | 'row';
+    index: number;
+    rowId?: string;
+    pointerId: number;
+    startClient: number;
+    startSize: number;
+  } | null>(null);
   const report = useInventoryFlooringReport(isOpen);
   const flooringOptions = useMemo(() => inventoryFlooringOptions(report.items), [report.items]);
   const filteredItems = useMemo(
@@ -40,6 +56,7 @@ export function InventoryFlooringStatusReport() {
   const visibleItems = showRemoved ? filteredItems : activeItems;
   const amountSummary = inventoryFlooringAmountSummary(activeItems);
   const selectedItem = visibleItems.find(item => item.id === selectedRowId) ?? null;
+  const tableWidth = columnWidths.reduce((total, width) => total + width, 0);
 
   useEffect(() => {
     if (selectedRowId && !visibleItems.some(item => item.id === selectedRowId)) setSelectedRowId(null);
@@ -84,6 +101,73 @@ export function InventoryFlooringStatusReport() {
       setRowActionError(error instanceof Error ? error.message : 'Row could not be restored.');
     }
   };
+
+  const beginResize = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    kind: 'column' | 'row',
+    index: number,
+    rowId?: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const startSize = kind === 'column'
+      ? columnWidths[index]
+      : rowHeights[rowId ?? ''] ?? INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT;
+    if (startSize === undefined) return;
+    resizeGestureRef.current = {
+      kind,
+      index,
+      rowId,
+      pointerId: event.pointerId,
+      startClient: kind === 'column' ? event.clientX : event.clientY,
+      startSize,
+    };
+    if (kind === 'row' && rowId) setSelectedRowId(rowId);
+  };
+
+  const continueResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const gesture = resizeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const delta = (gesture.kind === 'column' ? event.clientX : event.clientY) - gesture.startClient;
+    if (gesture.kind === 'column') {
+      setColumnWidths(current => current.map((width, index) => index === gesture.index
+        ? resizedInventoryFlooringColumnWidth(gesture.startSize, delta, index)
+        : width));
+      return;
+    }
+    if (gesture.rowId) {
+      setRowHeights(current => ({
+        ...current,
+        [gesture.rowId as string]: resizedInventoryFlooringRowHeight(gesture.startSize, delta),
+      }));
+    }
+  };
+
+  const finishResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const gesture = resizeGestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    resizeGestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const resetGridSizes = () => {
+    setColumnWidths([...INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS]);
+    setRowHeights({});
+  };
+
+  const columnResizeHandle = (index: number, label: string) => (
+    <button
+      type="button"
+      aria-label={`Resize ${label} column`}
+      title={`Drag to resize ${label} column`}
+      onPointerDown={event => beginResize(event, 'column', index)}
+      onPointerMove={continueResize}
+      onPointerUp={finishResize}
+      onPointerCancel={finishResize}
+      className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none border-r-2 border-amber-500/35 bg-transparent hover:border-amber-400 focus:border-amber-400 focus:outline-none"
+    />
+  );
 
   return (
     <section aria-labelledby="inventory-flooring-status-heading">
@@ -222,39 +306,70 @@ export function InventoryFlooringStatusReport() {
                 <p className="flex items-center justify-center gap-2 py-12 text-sm text-ink-500"><LoaderCircle className="h-4 w-4 animate-spin" /> Loading all inventory…</p>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-ink-700 bg-ink-950/50">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-700 bg-ink-900 px-3 py-2 text-xs text-ink-400">
+                    <span>Drag an amber header edge to resize a column, or the amber bottom edge beside a row number to resize that row.</span>
+                    <button type="button" onClick={resetGridSizes} className="inline-flex items-center gap-1 rounded-md border border-ink-700 px-2 py-1 font-semibold text-ink-300 hover:border-amber-500 hover:text-ink-100">
+                      <RotateCcw className="h-3 w-3" /> Reset sizes
+                    </button>
+                  </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[820px] text-sm">
+                    <table data-resizable-grid="inventory-flooring" className="table-fixed text-sm" style={{ width: `${tableWidth}px` }}>
+                      <colgroup>
+                        {columnWidths.map((width, index) => <col key={index} style={{ width: `${width}px` }} />)}
+                      </colgroup>
                       <thead className="text-left text-[11px] uppercase tracking-wide text-ink-500">
-                        <tr><th className="px-3 py-2 text-center">#</th><th className="px-3 py-2">Inventory</th><th className="px-3 py-2">Store</th><th className="px-3 py-2">Serial number</th><th className="px-3 py-2">Flooring designation</th><th className="px-3 py-2">Status / customer</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2 text-right">Report</th></tr>
+                        <tr>
+                          <th className="relative overflow-hidden px-3 py-2 text-center">#{columnResizeHandle(0, 'number')}</th>
+                          <th className="relative overflow-hidden px-3 py-2">Inventory{columnResizeHandle(1, 'inventory')}</th>
+                          <th className="relative overflow-hidden px-3 py-2">Store{columnResizeHandle(2, 'store')}</th>
+                          <th className="relative overflow-hidden px-3 py-2">Serial number{columnResizeHandle(3, 'serial number')}</th>
+                          <th className="relative overflow-hidden px-3 py-2">Flooring designation{columnResizeHandle(4, 'flooring designation')}</th>
+                          <th className="relative overflow-hidden px-3 py-2">Status / customer{columnResizeHandle(5, 'status or customer')}</th>
+                          <th className="relative overflow-hidden px-3 py-2 text-right"><span>Amount</span>{columnResizeHandle(6, 'amount')}</th>
+                          <th className="relative overflow-hidden px-3 py-2 text-right">Report{columnResizeHandle(7, 'report')}</th>
+                        </tr>
                       </thead>
                       <tbody>
                         {visibleItems.map((item, index) => {
                           const serial = splitSerialAndFlooring(item.sku).serial;
                           const isRemoved = inventoryFlooringRowIsRemoved(item);
+                          const rowHeight = rowHeights[item.id] ?? INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT;
                           return (
                             <tr
                               key={item.id}
                               className={`border-t border-ink-800 text-ink-300 ${isRemoved ? 'opacity-60' : ''}`}
-                              style={{ backgroundColor: item.flooring_report.background_color ?? undefined }}
+                              style={{ backgroundColor: item.flooring_report.background_color ?? undefined, height: `${rowHeight}px` }}
                             >
-                              <td className="px-2 py-2 text-center">
-                                <button
-                                  type="button"
-                                  aria-pressed={selectedRowId === item.id}
-                                  aria-label={`Select row ${index + 1} for background color`}
-                                  onClick={() => setSelectedRowId(current => current === item.id ? null : item.id)}
-                                  className={`h-7 min-w-7 rounded-md border px-1 text-xs font-bold ${selectedRowId === item.id ? 'border-amber-500 text-amber-400' : 'border-ink-700 text-ink-400 hover:text-ink-100'}`}
-                                >
-                                  {index + 1}
-                                </button>
+                              <td className="relative overflow-hidden p-0 text-center" style={{ height: `${rowHeight}px` }}>
+                                <div className="relative flex h-full items-center justify-center px-2">
+                                  <button
+                                    type="button"
+                                    aria-pressed={selectedRowId === item.id}
+                                    aria-label={`Select row ${index + 1} for background color`}
+                                    onClick={() => setSelectedRowId(current => current === item.id ? null : item.id)}
+                                    className={`h-7 min-w-7 rounded-md border px-1 text-xs font-bold ${selectedRowId === item.id ? 'border-amber-500 text-amber-400' : 'border-ink-700 text-ink-400 hover:text-ink-100'}`}
+                                  >
+                                    {index + 1}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-label={`Resize row ${index + 1}`}
+                                    title={`Drag to resize row ${index + 1}`}
+                                    onPointerDown={event => beginResize(event, 'row', index, item.id)}
+                                    onPointerMove={continueResize}
+                                    onPointerUp={finishResize}
+                                    onPointerCancel={finishResize}
+                                    className="absolute -bottom-1 left-0 z-10 h-2 w-full cursor-row-resize touch-none border-b-2 border-amber-500/35 bg-transparent hover:border-amber-400 focus:border-amber-400 focus:outline-none"
+                                  />
+                                </div>
                               </td>
-                              <td className="px-3 py-2 font-medium text-ink-100">{item.model || item.product}<span className="block text-xs font-normal text-ink-500">{item.brand || item.product}</span></td>
-                              <td className="px-3 py-2">{item.locations?.name || '—'}</td>
-                              <td className="px-3 py-2">{serial || '—'}</td>
-                              <td className="px-3 py-2"><FlooringDesignationSelect item={item} onSave={report.updateDesignation} /></td>
-                              <td className="px-3 py-2"><FlooringStatusInput item={item} onSave={report.updateStatusText} /></td>
-                              <td className="px-3 py-2 text-right"><FlooringAmountInput item={item} onSave={report.updateAmount} /></td>
-                              <td className="px-3 py-2 text-right">
+                              <td className="overflow-hidden px-3 py-1 font-medium text-ink-100"><div className="max-h-full overflow-hidden">{item.model || item.product}<span className="block truncate text-xs font-normal text-ink-500">{item.brand || item.product}</span></div></td>
+                              <td className="overflow-hidden truncate px-3 py-1">{item.locations?.name || '—'}</td>
+                              <td className="overflow-hidden truncate px-3 py-1">{serial || '—'}</td>
+                              <td className="overflow-hidden px-2 py-1"><FlooringDesignationSelect item={item} onSave={report.updateDesignation} /></td>
+                              <td className="overflow-hidden px-2 py-1"><FlooringStatusInput item={item} onSave={report.updateStatusText} /></td>
+                              <td className="overflow-hidden px-2 py-1 text-right"><FlooringAmountInput item={item} onSave={report.updateAmount} /></td>
+                              <td className="overflow-hidden px-2 py-1 text-right">
                                 {isRemoved ? (
                                   <button type="button" onClick={() => { void restoreRow(item); }} className="rounded-md border border-ink-700 px-2 py-1 text-xs text-ink-300 hover:text-ink-100">Restore</button>
                                 ) : (
@@ -313,7 +428,7 @@ function FlooringDesignationSelect({ item, onSave }: FlooringDesignationSelectPr
   };
 
   return (
-    <div className="min-w-48">
+    <div className="min-w-0 w-full">
       <select
         aria-label={`Flooring status for ${item.model || item.product}`}
         value={value}
@@ -371,7 +486,7 @@ function FlooringAmountInput({ item, onSave }: FlooringAmountInputProps) {
   };
 
   return (
-    <div className="ml-auto w-36">
+    <div className="ml-auto min-w-0 w-full">
       <div className="flex items-center rounded-lg border border-ink-700 bg-ink-900 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500/40">
         <span className="pl-2 text-xs text-ink-500">$</span>
         <input
@@ -436,7 +551,7 @@ function FlooringStatusInput({ item, onSave }: FlooringStatusInputProps) {
   };
 
   return (
-    <div className="min-w-44">
+    <div className="min-w-0 w-full">
       <input
         type="text"
         maxLength={120}

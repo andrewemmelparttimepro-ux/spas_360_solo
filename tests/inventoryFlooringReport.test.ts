@@ -14,6 +14,12 @@ import {
   inventorySkuForFlooringDesignation,
   type InventoryFlooringReportItem,
 } from '../src/lib/inventoryFlooringReport.ts';
+import {
+  INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS,
+  INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT,
+  resizedInventoryFlooringColumnWidth,
+  resizedInventoryFlooringRowHeight,
+} from '../src/lib/inventoryFlooringGrid.ts';
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -97,6 +103,16 @@ describe('Inventory Flooring Status report', () => {
     assert.ok(INVENTORY_FLOORING_ROW_COLORS.every(color => /^#[0-9A-F]{6}$/.test(color)));
   });
 
+  it('turns pointer deltas into bounded column widths and row heights', () => {
+    assert.equal(resizedInventoryFlooringColumnWidth(180, 40, 1), 220);
+    assert.equal(resizedInventoryFlooringColumnWidth(180, -10_000, 1), 88);
+    assert.equal(resizedInventoryFlooringColumnWidth(180, 10_000, 1), 480);
+    assert.equal(resizedInventoryFlooringRowHeight(INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT, -10_000), 36);
+    assert.equal(resizedInventoryFlooringRowHeight(INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT, 10_000), 180);
+    assert.throws(() => resizedInventoryFlooringColumnWidth(100, 0, 99), /Unknown inventory flooring column/);
+    assert.equal(INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS.length, 8);
+  });
+
   it('is owner-scoped, organization-wide, and placed immediately above Paid Commissions', async () => {
     const [page, hook, component, migration, rowControlsMigration] = await Promise.all([
       read('src/pages/OwnersCorner.tsx'),
@@ -131,6 +147,15 @@ describe('Inventory Flooring Status report', () => {
     assert.match(component, /Custom row background color/);
     assert.match(component, /Paid off/);
     assert.match(component, /Show paid-off rows/);
+    assert.match(component, /data-resizable-grid="inventory-flooring"/);
+    assert.match(component, /Drag an amber header edge to resize a column/);
+    assert.match(component, /aria-label=\{`Resize \$\{label\} column`\}/);
+    assert.match(component, /aria-label=\{`Resize row \$\{index \+ 1\}`\}/);
+    assert.match(component, /cursor-col-resize/);
+    assert.match(component, /cursor-row-resize/);
+    assert.match(component, /Reset sizes/);
+    assert.match(component, /<colgroup>[\s\S]*columnWidths\.map/);
+    assert.match(component, /selectedStore \|\| 'All Stores'[\s\S]*selectedFlooring \|\| 'All flooring designations'/);
     assert.match(hook, /rpc\('set_inventory_flooring_row_value',[\s\S]*p_inventory_item_id: item\.id[\s\S]*p_expected_version: item\.flooring_report\.version[\s\S]*p_field: field/);
     assert.match(rowControlsMigration, /create table if not exists public\.inventory_flooring_rows/);
     assert.match(rowControlsMigration, /foreign key \(inventory_item_id, org_id\)[\s\S]*references public\.inventory_items\(id, org_id\)/);

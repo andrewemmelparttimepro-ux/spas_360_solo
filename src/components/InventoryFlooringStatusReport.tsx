@@ -9,6 +9,7 @@ import {
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
+  inventoryForSerialSearch,
   inventoryForStore,
   inventoryFlooringRowIsRemoved,
   isInventoryFlooringDesignation,
@@ -30,6 +31,7 @@ export function InventoryFlooringStatusReport() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFlooring, setSelectedFlooring] = useState('');
   const [selectedStore, setSelectedStore] = useState<InventoryFlooringStore>('');
+  const [serialSearch, setSerialSearch] = useState('');
   const [showRemoved, setShowRemoved] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [rowActionError, setRowActionError] = useState<string | null>(null);
@@ -46,8 +48,11 @@ export function InventoryFlooringStatusReport() {
   const report = useInventoryFlooringReport(isOpen);
   const flooringOptions = useMemo(() => inventoryFlooringOptions(report.items), [report.items]);
   const filteredItems = useMemo(
-    () => inventoryForFlooring(inventoryForStore(report.items, selectedStore), selectedFlooring),
-    [report.items, selectedFlooring, selectedStore],
+    () => inventoryForSerialSearch(
+      inventoryForFlooring(inventoryForStore(report.items, selectedStore), selectedFlooring),
+      serialSearch,
+    ),
+    [report.items, selectedFlooring, selectedStore, serialSearch],
   );
   const activeItems = useMemo(
     () => filteredItems.filter(item => !inventoryFlooringRowIsRemoved(item)),
@@ -65,6 +70,7 @@ export function InventoryFlooringStatusReport() {
   const closeReport = () => {
     setSelectedFlooring('');
     setSelectedStore('');
+    setSerialSearch('');
     setShowRemoved(false);
     setSelectedRowId(null);
     setRowActionError(null);
@@ -207,7 +213,7 @@ export function InventoryFlooringStatusReport() {
               <button type="button" aria-label="Close Inventory Flooring Status report" onClick={closeReport} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:text-ink-100"><X className="h-4 w-4" /></button>
             </header>
 
-            <div className="grid gap-3 border-b border-ink-700 bg-ink-950/45 px-4 py-3 sm:grid-cols-3 sm:px-6">
+            <div className="grid gap-3 border-b border-ink-700 bg-ink-950/45 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.6fr)] sm:px-6">
               <label className="block text-xs font-semibold text-ink-400">
                 Store
                 <select
@@ -233,15 +239,28 @@ export function InventoryFlooringStatusReport() {
                   {flooringOptions.map(option => <option key={option} value={option}>{option}</option>)}
                 </select>
               </label>
-              <label className="flex items-end gap-2 rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-xs font-semibold text-ink-400">
-                <input
-                  type="checkbox"
-                  checked={showRemoved}
-                  onChange={event => setShowRemoved(event.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Show paid-off rows
-              </label>
+              <div className="flex min-w-0 items-end gap-2">
+                <label className="min-w-0 flex-1 text-xs font-semibold text-ink-400">
+                  Serial number search
+                  <input
+                    type="search"
+                    aria-label="Search by serial number"
+                    value={serialSearch}
+                    onChange={event => setSerialSearch(event.target.value)}
+                    placeholder="Search serial number"
+                    className="mt-1 block w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none placeholder:text-ink-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40"
+                  />
+                </label>
+                <label className="flex min-h-[38px] shrink-0 items-center gap-2 rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-xs font-semibold text-ink-400">
+                  <input
+                    type="checkbox"
+                    checked={showRemoved}
+                    onChange={event => setShowRemoved(event.target.checked)}
+                    className="h-4 w-4 accent-amber-500"
+                  />
+                  Show paid-off rows
+                </label>
+              </div>
             </div>
 
             <div
@@ -379,7 +398,15 @@ export function InventoryFlooringStatusReport() {
                             </tr>
                           );
                         })}
-                        {!visibleItems.length && <tr><td colSpan={8} className="px-3 py-10 text-center text-sm text-ink-500">No inventory matches these store and flooring filters.</td></tr>}
+                        {!visibleItems.length && (
+                          <tr>
+                            <td colSpan={8} className="px-3 py-10 text-center text-sm text-ink-500">
+                              {serialSearch.trim()
+                                ? `No inventory matches serial number “${serialSearch.trim()}” with the selected filters${showRemoved ? '.' : ' and paid-off row setting.'}`
+                                : 'No inventory matches the selected store, flooring, and paid-off row filters.'}
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-ink-700 bg-ink-950 font-bold text-ink-100">

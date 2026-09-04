@@ -102,6 +102,20 @@ export function inventoryForStore(
   return items.filter(item => canonicalInventoryFlooringStore(item.locations?.name).toLocaleLowerCase() === selected);
 }
 
+const normalizedSerialSearch = (value: string) =>
+  value.toLocaleLowerCase().replace(/\s+/g, '');
+
+export function inventoryForSerialSearch(
+  items: InventoryFlooringReportItem[],
+  query: string,
+) {
+  const selected = normalizedSerialSearch(query);
+  if (!selected) return items;
+  return items.filter(item =>
+    normalizedSerialSearch(splitSerialAndFlooring(item.sku).serial).includes(selected),
+  );
+}
+
 export function inventorySkuForFlooringDesignation(
   sku: string,
   designation: string,

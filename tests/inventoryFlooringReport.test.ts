@@ -9,6 +9,7 @@ import {
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
+  inventoryForSerialSearch,
   inventoryForStore,
   inventoryFlooringRowIsRemoved,
   inventorySkuForFlooringDesignation,
@@ -59,6 +60,30 @@ describe('Inventory Flooring Status report', () => {
     assert.deepEqual(inventoryForStore(items, 'Minot').map(item => item.id), ['1', '4']);
     assert.deepEqual(inventoryForStore(items, 'Bismarck').map(item => item.id), ['2', '3']);
     assert.deepEqual(inventoryForStore(items, ''), items);
+  });
+
+  it('searches serial/SKU case-insensitively, tolerates whitespace, and composes with existing filters', () => {
+    const paidOffMatch: InventoryFlooringReportItem = {
+      ...items[0],
+      id: '5',
+      sku: 'PAID OFF 900 "Wells Fargo"',
+      flooring_report: flooringRow('5', true),
+    };
+    const sourceItems = [...items, paidOffMatch];
+
+    assert.deepEqual(inventoryForSerialSearch(sourceItems, '  paid off900  ').map(item => item.id), ['5']);
+    assert.deepEqual(inventoryForSerialSearch(sourceItems, '100').map(item => item.id), ['1']);
+    assert.deepEqual(inventoryForSerialSearch(sourceItems, 'wells fargo'), []);
+    assert.deepEqual(inventoryForSerialSearch(sourceItems, '   '), sourceItems);
+
+    const minotWellsFargo = inventoryForFlooring(
+      inventoryForStore(sourceItems, 'Minot'),
+      'Wells Fargo Minot',
+    );
+    const serialMatches = inventoryForSerialSearch(minotWellsFargo, 'paid off900');
+    assert.deepEqual(serialMatches.map(item => item.id), ['5']);
+    assert.deepEqual(serialMatches.filter(item => !inventoryFlooringRowIsRemoved(item)), []);
+    assert.deepEqual(sourceItems, [...items, paidOffMatch]);
   });
 
   it('changes only the flooring segment while preserving the serial and rejects invalid values', () => {
@@ -147,6 +172,8 @@ describe('Inventory Flooring Status report', () => {
     assert.match(component, /Custom row background color/);
     assert.match(component, /Paid off/);
     assert.match(component, /Show paid-off rows/);
+    assert.match(component, /Serial number search[\s\S]*aria-label="Search by serial number"/);
+    assert.match(component, /inventoryForSerialSearch\([\s\S]*inventoryForFlooring\(inventoryForStore/);
     assert.match(component, /data-resizable-grid="inventory-flooring"/);
     assert.match(component, /Drag an amber header edge to resize a column/);
     assert.match(component, /aria-label=\{`Resize \$\{label\} column`\}/);

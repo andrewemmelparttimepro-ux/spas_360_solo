@@ -57,7 +57,7 @@ export function useInventoryFlooringReport(enabled = true) {
     for (let from = 0; ; from += PAGE_SIZE) {
       const result = await supabase
         .from('inventory_flooring_rows')
-        .select('inventory_item_id, org_id, status_text, background_color, report_removed_at, version, updated_at, updated_by')
+        .select('inventory_item_id, org_id, status_text, background_color, report_removed_at, report_removed_by, removed_by:report_removed_by(first_name, last_name), version, updated_at, updated_by')
         .eq('org_id', profile.org_id)
         .order('inventory_item_id')
         .range(from, from + PAGE_SIZE - 1);

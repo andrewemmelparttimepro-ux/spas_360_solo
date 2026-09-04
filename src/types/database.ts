@@ -99,7 +99,9 @@ export interface InventoryItem {
 export interface InventoryFlooringRow {
   inventory_item_id: string; org_id: string;
   status_text: string | null; background_color: string | null;
-  report_removed_at: string | null; version: number;
+  report_removed_at: string | null; report_removed_by?: string | null;
+  removed_by?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+  version: number;
   updated_at: string; updated_by: string | null;
 }
 

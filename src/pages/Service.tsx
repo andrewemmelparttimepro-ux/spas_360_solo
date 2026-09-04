@@ -515,7 +515,6 @@ export default function Service() {
               <button onClick={() => setShowCreate(false)} disabled={creatingJob} className="text-ink-500 hover:text-ink-300 disabled:opacity-50"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
-              <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <CustomerCombobox
                 customers={contacts}
                 selectedId={newJob.contact_id}
@@ -524,6 +523,7 @@ export default function Service() {
                   if (contactId) applyAutoTitle(contactId);
                 }}
               />
+              <input placeholder="Job Title *" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" />
               <select value={newJob.job_type} onChange={e => setNewJob({...newJob, job_type: e.target.value as JobType})} className="w-full px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500">
                 {JOB_TYPE_OPTIONS.map(jobType => <option key={jobType}>{jobType}</option>)}
               </select>

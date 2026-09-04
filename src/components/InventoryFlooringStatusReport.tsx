@@ -27,6 +27,15 @@ import {
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
+/** "Paid off Sep 4, 2026, 3:10 PM by Brandon Solem" — who marked it and when. */
+function paidOffStamp(item: InventoryFlooringReportItem): string {
+  const row = item.flooring_report;
+  if (!row?.report_removed_at) return 'Paid off';
+  const who = Array.isArray(row.removed_by) ? row.removed_by[0] : row.removed_by;
+  const when = new Date(row.report_removed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  return `Paid off ${when}${who ? ` by ${who.first_name} ${who.last_name}`.trimEnd() : ''}`;
+}
+
 export function InventoryFlooringStatusReport() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFlooring, setSelectedFlooring] = useState('');
@@ -390,7 +399,10 @@ export function InventoryFlooringStatusReport() {
                               <td className="overflow-hidden px-2 py-1 text-right"><FlooringAmountInput item={item} onSave={report.updateAmount} /></td>
                               <td className="overflow-hidden px-2 py-1 text-right">
                                 {isRemoved ? (
-                                  <button type="button" onClick={() => { void restoreRow(item); }} className="rounded-md border border-ink-700 px-2 py-1 text-xs text-ink-300 hover:text-ink-100">Restore</button>
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className="text-[11px] text-ink-400" data-paid-off-stamp>{paidOffStamp(item)}</span>
+                                    <button type="button" onClick={() => { void restoreRow(item); }} className="rounded-md border border-ink-700 px-2 py-1 text-xs text-ink-300 hover:text-ink-100">Restore</button>
+                                  </div>
                                 ) : (
                                   <button type="button" aria-label={`Remove ${item.model || item.product} from flooring report`} onClick={() => { void removeRow(item); }} className="inline-flex items-center gap-1 rounded-md border border-ink-700 px-2 py-1 text-xs text-ink-400 hover:border-red-500/50 hover:text-red-300"><Trash2 className="h-3 w-3" /> Paid off</button>
                                 )}

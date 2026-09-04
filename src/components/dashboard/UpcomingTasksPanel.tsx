@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   ALL_TASK_OWNERS,
@@ -28,15 +28,19 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
   const [scheduleFilter, setScheduleFilter] = useState<TaskScheduleFilter>(ALL_TASKS);
   const [now, setNow] = useState(() => new Date());
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // The Overdue Tasks tile deep-links here: /dashboard?tasks=past-due
+  // The Overdue Tasks tile deep-links here: /dashboard?tasks=past-due. Apply it
+  // once, then drop the parameter so the dropdown is free to change afterwards.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('tasks') !== 'past-due') return;
     setScheduleFilter(PAST_DUE_TASKS);
     setOwnerFilter(ALL_TASK_OWNERS);
     document.getElementById('lead-follow-up-tasks-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [location.search]);
+    params.delete('tasks');
+    navigate({ pathname: location.pathname, search: params.toString() ? `?${params}` : '' }, { replace: true });
+  }, [location.search, location.pathname, navigate]);
 
   useEffect(() => {
     if (scheduleFilter === ALL_TASKS) return;
@@ -57,6 +61,24 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
     [openDeals, tasks, ownerFilter, now],
   );
   const showingDealsMissingTasks = scheduleFilter === NO_TASK_SCHEDULED;
+
+  const renderTask = (task: UpcomingTaskItem) => {
+    const overdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < now.getTime());
+    return (
+      <Link
+        key={task.id}
+        to={task.link}
+        className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-ink-700/70 hover:border-brand-500/30 group"
+      >
+        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${overdue ? 'bg-red-400' : 'bg-amber-500'}`} />
+        <div className="ml-3 min-w-0 flex-1">
+          <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{task.title}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{task.desc} · {task.assignedName}</p>
+        </div>
+        <span className={`ml-2 shrink-0 text-xs font-medium ${overdue ? 'text-red-400' : 'text-ink-500'}`}>{task.time}</span>
+      </Link>
+    );
+  };
 
   return (
     <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
@@ -104,6 +126,26 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
               </div>
             </Link>
           ))
+        ) : scheduleFilter === ALL_TASKS && (filteredTasks.length > 0 || dealsMissingTasks.length > 0) ? (
+          <>
+            {filteredTasks.map(task => renderTask(task))}
+            {dealsMissingTasks.length > 0 && (
+              <div className="pt-2">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-red-400">No task scheduled</p>
+                <div className="space-y-3">
+                  {dealsMissingTasks.map(deal => (
+                    <Link key={deal.id} to={deal.link} className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-red-500/30 hover:border-brand-500/30 group">
+                      <div className="w-2 h-2 mt-2 rounded-full flex-shrink-0 bg-red-400" />
+                      <div className="ml-3 min-w-0 flex-1">
+                        <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{deal.title}</p>
+                        <p className="text-xs text-ink-400 mt-0.5">No upcoming task · {deal.assignedName}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         ) : filteredTasks.length === 0 ? (
           <p className="text-sm text-ink-500 text-center py-6">
             {scheduleFilter === PAST_DUE_TASKS
@@ -114,23 +156,7 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
               ? `No upcoming tasks assigned to ${taskOwnerName(selectedOwner)}.`
               : 'No upcoming tasks.'}
           </p>
-        ) : filteredTasks.map(task => {
-          const overdue = Boolean(task.dueAt && new Date(task.dueAt).getTime() < now.getTime());
-          return (
-          <Link
-            key={task.id}
-            to={task.link}
-            className="flex items-start p-3 bg-ink-850/70 hover:bg-brand-500/10 rounded-lg transition-colors cursor-pointer border border-ink-700/70 hover:border-brand-500/30 group"
-          >
-            <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${overdue ? 'bg-red-400' : 'bg-amber-500'}`} />
-            <div className="ml-3 min-w-0 flex-1">
-              <p className="text-sm font-medium text-ink-100 group-hover:text-brand-500">{task.title}</p>
-              <p className="text-xs text-ink-400 mt-0.5">{task.desc} · {task.assignedName}</p>
-            </div>
-            <span className={`ml-2 shrink-0 text-xs font-medium ${overdue ? 'text-red-400' : 'text-ink-500'}`}>{task.time}</span>
-          </Link>
-          );
-        })}
+        ) : filteredTasks.map(renderTask)}
       </div>
     </div>
   );

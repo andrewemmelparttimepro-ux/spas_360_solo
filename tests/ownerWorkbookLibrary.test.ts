@@ -68,6 +68,22 @@ describe('owner workbook library', () => {
     assert.match(component, /<span ref=\{sheetEditControlsRef\} className="flex shrink-0 items-center gap-1 px-1">[\s\S]*Duplicate sheet[\s\S]*Delete sheet/);
   });
 
+  it('refreshes the shared owner workbook list for every organization change', async () => {
+    const [componentBytes, migrationBytes] = await Promise.all([
+      read('src/components/OwnerWorkbookLibrary.tsx'),
+      read('supabase/migrations/20260904123500_publish_owner_workbooks_realtime.sql'),
+    ]);
+    const component = componentBytes.toString('utf8');
+    const migration = migrationBytes.toString('utf8');
+
+    assert.match(component, /\.on\('postgres_changes',[\s\S]*event: '\*'[\s\S]*table: 'owner_workbooks'/);
+    assert.match(component, /filter: `org_id=eq\.\$\{profile\.org_id\}`/);
+    assert.doesNotMatch(component, /filter: `(?:created_by|updated_by|user_id)=eq/);
+    assert.match(component, /removeChannel\(channel\)/);
+    assert.match(migration, /pg_publication_tables[\s\S]*pubname = 'supabase_realtime'[\s\S]*tablename = 'owner_workbooks'/);
+    assert.match(migration, /alter publication supabase_realtime add table public\.owner_workbooks/);
+  });
+
   it('defines an owner-only private bucket and tenant-scoped metadata policies', async () => {
     const [migrationBytes, spasSalesMigrationBytes, controlsMigrationBytes, deleteMigrationBytes, componentBytes, pageBytes, privateSource] = await Promise.all([
       read('supabase/migrations/20260831234029_add_owner_workbook_library.sql'),

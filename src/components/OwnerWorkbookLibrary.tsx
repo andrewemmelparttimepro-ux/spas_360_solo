@@ -144,6 +144,21 @@ export function OwnerWorkbookLibrary() {
 
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
+  useEffect(() => {
+    if (profile?.role !== 'owner_manager' || !profile.org_id) return;
+    const channel = supabase
+      .channel(`owner-workbooks-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'owner_workbooks',
+        filter: `org_id=eq.${profile.org_id}`,
+      }, () => { void loadRecords(); })
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [loadRecords, profile?.org_id, profile?.role]);
+
   const inventoryWorkbook = records.find(record => record.folder_key === INVENTORY_PROFITS_FOLDER);
   const spasEtcMajorUnitWorkbooks = sortOwnerWorkbooks(
     records.filter(record => record.folder_key === SPAS_ETC_MAJOR_UNIT_SALES_FOLDER),

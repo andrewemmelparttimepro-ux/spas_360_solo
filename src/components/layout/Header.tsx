@@ -290,7 +290,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           )}
         </button>
         {notifOpen && (
-          <div className="absolute right-0 top-full mt-1 w-80 bg-ink-850 rounded-lg shadow-lg border border-ink-700 z-50 overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-4rem)] bg-ink-850 rounded-lg shadow-lg border border-ink-700 z-50 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-ink-700">
               <p className="text-sm font-semibold text-ink-100">Notifications</p>
               {unreadCount > 0 && (

@@ -96,6 +96,13 @@ export interface InventoryItem {
   notes: string | null; created_at: string; updated_at: string;
 }
 
+export interface InventoryFlooringRow {
+  inventory_item_id: string; org_id: string;
+  status_text: string | null; background_color: string | null;
+  report_removed_at: string | null; version: number;
+  updated_at: string; updated_by: string | null;
+}
+
 export interface CommunicationThread {
   id: string; org_id: string; contact_id: string;
   thread_type: 'sms' | 'email'; last_message_at: string | null;

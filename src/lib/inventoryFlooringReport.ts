@@ -1,11 +1,12 @@
 import { joinSerialAndFlooring, splitSerialAndFlooring } from './inventoryFields.ts';
-import type { InventoryItem } from '../types/database.ts';
+import type { InventoryFlooringRow, InventoryItem } from '../types/database.ts';
 
 export type InventoryFlooringReportItem = Pick<
   InventoryItem,
   'id' | 'location_id' | 'sku' | 'product' | 'brand' | 'model' | 'status' | 'flooring_amount' | 'notes'
 > & {
   locations?: { name?: string | null } | null;
+  flooring_report: InventoryFlooringRow;
 };
 
 const LEGACY_FLOORING_SEGMENT = /(?:^|·)\s*Flooring:\s*(.*?)(?=\s*·|$)/i;
@@ -22,6 +23,18 @@ export const INVENTORY_FLOORING_DESIGNATIONS = [
 
 export type InventoryFlooringDesignation = typeof INVENTORY_FLOORING_DESIGNATIONS[number];
 export type InventoryFlooringStore = '' | 'Minot' | 'Bismarck';
+
+export const INVENTORY_FLOORING_ROW_COLORS = [
+  '#3F1D1D',
+  '#3B2F0F',
+  '#163B2A',
+  '#17365D',
+  '#312E5A',
+  '#4A1D45',
+] as const;
+
+export const inventoryFlooringRowIsRemoved = (item: InventoryFlooringReportItem) =>
+  item.flooring_report.report_removed_at !== null;
 
 export const canonicalInventoryFlooringStore = (
   storeName: string | null | undefined,

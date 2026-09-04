@@ -3,23 +3,36 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   INVENTORY_FLOORING_DESIGNATIONS,
+  INVENTORY_FLOORING_ROW_COLORS,
   canonicalInventoryFlooringStore,
   inventoryFlooringAmountSummary,
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
   inventoryForStore,
+  inventoryFlooringRowIsRemoved,
   inventorySkuForFlooringDesignation,
   type InventoryFlooringReportItem,
 } from '../src/lib/inventoryFlooringReport.ts';
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
+const flooringRow = (inventoryItemId: string, removed = false) => ({
+  inventory_item_id: inventoryItemId,
+  org_id: 'org-a',
+  status_text: null,
+  background_color: null,
+  report_removed_at: removed ? '2026-09-04T12:00:00.000Z' : null,
+  version: 1,
+  updated_at: '2026-09-04T12:00:00.000Z',
+  updated_by: null,
+});
+
 const items: InventoryFlooringReportItem[] = [
-  { id: '1', location_id: 'a', sku: '100 "Wells Fargo"', product: 'Spa', brand: 'A', model: 'One', status: 'In Stock', flooring_amount: 10000, notes: null, locations: { name: 'Minot' } },
-  { id: '2', location_id: 'b', sku: '200 "MCHL TCCU"', product: 'Spa', brand: 'B', model: 'Two', status: 'On Order', flooring_amount: 20000, notes: null, locations: { name: "Bismarck (Spa's Etc)" } },
-  { id: '3', location_id: 'b', sku: '300 wells fargo', product: 'Spa', brand: 'C', model: 'Three', status: 'Sold', flooring_amount: null, notes: null, locations: { name: "Bismarck (Spa's Etc)" } },
-  { id: '4', location_id: 'a', sku: '400', product: 'Spa', brand: 'D', model: 'Four', status: 'Delivered', flooring_amount: 5000, notes: 'Imported · Flooring: Spas Etc TCCU · Customer: STOCK', locations: { name: 'Minot' } },
+  { id: '1', location_id: 'a', sku: '100 "Wells Fargo"', product: 'Spa', brand: 'A', model: 'One', status: 'In Stock', flooring_amount: 10000, notes: null, locations: { name: 'Minot' }, flooring_report: flooringRow('1') },
+  { id: '2', location_id: 'b', sku: '200 "MCHL TCCU"', product: 'Spa', brand: 'B', model: 'Two', status: 'On Order', flooring_amount: 20000, notes: null, locations: { name: "Bismarck (Spa's Etc)" }, flooring_report: flooringRow('2') },
+  { id: '3', location_id: 'b', sku: '300 wells fargo', product: 'Spa', brand: 'C', model: 'Three', status: 'Sold', flooring_amount: null, notes: null, locations: { name: "Bismarck (Spa's Etc)" }, flooring_report: flooringRow('3') },
+  { id: '4', location_id: 'a', sku: '400', product: 'Spa', brand: 'D', model: 'Four', status: 'Delivered', flooring_amount: 5000, notes: 'Imported · Flooring: Spas Etc TCCU · Customer: STOCK', locations: { name: 'Minot' }, flooring_report: flooringRow('4') },
 ];
 
 describe('Inventory Flooring Status report', () => {
@@ -77,12 +90,20 @@ describe('Inventory Flooring Status report', () => {
     });
   });
 
+  it('tracks report-only removal independently from inventory and exposes a bounded color palette', () => {
+    assert.equal(inventoryFlooringRowIsRemoved(items[0]), false);
+    assert.equal(inventoryFlooringRowIsRemoved({ ...items[0], flooring_report: flooringRow('1', true) }), true);
+    assert.equal(INVENTORY_FLOORING_ROW_COLORS.length, 6);
+    assert.ok(INVENTORY_FLOORING_ROW_COLORS.every(color => /^#[0-9A-F]{6}$/.test(color)));
+  });
+
   it('is owner-scoped, organization-wide, and placed immediately above Paid Commissions', async () => {
-    const [page, hook, component, migration] = await Promise.all([
+    const [page, hook, component, migration, rowControlsMigration] = await Promise.all([
       read('src/pages/OwnersCorner.tsx'),
       read('src/hooks/useInventoryFlooringReport.ts'),
       read('src/components/InventoryFlooringStatusReport.tsx'),
       read('supabase/migrations/20260904073000_add_inventory_flooring_amount.sql'),
+      read('supabase/migrations/20260904124500_add_inventory_flooring_row_controls.sql'),
     ]);
     const flooringReport = page.indexOf('<InventoryFlooringStatusReport />');
     const paidCommissions = page.indexOf('<PaidCommissionsTracker />');
@@ -99,10 +120,28 @@ describe('Inventory Flooring Status report', () => {
     assert.match(component, /selectedStore \|\| 'All Stores'[\s\S]*selectedFlooring \|\| 'All flooring designations'/);
     assert.match(component, /Flooring status for/);
     assert.match(component, />Amount<[\s\S]*total Amount/);
-    assert.match(hook, /update\(\{ flooring_amount: flooringAmount \}\)/);
+    assert.match(hook, /update\(\{ flooring_amount: flooringAmount \}\)[\s\S]*\.eq\('id', item\.id\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*(?:\.is|\.eq)\('flooring_amount'/);
     assert.match(hook, /update\(\{ sku \}\)[\s\S]*\.eq\('id', item\.id\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*\.eq\('sku', item\.sku\)/);
     assert.doesNotMatch(hook, /cost|msrp|sale_price/);
     assert.match(migration, /add column if not exists flooring_amount numeric\(12, 2\)/);
     assert.match(migration, /Only an owner can change an inventory flooring amount/);
+    assert.match(component, /Status \/ customer/);
+    assert.match(component, /placeholder="Customer name"/);
+    assert.match(component, /Select row \$\{index \+ 1\} for background color/);
+    assert.match(component, /Custom row background color/);
+    assert.match(component, /Paid off/);
+    assert.match(component, /Show paid-off rows/);
+    assert.match(hook, /rpc\('set_inventory_flooring_row_value',[\s\S]*p_inventory_item_id: item\.id[\s\S]*p_expected_version: item\.flooring_report\.version[\s\S]*p_field: field/);
+    assert.match(rowControlsMigration, /create table if not exists public\.inventory_flooring_rows/);
+    assert.match(rowControlsMigration, /foreign key \(inventory_item_id, org_id\)[\s\S]*references public\.inventory_items\(id, org_id\)/);
+    assert.match(rowControlsMigration, /status_text text[\s\S]*background_color text[\s\S]*report_removed_at timestamptz[\s\S]*version bigint/);
+    assert.match(rowControlsMigration, /for update to authenticated[\s\S]*org_id = \(select public\.auth_org\(\)\)[\s\S]*auth_role\(\)\) = 'owner_manager'/);
+    assert.doesNotMatch(rowControlsMigration, /grant (?:delete|insert|update) (?:\([^)]*\) )?on table public\.inventory_flooring_rows to authenticated/);
+    assert.match(rowControlsMigration, /security definer[\s\S]*p_field = 'status_text'[\s\S]*p_field = 'background_color'[\s\S]*p_field = 'report_removed'/);
+    assert.match(rowControlsMigration, /org_id = v_org_id[\s\S]*version = p_expected_version/);
+    assert.match(rowControlsMigration, /grant execute on function public\.set_inventory_flooring_row_value\(uuid, bigint, text, text\)[\s\S]*to authenticated, service_role/);
+    assert.match(rowControlsMigration, /new\.version := old\.version \+ 1/);
+    assert.match(rowControlsMigration, /after insert on public\.inventory_items/);
+    assert.match(rowControlsMigration, /alter publication supabase_realtime add table public\.inventory_flooring_rows/);
   });
 });

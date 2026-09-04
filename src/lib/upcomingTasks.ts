@@ -68,7 +68,8 @@ export function isTaskDueToday(task: UpcomingTaskItem, now: Date = new Date()): 
   if (!INCOMPLETE_TASK_STATUSES.has(task.status) || !task.dueAt) return false;
   const dueAt = new Date(task.dueAt);
   if (Number.isNaN(dueAt.getTime())) return false;
-  return dueAt.getFullYear() === now.getFullYear()
+  return dueAt.getTime() >= now.getTime()
+    && dueAt.getFullYear() === now.getFullYear()
     && dueAt.getMonth() === now.getMonth()
     && dueAt.getDate() === now.getDate();
 }

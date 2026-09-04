@@ -37,10 +37,18 @@ describe('Dashboard upcoming tasks', () => {
     assert.deepEqual(filterUpcomingTasks([...tasks, completedTask], ALL_TASK_OWNERS, PAST_DUE_TASKS, now), [tasks[0]]);
   });
 
-  it('combines salesperson and due-today filters independently', () => {
+  it('combines salesperson and due-today filters without repeating overdue tasks', () => {
     const now = new Date('2026-08-25T14:00:00Z');
     assert.deepEqual(filterUpcomingTasks(tasks, 'owner-b', TASKS_DUE_TODAY, now), [tasks[1]]);
-    assert.deepEqual(filterUpcomingTasks(tasks, 'owner-a', TASKS_DUE_TODAY, now), [tasks[0]]);
+    assert.deepEqual(filterUpcomingTasks(tasks, 'owner-a', TASKS_DUE_TODAY, now), []);
+    assert.deepEqual(filterUpcomingTasks(tasks, ALL_TASK_OWNERS, TASKS_DUE_TODAY, now), [tasks[1]]);
+  });
+
+  it('puts a task due at the current instant in Due Today, not Past Due', () => {
+    const now = new Date('2026-08-25T14:00:00Z');
+    const dueNow = { ...tasks[0], dueAt: now.toISOString() };
+    assert.deepEqual(filterUpcomingTasks([dueNow], ALL_TASK_OWNERS, TASKS_DUE_TODAY, now), [dueNow]);
+    assert.deepEqual(filterUpcomingTasks([dueNow], ALL_TASK_OWNERS, PAST_DUE_TASKS, now), []);
   });
 
   it('removes only the known NDAI Thrawn profile from human owner options', () => {

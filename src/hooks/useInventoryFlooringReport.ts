@@ -180,7 +180,16 @@ export function useInventoryFlooringReport(enabled = true) {
 
     if (result.error) throw new Error(result.error.message);
     if (!result.data) throw new Error('This row changed elsewhere. Refresh and try again.');
-    const flooringReport = result.data as unknown as InventoryFlooringRow;
+    const returnedFlooringReport = result.data as unknown as InventoryFlooringRow;
+    // The RPC authors the actor ID. Add the already-authenticated profile name only
+    // when that returned ID confirms this user performed the transition, so the
+    // paid-off stamp does not depend on a later Realtime refetch to show "who".
+    const flooringReport: InventoryFlooringRow = returnedFlooringReport.report_removed_by === profile.id
+      ? {
+          ...returnedFlooringReport,
+          removed_by: { first_name: profile.first_name, last_name: profile.last_name },
+        }
+      : returnedFlooringReport;
     setItems(current => current.map(currentItem => currentItem.id === item.id
       ? { ...currentItem, flooring_report: flooringReport }
       : currentItem));

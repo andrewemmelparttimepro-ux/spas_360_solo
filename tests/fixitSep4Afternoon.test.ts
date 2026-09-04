@@ -17,8 +17,10 @@ describe('Brandon, Sep 4 afternoon cards', () => {
       read('src/components/InventoryFlooringStatusReport.tsx'),
     ]);
     assert.match(migration, /add column if not exists report_removed_by uuid/);
+    assert.match(migration, /report_removed_at = case when p_value = 'true' then statement_timestamp\(\) else null end/);
     assert.match(migration, /report_removed_by = case when p_value = 'true' then \(select auth\.uid\(\)\) else null end/);
     assert.match(hook, /removed_by:report_removed_by\(first_name, last_name\)/);
+    assert.match(hook, /returnedFlooringReport\.report_removed_by === profile\.id[\s\S]*removed_by: \{ first_name: profile\.first_name, last_name: profile\.last_name \}/);
     assert.match(component, /data-paid-off-stamp/);
     assert.match(component, /Paid off \$\{when\}/);
   });

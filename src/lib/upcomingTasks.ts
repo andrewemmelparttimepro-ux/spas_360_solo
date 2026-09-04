@@ -1,11 +1,14 @@
 import type { Profile, Task, TaskStatus } from '@/types/database';
 
-export const ALL_TASK_OWNERS = 'all' as const;
+export const ALL_TASK_OWNERS = 'all-owners' as const;
+export const ALL_TASKS = 'all-tasks' as const;
 export const PAST_DUE_TASKS = 'past-due' as const;
 export const NO_TASK_SCHEDULED = 'no-task-scheduled' as const;
+export const TASKS_DUE_TODAY = 'due-today' as const;
 export const THRAWN_PROFILE_ID = '79ea8493-7436-46ab-a210-26cccdac4f2e';
 
-export type TaskOwnerFilter = typeof ALL_TASK_OWNERS | typeof PAST_DUE_TASKS | typeof NO_TASK_SCHEDULED | string;
+export type TaskOwnerFilter = typeof ALL_TASK_OWNERS | string;
+export type TaskScheduleFilter = typeof ALL_TASKS | typeof PAST_DUE_TASKS | typeof TASKS_DUE_TODAY | typeof NO_TASK_SCHEDULED;
 
 export type TaskOwnerOption = Pick<Profile, 'id' | 'first_name' | 'last_name'>;
 
@@ -44,17 +47,30 @@ export function taskOwnerName(owner: TaskOwnerOption): string {
 export function filterUpcomingTasks(
   tasks: UpcomingTaskItem[],
   ownerId: TaskOwnerFilter,
+  scheduleFilter: TaskScheduleFilter = ALL_TASKS,
   now: Date = new Date(),
 ): UpcomingTaskItem[] {
-  if (ownerId === ALL_TASK_OWNERS) return tasks;
-  if (ownerId === PAST_DUE_TASKS) return tasks.filter(task => isPastDueTask(task, now));
-  return tasks.filter(task => task.assignedTo === ownerId);
+  const ownerTasks = ownerId === ALL_TASK_OWNERS
+    ? tasks
+    : tasks.filter(task => task.assignedTo === ownerId);
+  if (scheduleFilter === PAST_DUE_TASKS) return ownerTasks.filter(task => isPastDueTask(task, now));
+  if (scheduleFilter === TASKS_DUE_TODAY) return ownerTasks.filter(task => isTaskDueToday(task, now));
+  return ownerTasks;
 }
 
 export function isPastDueTask(task: UpcomingTaskItem, now: Date = new Date()): boolean {
   if (!INCOMPLETE_TASK_STATUSES.has(task.status) || !task.dueAt) return false;
   const dueAt = new Date(task.dueAt);
   return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() < now.getTime();
+}
+
+export function isTaskDueToday(task: UpcomingTaskItem, now: Date = new Date()): boolean {
+  if (!INCOMPLETE_TASK_STATUSES.has(task.status) || !task.dueAt) return false;
+  const dueAt = new Date(task.dueAt);
+  if (Number.isNaN(dueAt.getTime())) return false;
+  return dueAt.getFullYear() === now.getFullYear()
+    && dueAt.getMonth() === now.getMonth()
+    && dueAt.getDate() === now.getDate();
 }
 
 export function dealsWithoutUpcomingTasks(

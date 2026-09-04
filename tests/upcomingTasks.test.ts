@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   ALL_TASK_OWNERS,
+  ALL_TASKS,
   dealsWithoutUpcomingTasks,
   filterTaskOwnerOptions,
   filterUpcomingTasks,
   PAST_DUE_TASKS,
   NO_TASK_SCHEDULED,
+  TASKS_DUE_TODAY,
   THRAWN_PROFILE_ID,
   upcomingTaskLink,
   type UpcomingTaskItem,
@@ -32,7 +34,13 @@ describe('Dashboard upcoming tasks', () => {
 
   it('defines Past Due by due_at before now and incomplete status', () => {
     const now = new Date('2026-08-25T14:00:00Z');
-    assert.deepEqual(filterUpcomingTasks([...tasks, completedTask], PAST_DUE_TASKS, now), [tasks[0]]);
+    assert.deepEqual(filterUpcomingTasks([...tasks, completedTask], ALL_TASK_OWNERS, PAST_DUE_TASKS, now), [tasks[0]]);
+  });
+
+  it('combines salesperson and due-today filters independently', () => {
+    const now = new Date('2026-08-25T14:00:00Z');
+    assert.deepEqual(filterUpcomingTasks(tasks, 'owner-b', TASKS_DUE_TODAY, now), [tasks[1]]);
+    assert.deepEqual(filterUpcomingTasks(tasks, 'owner-a', TASKS_DUE_TODAY, now), [tasks[0]]);
   });
 
   it('removes only the known NDAI Thrawn profile from human owner options', () => {
@@ -70,10 +78,12 @@ describe('Dashboard upcoming tasks', () => {
     assert.match(dashboard, /<UpcomingTasksPanel tasks=\{upcomingTasks\} owners=\{taskOwners\} openDeals=\{openDeals\}/);
     assert.match(panel, />Lead Follow Up Tasks</);
     assert.doesNotMatch(panel, />Upcoming Tasks</);
-    assert.match(panel, /<option value=\{ALL_TASK_OWNERS\}>All Tasks<\/option>/);
+    assert.match(panel, /<option value=\{ALL_TASK_OWNERS\}>All Sales People<\/option>/);
+    assert.match(panel, /<option value=\{ALL_TASKS\}>All Tasks<\/option>/);
     assert.match(panel, /<option value=\{PAST_DUE_TASKS\}>Past Due Tasks<\/option>/);
-    assert.match(panel, /<option value=\{NO_TASK_SCHEDULED\}>No Task Scheduled<\/option>/);
-    assert.match(panel, /filterUpcomingTasks\(tasks, ownerFilter, now\)/);
+    assert.match(panel, /<option value=\{TASKS_DUE_TODAY\}>Tasks Due Today<\/option>/);
+    assert.match(panel, /<option value=\{NO_TASK_SCHEDULED\}>No Tasks Scheduled<\/option>/);
+    assert.match(panel, /filterUpcomingTasks\(tasks, ownerFilter, scheduleFilter, now\)/);
     assert.match(panel, /No upcoming tasks assigned to/);
     assert.match(hook, /from\('tasks'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*assigned_to/);
     assert.match(hook, /from\('profiles'\)[\s\S]*\.eq\('org_id', profile\.org_id\)[\s\S]*owner_manager[\s\S]*salesperson/);

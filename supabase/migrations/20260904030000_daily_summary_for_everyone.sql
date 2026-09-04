@@ -71,7 +71,7 @@ begin
                and (t.completed_at is null or t.completed_at >= v_focus_start)
            ), '[]'::jsonb) as delegated_open,
            (select count(*) from public.tasks t where t.created_by = p.id and t.task_type = 'Delegated' and t.created_at >= v_start and t.created_at < v_end)::int as delegated_sent,
-           (select count(*) from public.tasks t where t.assigned_to = p.id and t.task_type = 'Sales Follow-Up' and t.status = 'Completed' and t.completed_at >= v_start and t.completed_at < v_end)::int as leads_followed_up,
+           (select count(*) from public.tasks t where t.assigned_to = p.id and t.task_type in ('Sales Follow-Up', 'Follow-up') and t.status = 'Completed' and t.completed_at >= v_start and t.completed_at < v_end)::int as leads_followed_up,
            (select count(*) from public.tasks t where t.created_by = p.id and t.created_at >= v_start and t.created_at < v_end)::int as tasks_set,
            (select count(*) from public.deals d where d.assigned_to = p.id and d.created_at >= v_start and d.created_at < v_end)::int as deals_created,
            (select count(*) from public.deals d join public.pipeline_stages ps on ps.id = d.stage_id where d.assigned_to = p.id and ps.is_won and coalesce(d.closed_at, d.updated_at) >= v_start and coalesce(d.closed_at, d.updated_at) < v_end)::int as deals_won,

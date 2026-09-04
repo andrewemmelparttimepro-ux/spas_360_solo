@@ -56,7 +56,7 @@ describe('Owner Morning Summary', () => {
     assert.match(migration, /at time zone 'America\/Chicago'/);
     assert.match(migration, /and \(v_is_owner or p\.id = v_user\)/);
     assert.match(migration, /if v_is_owner then/);
-    assert.match(migration, /task_type = 'Sales Follow-Up'/);
+    assert.match(migration, /task_type in \('Sales Follow-Up', 'Follow-up'\)/);
     assert.match(migration, /as leads_followed_up/);
     assert.match(migration, /as tasks_set/);
     assert.match(migration, /as deals_created/);

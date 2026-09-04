@@ -53,4 +53,14 @@ describe('named Fix-It and owner-only navigation boundaries', () => {
     assert.match(mediaHook, /from\('fix_it_attachments'\)/);
     assert.match(mediaHook, /\.eq\('purpose', 'report'\)/);
   });
+
+  it('grants Matt explicit owner activity access without admitting owner-class agents', async () => {
+    const migration = await read('supabase/migrations/20260904123000_grant_matt_owner_activity_access.sql');
+
+    assert.match(migration, /profile\.id = 'fd740394-5f28-4db5-84b8-348ab0d383d7'::uuid/i);
+    assert.match(migration, /profile\.org_id = '00000000-0000-0000-0000-000000000001'::uuid/i);
+    assert.match(migration, /profile\.role = 'owner_manager'/i);
+    assert.match(migration, /on conflict \(user_id\) do update set org_id = excluded\.org_id/i);
+    assert.doesNotMatch(migration, /create trigger|create or replace function|delete from public\.owner_activity_viewers/i);
+  });
 });

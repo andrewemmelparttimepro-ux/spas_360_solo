@@ -28,7 +28,7 @@ export function useInventoryFlooringReport(enabled = true) {
     for (let from = 0; ; from += PAGE_SIZE) {
       const result = await supabase
         .from('inventory_items')
-        .select('id, location_id, sku, product, brand, model, status, cost, locations:location_id(name)')
+        .select('id, location_id, sku, product, brand, model, status, cost, notes, locations:location_id(name)')
         .eq('org_id', profile.org_id)
         .is('removed_at', null)
         .order('created_at', { ascending: false })

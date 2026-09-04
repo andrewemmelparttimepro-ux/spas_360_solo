@@ -3,7 +3,7 @@ import { FileSpreadsheet, LoaderCircle, X } from 'lucide-react';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useInventoryFlooringReport } from '@/hooks/useInventoryFlooringReport';
 import {
-  inventoryFlooringCostTotal,
+  inventoryFlooringCostSummary,
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
@@ -21,7 +21,7 @@ export function InventoryFlooringStatusReport() {
     () => inventoryForFlooring(report.items, selectedFlooring),
     [report.items, selectedFlooring],
   );
-  const totalCost = inventoryFlooringCostTotal(visibleItems);
+  const costSummary = inventoryFlooringCostSummary(visibleItems);
 
   const closeReport = () => {
     setSelectedFlooring('');
@@ -105,14 +105,20 @@ export function InventoryFlooringStatusReport() {
                               <td className="px-3 py-2">{serial || '—'}</td>
                               <td className="px-3 py-2">{inventoryFlooringDesignation(item) || 'Unassigned'}</td>
                               <td className="px-3 py-2">{item.status}</td>
-                              <td className="px-3 py-2 text-right tabular-nums">{currency.format(Number(item.cost) || 0)}</td>
+                              <td className="px-3 py-2 text-right tabular-nums">{item.cost === null ? 'Not recorded' : currency.format(Number(item.cost))}</td>
                             </tr>
                           );
                         })}
                         {!visibleItems.length && <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-ink-500">No inventory matches this flooring designation.</td></tr>}
                       </tbody>
                       <tfoot>
-                        <tr className="border-t border-ink-700 bg-ink-950 font-bold text-ink-100"><td colSpan={5} className="px-3 py-3 text-right">{selectedFlooring || 'All inventory'} total cost ({visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'})</td><td className="px-3 py-3 text-right tabular-nums">{currency.format(totalCost)}</td></tr>
+                        <tr className="border-t border-ink-700 bg-ink-950 font-bold text-ink-100">
+                          <td colSpan={5} className="px-3 py-3 text-right">
+                            {selectedFlooring || 'All inventory'} total cost ({visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'})
+                            {costSummary.missingCount > 0 && <span className="mt-1 block text-xs font-normal text-amber-400">{costSummary.missingCount} {costSummary.missingCount === 1 ? 'item is' : 'items are'} missing cost; the total cannot be finalized.</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums">{costSummary.missingCount > 0 ? 'Not available' : currency.format(costSummary.total)}</td>
+                        </tr>
                       </tfoot>
                     </table>
                   </div>

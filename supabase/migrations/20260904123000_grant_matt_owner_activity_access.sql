@@ -8,5 +8,6 @@ from public.profiles profile
 where profile.id = 'fd740394-5f28-4db5-84b8-348ab0d383d7'::uuid
   and profile.org_id = '00000000-0000-0000-0000-000000000001'::uuid
   and profile.role = 'owner_manager'
-on conflict (user_id) do update set org_id = excluded.org_id;
-
+on conflict (user_id) do update
+set org_id = excluded.org_id
+where owner_activity_viewers.org_id is distinct from excluded.org_id;

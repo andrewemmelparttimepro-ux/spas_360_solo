@@ -60,7 +60,7 @@ describe('named Fix-It and owner-only navigation boundaries', () => {
     assert.match(migration, /profile\.id = 'fd740394-5f28-4db5-84b8-348ab0d383d7'::uuid/i);
     assert.match(migration, /profile\.org_id = '00000000-0000-0000-0000-000000000001'::uuid/i);
     assert.match(migration, /profile\.role = 'owner_manager'/i);
-    assert.match(migration, /on conflict \(user_id\) do update set org_id = excluded\.org_id/i);
+    assert.match(migration, /on conflict \(user_id\) do update[\s\S]*set org_id = excluded\.org_id[\s\S]*where owner_activity_viewers\.org_id is distinct from excluded\.org_id/i);
     assert.doesNotMatch(migration, /create trigger|create or replace function|delete from public\.owner_activity_viewers/i);
   });
 });

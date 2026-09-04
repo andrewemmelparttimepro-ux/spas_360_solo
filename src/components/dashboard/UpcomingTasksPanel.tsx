@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import {
   ALL_TASK_OWNERS,
@@ -26,6 +27,16 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
   const [ownerFilter, setOwnerFilter] = useState<TaskOwnerFilter>(ALL_TASK_OWNERS);
   const [scheduleFilter, setScheduleFilter] = useState<TaskScheduleFilter>(ALL_TASKS);
   const [now, setNow] = useState(() => new Date());
+  const location = useLocation();
+
+  // The Overdue Tasks tile deep-links here: /dashboard?tasks=past-due
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('tasks') !== 'past-due') return;
+    setScheduleFilter(PAST_DUE_TASKS);
+    setOwnerFilter(ALL_TASK_OWNERS);
+    document.getElementById('lead-follow-up-tasks-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [location.search]);
 
   useEffect(() => {
     if (scheduleFilter === ALL_TASKS) return;
@@ -50,7 +61,7 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
   return (
     <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-ink-700 bg-ink-850/70">
-        <h2 className="text-base font-semibold text-ink-100">Lead Follow Up Tasks</h2>
+        <h2 id="lead-follow-up-tasks-heading" className="text-base font-semibold text-ink-100">Lead Follow Up Tasks</h2>
         <div className="flex min-w-0 flex-wrap justify-end gap-2">
           <select
             aria-label="Filter upcoming tasks by salesperson"

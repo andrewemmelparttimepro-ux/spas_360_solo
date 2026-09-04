@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Wrench, Package, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
+import { DollarSign, Users, Wrench, AlarmClock, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats } from '@/hooks/useDashboard';
 import {
@@ -26,7 +26,8 @@ const statMeta = [
   { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
   // A neutral count, not an alarm — red implied something was wrong at 0 parts
-  { key: 'overduePartsCount', title: 'Overdue Parts', icon: Package, color: 'text-violet-400', bg: 'bg-violet-500/15', format: (v: number) => String(v), link: '/knowledge' },
+  // Brandon (Sep 4): the fourth tile counts overdue follow-up tasks and opens that list.
+  { key: 'overdueTaskCount', title: 'Overdue Tasks', icon: AlarmClock, color: 'text-red-400', bg: 'bg-red-500/15', format: (v: number) => String(v), link: '/dashboard?tasks=past-due' },
 ] as const;
 
 export default function Dashboard() {
@@ -56,6 +57,12 @@ export default function Dashboard() {
     appliedPeriod === 'custom' ? appliedCustomRange : null,
     revenueFilters,
   );
+
+  const overdueTaskCount = useMemo(
+    () => upcomingTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < Date.now()).length,
+    [upcomingTasks],
+  );
+  const tileStats = { ...stats, overdueTaskCount };
 
   const customCandidate = { startDate: customStart, endDate: customEnd };
   const validCustomRange = dashboardRangeFor('custom', customCandidate);
@@ -146,7 +153,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statMeta.map((meta) => {
-          const value = stats[meta.key];
+          const value = tileStats[meta.key];
           return (
             <Link key={meta.key} to={meta.link} className="dashboard-stat-card relative bg-ink-900 rounded-xl border border-ink-700 p-4 sm:p-5 flex items-start justify-between gap-3 hover:border-brand-500/50 hover:bg-ink-850 transition-all group">
               {/* Numbers are doors — Brandon clicks a stat expecting to land on those rows */}

@@ -570,13 +570,12 @@ export default function JobDetail() {
             {canEditJob && property && <EditableField label="Address" value={property.address} field="address" onSave={saveJob} icon={MapPin} />}
             {canEditJob ? <ScheduleDateRangeEditor job={job} onSave={saveJob} /> : <ScheduleSummary job={job} />}
             {job.estimated_duration && <div className="text-sm text-ink-300">Duration: {job.estimated_duration} min</div>}
-            {canEditJob
-              ? <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
-              : job.amount_to_collect != null && <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />Collect ${Number(job.amount_to_collect).toLocaleString()}</div>}
-            {/* When the invoice can't be estimated yet, the level (1=routine, 3=expensive) carries "in play" on the customer card */}
-            {canEditJob && !job.amount_to_collect && (
-              <EditableField label="Service Level (1–3)" value={job.service_level ?? null} field="service_level" onSave={saveJob} icon={Wrench} type="select" options={['1', '2', '3']} numeric color="text-amber-300" />
-            )}
+            <div>
+              <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-500">Collect</h3>
+              {canEditJob
+                ? <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
+                : <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />{job.amount_to_collect != null ? `$${Number(job.amount_to_collect).toLocaleString()}` : 'Nothing to collect yet'}</div>}
+            </div>
           </div>
         </div>
 

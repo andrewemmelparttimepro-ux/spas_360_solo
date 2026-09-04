@@ -10,7 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test:migration": "node --experimental-strip-types --test tests/migrationCenter.test.ts",
-    "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts",
+    "test:follow-up": "node --experimental-strip-types --test tests/followUp.test.ts tests/followUpTaskHistory.test.ts",
     "test:deal-stage": "node --experimental-strip-types --test tests/dealStage.test.ts",
     "test:job-photos": "node --test tests/jobPhotoPolicy.test.mjs",
     "test:fixit": "node --experimental-strip-types --test src/lib/customerSearch.test.ts tests/brandon-ui-spec.test.mjs tests/customerAddress.test.ts tests/customerDealFields.test.ts tests/customerFollowupRequirement.test.ts tests/customerInterests.test.ts tests/customerMajorUnits.test.ts tests/dashboardDuck.test.ts tests/dashboardPeriods.test.ts tests/dashboardRevenueFilters.test.ts tests/dealOwnerFilter.test.ts tests/fixItAttachmentUrls.test.ts tests/fixItClosureFlow.test.ts tests/inventoryFlooringReport.test.ts tests/inventoryProfits.test.ts tests/ownerWorkbookLibrary.test.ts tests/jobContactDetails.test.ts tests/ownersReport.test.ts tests/upcomingTasks.test.ts",

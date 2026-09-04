@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck } from 'lucide-react';
+import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck, LockKeyhole } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
 import { supabase } from '@/lib/supabase';
 import { activePipelineStages, outcomeStage } from '@/lib/dealStage';
@@ -33,6 +33,7 @@ import {
   type DealInventoryOption,
 } from '@/lib/dealInventory';
 import { inventoryCustomerOrStock } from '@/lib/inventoryFields';
+import { isCompletedLateFollowUp } from '@/lib/followUpTaskHistory';
 
 const priorityColors: Record<DealPriority, string> = { High: 'bg-red-500/15 text-red-300', Medium: 'bg-amber-500/15 text-amber-300', Low: 'bg-brand-500/15 text-brand-300' };
 
@@ -218,6 +219,7 @@ export default function DealDetail() {
   const nextFollowUp = summarizeDealFollowUps(tasks).get(deal.id);
   const nextFollowUpState = getFollowUpState(nextFollowUp);
   const openTaskCount = tasks.filter(task => task.status !== 'Completed').length;
+  const completedLateTaskCount = tasks.filter(isCompletedLateFollowUp).length;
 
   const closeCloseSale = () => {
     if (closeSaleBusy) return;
@@ -577,7 +579,11 @@ export default function DealDetail() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Follow-Up Tasks</h2>
-                <p className="mt-1 text-xs text-ink-500">{openTaskCount} open · earliest due date drives Next activity</p>
+                <p className="mt-1 text-xs text-ink-500">
+                  {openTaskCount} open
+                  {completedLateTaskCount > 0 && <span className="font-semibold text-red-300"> · {completedLateTaskCount} completed late</span>}
+                  {' · '}earliest due date drives Next activity
+                </p>
               </div>
               <button onClick={openTaskComposer} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button>
             </div>
@@ -635,24 +641,35 @@ export default function DealDetail() {
               ) : tasks.map(task => {
                 const completed = task.status === 'Completed';
                 const overdue = !completed && new Date(task.due_at).getTime() < Date.now();
+                const completedLate = isCompletedLateFollowUp(task);
+                const displayedDueAt = completedLate ? task.overdue_due_at : task.due_at;
                 return (
                   <div key={task.id} className={cn(
                     'flex items-center gap-3 rounded-lg border p-3',
-                    completed ? 'border-ink-800 bg-ink-950/60' : overdue ? 'border-red-500/30 bg-red-500/5' : 'border-ink-800 bg-ink-950',
+                    completedLate ? 'border-red-500/50 bg-red-500/10' : completed ? 'border-ink-800 bg-ink-950/60' : overdue ? 'border-red-500/30 bg-red-500/5' : 'border-ink-800 bg-ink-950',
                   )}>
                     <input
                       type="checkbox"
                       checked={completed}
+                      disabled={completed}
+                      aria-label={completedLate ? `${task.title} completed late and locked` : `Mark ${task.title} complete`}
                       onChange={() => !completed && completeTask(task.id)}
-                      className="h-4 w-4 rounded border-ink-600 text-brand-400"
+                      className="h-4 w-4 rounded border-ink-600 text-brand-400 disabled:cursor-not-allowed"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className={cn('truncate text-sm', completed ? 'line-through text-ink-500' : 'font-medium text-ink-100')}>{task.title}</p>
-                      <p className={cn('mt-1 flex items-center gap-1 text-xs', overdue ? 'text-red-300' : 'text-ink-500')}>
+                      <p className={cn('truncate text-sm', completedLate ? 'font-semibold text-red-200' : completed ? 'line-through text-ink-500' : 'font-medium text-ink-100')}>{task.title}</p>
+                      <p className={cn('mt-1 flex flex-wrap items-center gap-1 text-xs', completedLate || overdue ? 'text-red-300' : 'text-ink-500')}>
                         <Clock3 className="h-3 w-3" />
-                        {overdue ? 'Overdue · ' : ''}{new Date(task.due_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                        {completedLate ? 'Missed deadline · Due ' : overdue ? 'Overdue · ' : ''}
+                        {displayedDueAt ? new Date(displayedDueAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'No due date'}
+                        {completedLate && task.completed_at && <> · Completed {new Date(task.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</>}
                       </p>
                     </div>
+                    {completedLate && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300" title="Permanent missed-task history">
+                        <LockKeyhole className="h-3 w-3" /> Completed late
+                      </span>
+                    )}
                     <span className="rounded-full border border-ink-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-400">{task.priority}</span>
                   </div>
                 );

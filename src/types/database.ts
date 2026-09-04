@@ -121,6 +121,7 @@ export interface Task {
   priority: DealPriority; status: TaskStatus;
   task_type: string | null; created_by: string;
   assignee_notes: string | null; completed_at: string | null;
+  was_overdue_at_completion: boolean; overdue_due_at: string | null;
   proof_required: boolean; proof_photo_path: string | null;
   escalated_at: string | null; nudged_at: string | null;
   created_at: string; updated_at: string;

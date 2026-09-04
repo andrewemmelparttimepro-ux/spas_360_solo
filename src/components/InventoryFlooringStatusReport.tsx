@@ -200,7 +200,7 @@ export function InventoryFlooringStatusReport() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="inventory-flooring-status-report-title"
-            className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl"
+            className="flex max-h-[94vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl"
             onClick={event => event.stopPropagation()}
           >
             <DialogKeys onClose={closeReport} />

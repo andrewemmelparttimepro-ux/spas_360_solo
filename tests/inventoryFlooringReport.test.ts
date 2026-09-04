@@ -175,6 +175,7 @@ describe('Inventory Flooring Status report', () => {
     assert.match(component, /Serial number search[\s\S]*aria-label="Search by serial number"/);
     assert.match(component, /inventoryForSerialSearch\([\s\S]*inventoryForFlooring\(inventoryForStore/);
     assert.match(component, /data-resizable-grid="inventory-flooring"/);
+    assert.match(component, /role="dialog"[\s\S]*max-w-\[1280px\][\s\S]*data-resizable-grid="inventory-flooring"/);
     assert.match(component, /Drag an amber header edge to resize a column/);
     assert.match(component, /aria-label=\{`Resize \$\{label\} column`\}/);
     assert.match(component, /aria-label=\{`Resize row \$\{index \+ 1\}`\}/);

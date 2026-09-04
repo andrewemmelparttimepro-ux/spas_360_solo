@@ -21,6 +21,7 @@ import {
 } from '@/lib/ownersReport';
 import { salespersonGrossRanking, viewOwnersReportPdf, type OwnersReportPdfInput } from '@/lib/ownersReportPdf';
 import { PaidCommissionsTracker } from '@/components/PaidCommissionsTracker';
+import { InventoryFlooringStatusReport } from '@/components/InventoryFlooringStatusReport';
 import { OwnerWorkbookLibrary } from '@/components/OwnerWorkbookLibrary';
 import StaffTimeReport from '@/components/StaffTimeReport';
 import RecurringChecklists from '@/components/RecurringChecklists';
@@ -68,6 +69,7 @@ export default function OwnersCorner() {
             <p>Owner access is active. Each destination keeps its existing permissions and data controls.</p>
           </div>
           <OwnerWorkbookLibrary />
+          <InventoryFlooringStatusReport />
           <PaidCommissionsTracker />
           <StaffTimeReport />
           <RecurringChecklists />

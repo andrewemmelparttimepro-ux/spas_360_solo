@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { InventoryFlooringReportItem } from '@/lib/inventoryFlooringReport';
+import {
+  inventorySkuForFlooringDesignation,
+  isInventoryFlooringDesignation,
+  type InventoryFlooringDesignation,
+  type InventoryFlooringReportItem,
+} from '@/lib/inventoryFlooringReport';
 
 const PAGE_SIZE = 1000;
 
@@ -88,5 +93,35 @@ export function useInventoryFlooringReport(enabled = true) {
       : item));
   }, [profile]);
 
-  return { items, isLoading, error, refresh: fetchItems, updateAmount };
+  const updateDesignation = useCallback(async (
+    item: InventoryFlooringReportItem,
+    designation: InventoryFlooringDesignation,
+  ) => {
+    if (!profile || profile.role !== 'owner_manager') {
+      throw new Error('Owner access is required to edit flooring status.');
+    }
+    if (!isInventoryFlooringDesignation(designation)) {
+      throw new Error('Choose a valid flooring status.');
+    }
+
+    const sku = inventorySkuForFlooringDesignation(item.sku, designation);
+    if (sku === item.sku) return;
+
+    const result = await supabase
+      .from('inventory_items')
+      .update({ sku })
+      .eq('id', item.id)
+      .eq('org_id', profile.org_id)
+      .eq('sku', item.sku)
+      .is('removed_at', null)
+      .select('id, sku')
+      .single();
+
+    if (result.error) throw new Error(result.error.message);
+    setItems(current => current.map(currentItem => currentItem.id === item.id
+      ? { ...currentItem, sku: result.data.sku }
+      : currentItem));
+  }, [profile]);
+
+  return { items, isLoading, error, refresh: fetchItems, updateAmount, updateDesignation };
 }

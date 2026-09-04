@@ -3,10 +3,16 @@ import { FileSpreadsheet, LoaderCircle, X } from 'lucide-react';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useInventoryFlooringReport } from '@/hooks/useInventoryFlooringReport';
 import {
+  INVENTORY_FLOORING_DESIGNATIONS,
   inventoryFlooringAmountSummary,
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
+  inventoryForStore,
+  isInventoryFlooringDesignation,
+  type InventoryFlooringDesignation,
+  type InventoryFlooringReportItem,
+  type InventoryFlooringStore,
 } from '@/lib/inventoryFlooringReport';
 import { splitSerialAndFlooring } from '@/lib/inventoryFields';
 
@@ -15,16 +21,18 @@ const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: '
 export function InventoryFlooringStatusReport() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedFlooring, setSelectedFlooring] = useState('');
+  const [selectedStore, setSelectedStore] = useState<InventoryFlooringStore>('');
   const report = useInventoryFlooringReport(isOpen);
   const flooringOptions = useMemo(() => inventoryFlooringOptions(report.items), [report.items]);
   const visibleItems = useMemo(
-    () => inventoryForFlooring(report.items, selectedFlooring),
-    [report.items, selectedFlooring],
+    () => inventoryForFlooring(inventoryForStore(report.items, selectedStore), selectedFlooring),
+    [report.items, selectedFlooring, selectedStore],
   );
   const amountSummary = inventoryFlooringAmountSummary(visibleItems);
 
   const closeReport = () => {
     setSelectedFlooring('');
+    setSelectedStore('');
     setIsOpen(false);
   };
 
@@ -66,8 +74,21 @@ export function InventoryFlooringStatusReport() {
               <button type="button" aria-label="Close Inventory Flooring Status report" onClick={closeReport} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:text-ink-100"><X className="h-4 w-4" /></button>
             </header>
 
-            <div className="border-b border-ink-700 bg-ink-950/45 px-4 py-3 sm:px-6">
-              <label className="block max-w-sm text-xs font-semibold text-ink-400">
+            <div className="grid gap-3 border-b border-ink-700 bg-ink-950/45 px-4 py-3 sm:grid-cols-2 sm:px-6">
+              <label className="block text-xs font-semibold text-ink-400">
+                Store
+                <select
+                  aria-label="Store"
+                  value={selectedStore}
+                  onChange={event => setSelectedStore(event.target.value as InventoryFlooringStore)}
+                  className="mt-1 block w-full rounded-lg border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40"
+                >
+                  <option value="">All Stores</option>
+                  <option value="Minot">Minot</option>
+                  <option value="Bismarck">Bismarck</option>
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-ink-400">
                 Flooring designation
                 <select
                   aria-label="Flooring designation"
@@ -103,13 +124,13 @@ export function InventoryFlooringStatusReport() {
                               <td className="px-3 py-2 font-medium text-ink-100">{item.model || item.product}<span className="block text-xs font-normal text-ink-500">{item.brand || item.product}</span></td>
                               <td className="px-3 py-2">{item.locations?.name || '—'}</td>
                               <td className="px-3 py-2">{serial || '—'}</td>
-                              <td className="px-3 py-2">{inventoryFlooringDesignation(item) || 'Unassigned'}</td>
+                              <td className="px-3 py-2"><FlooringDesignationSelect item={item} onSave={report.updateDesignation} /></td>
                               <td className="px-3 py-2">{item.status}</td>
                               <td className="px-3 py-2 text-right"><FlooringAmountInput item={item} onSave={report.updateAmount} /></td>
                             </tr>
                           );
                         })}
-                        {!visibleItems.length && <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-ink-500">No inventory matches this flooring designation.</td></tr>}
+                        {!visibleItems.length && <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-ink-500">No inventory matches these store and flooring filters.</td></tr>}
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-ink-700 bg-ink-950 font-bold text-ink-100">
@@ -129,6 +150,48 @@ export function InventoryFlooringStatusReport() {
         </div>
       )}
     </section>
+  );
+}
+
+type FlooringDesignationSelectProps = {
+  item: InventoryFlooringReportItem;
+  onSave: (item: InventoryFlooringReportItem, designation: InventoryFlooringDesignation) => Promise<void>;
+};
+
+function FlooringDesignationSelect({ item, onSave }: FlooringDesignationSelectProps) {
+  const storedValue = inventoryFlooringDesignation(item);
+  const value = isInventoryFlooringDesignation(storedValue) ? storedValue : '';
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (designation: string) => {
+    if (!isInventoryFlooringDesignation(designation) || designation === value) return;
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onSave(item, designation);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Flooring status could not be saved.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-w-48">
+      <select
+        aria-label={`Flooring status for ${item.model || item.product}`}
+        value={value}
+        disabled={isSaving}
+        onChange={event => { void save(event.target.value); }}
+        className="w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-ink-100 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40 disabled:opacity-60"
+      >
+        {!value && <option value="" disabled>Select flooring status</option>}
+        {INVENTORY_FLOORING_DESIGNATIONS.map(option => <option key={option} value={option}>{option}</option>)}
+      </select>
+      {isSaving && <span className="mt-1 block text-[10px] text-ink-500">Saving…</span>}
+      {error && <span role="alert" className="mt-1 block text-[10px] leading-tight text-red-400">{error}</span>}
+    </div>
   );
 }
 

@@ -266,7 +266,7 @@ export default function DelegatedTasksPanel() {
                     completed ? 'bg-emerald-500/10 text-emerald-400' : overdue ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400',
                   )}>
                     {completed ? <CheckCircle2 className="h-3 w-3" /> : overdue ? <AlertTriangle className="h-3 w-3" /> : null}
-                    {completed ? DELEGATED_STATUS_LABELS.completed : overdue ? 'Overdue' : DELEGATED_STATUS_LABELS.incomplete}
+                    {completed ? DELEGATED_STATUS_LABELS.completed : overdue ? 'Missed Task' : DELEGATED_STATUS_LABELS.incomplete}
                   </span>
                   {canEdit && !completed && (
                     <button type="button" aria-label={`Nudge ${personName(task.assigned)} about ${task.title}`} title="Send a reminder" disabled={busy} onClick={() => void nudge(task)} className="rounded-md p-1.5 text-ink-500 hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-50"><BellRing className="h-3.5 w-3.5" /></button>

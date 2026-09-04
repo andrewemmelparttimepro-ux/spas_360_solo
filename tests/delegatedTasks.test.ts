@@ -98,6 +98,7 @@ describe('Delegated Tasks v2', () => {
     assert.match(panel, /Please Complete/);
     assert.match(panel, /Due date and time \(optional\)/);
     assert.match(panel, /DELEGATED_STATUS_LABELS\.incomplete/);
+    assert.match(panel, /overdue \? 'Missed Task' : DELEGATED_STATUS_LABELS\.incomplete/);
     assert.doesNotMatch(panel, /Not Completed/);
     assert.match(panel, /<option value="">All Staff<\/option>/);
     assert.match(panel, /<option value="incomplete">All Incomplete<\/option>/);

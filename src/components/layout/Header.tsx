@@ -117,6 +117,22 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     if (params.get('suggestions') === 'open') setSuggestionOpen(true);
   }, [location.search]);
 
+  // Modal key handlers run in capture first, so Escape only dismisses an exposed popover.
+  useEffect(() => {
+    if (!locOpen && !userOpen && !notifOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const root = notifOpen ? notifRef.current : locOpen ? locRef.current : userRef.current;
+      event.preventDefault();
+      setLocOpen(false);
+      setUserOpen(false);
+      setNotifOpen(false);
+      root?.querySelector('button')?.focus({ preventScroll: true });
+    };
+    document.addEventListener('keydown', onEscape);
+    return () => document.removeEventListener('keydown', onEscape);
+  }, [locOpen, userOpen, notifOpen]);
+
   // Close dropdowns on click outside
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -226,7 +242,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Location Selector */}
       <div className="relative shrink-0" ref={locRef}>
         <button
-          onClick={() => setLocOpen(!locOpen)}
+          aria-label={`Select store: ${locationLabel}`}
+          aria-expanded={locOpen}
+          onClick={() => { setLocOpen(!locOpen); setUserOpen(false); setNotifOpen(false); }}
           className="flex items-center text-[13px] font-medium text-ink-300 bg-ink-850 hover:bg-ink-800 border border-ink-700 px-2.5 sm:px-3 py-1.5 rounded-full transition-colors"
         >
           <MapPin className="w-3.5 h-3.5 mr-0 2xl:mr-1.5 text-brand-400" />
@@ -259,7 +277,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* Notifications */}
       <div className="relative shrink-0" ref={notifRef}>
         <button
-          onClick={() => setNotifOpen(o => !o)}
+          aria-expanded={notifOpen}
+          onClick={() => { setNotifOpen(o => !o); setLocOpen(false); setUserOpen(false); }}
           className="relative p-2 text-ink-500 hover:text-ink-300 transition-colors rounded-full hover:bg-ink-800"
           aria-label="Notifications"
         >
@@ -319,7 +338,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       {/* User Menu */}
       <div className="relative shrink-0" ref={userRef}>
         <button
-          onClick={() => setUserOpen(!userOpen)}
+          aria-label="Account menu"
+          aria-expanded={userOpen}
+          onClick={() => { setUserOpen(!userOpen); setLocOpen(false); setNotifOpen(false); }}
           className="flex items-center gap-2.5 pl-2 sm:pl-3 sm:border-l border-ink-700 hover:bg-ink-800 rounded-lg pr-1 sm:pr-2 py-1 transition-colors"
         >
           <div className="text-right hidden 2xl:block">

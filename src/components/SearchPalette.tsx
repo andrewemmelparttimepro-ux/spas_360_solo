@@ -4,6 +4,7 @@ import { Search, Contact, Users, Wrench, Package, CornerDownLeft, Plus, LayoutDa
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn, formatPhone } from '@/lib/utils';
+import { useModal } from '@/hooks/useModal';
 
 interface Hit {
   id: string;
@@ -47,6 +48,7 @@ const ACTIONS: Action[] = [
 
 /** ⌘K global search across contacts, deals, jobs, and inventory. */
 export default function SearchPalette({ onClose }: { onClose: () => void }) {
+  const { dialogRef, dialogProps } = useModal(onClose);
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -54,7 +56,6 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
 
   const runSearch = useCallback(async (q: string) => {
     if (!profile || q.trim().length < 2) { setHits([]); return; }
@@ -161,7 +162,8 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-[12vh] px-4"
       onClick={onClose}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        // Arrow/Enter selection belongs to the search field; focused buttons keep native activation.
+        if (e.target !== inputRef.current) return;
         if (e.key === 'ArrowDown') { e.preventDefault(); setSelected(i => flat.length ? (i + 1) % flat.length : 0); }
         if (e.key === 'ArrowUp') { e.preventDefault(); setSelected(i => flat.length ? (i - 1 + flat.length) % flat.length : 0); }
         if (e.key === 'Enter') {
@@ -170,11 +172,12 @@ export default function SearchPalette({ onClose }: { onClose: () => void }) {
         }
       }}
     >
-      <div className="bg-ink-900 border border-ink-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div ref={dialogRef} {...dialogProps} aria-label="Search and quick actions" className="bg-ink-900 border border-ink-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 px-4 border-b border-ink-700">
           <Search className="w-4 h-4 text-ink-500 shrink-0" />
           <input
             ref={inputRef}
+            aria-label="Search everything"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search customers, inventory, parts, manuals…"

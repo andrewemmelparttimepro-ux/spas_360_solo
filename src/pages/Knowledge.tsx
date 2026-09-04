@@ -4,6 +4,7 @@ import { BookOpen, ExternalLink, FileKey2, Files, FileText, Search, ShieldCheck,
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { filterKnowledgeDocuments } from '@/lib/knowledgeDocuments';
 import { confirmLibraryDeletion, requestLibraryDeletion, type LibraryDeleteKind } from '@/lib/libraryDeletion';
 
 type KnowledgeResult = {
@@ -211,14 +212,16 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
     return () => window.clearTimeout(timer);
   }, [query, type, search, setParams]);
 
+  const visibleDocuments = useMemo(() => filterKnowledgeDocuments(documents, type), [documents, type]);
+
   const groupedDocuments = useMemo(() => {
     const groups = new Map<string, KnowledgeDocument[]>();
-    for (const document of documents) {
+    for (const document of visibleDocuments) {
       const key = document.manufacturer ?? 'SPAS 360';
       groups.set(key, [...(groups.get(key) ?? []), document]);
     }
     return [...groups.entries()];
-  }, [documents]);
+  }, [visibleDocuments]);
 
   const openSource = async (document: KnowledgeDocument | KnowledgeResult) => {
     if (document.source_url) { window.open(document.source_url, '_blank', 'noopener,noreferrer'); return; }
@@ -356,13 +359,14 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
           <label className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
             <input
+              aria-label="Search documents"
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Part number, model, error code, procedure…"
               className="w-full rounded-xl border border-ink-700 bg-ink-950 py-2.5 pl-10 pr-3 text-sm text-ink-100 outline-none placeholder:text-ink-500 focus:border-brand-500"
             />
           </label>
-          <select value={type} onChange={event => setType(event.target.value)} className="rounded-xl border border-ink-700 bg-ink-950 px-3 py-2.5 text-sm text-ink-200 outline-none focus:border-brand-500">
+          <select aria-label="Document type" value={type} onChange={event => setType(event.target.value)} className="rounded-xl border border-ink-700 bg-ink-950 px-3 py-2.5 text-sm text-ink-200 outline-none focus:border-brand-500">
             {TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
@@ -407,8 +411,9 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
         <section className="space-y-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">Indexed source library</h2>
-            <p className="mt-1 text-xs text-ink-500">{documents.length} active source{documents.length === 1 ? '' : 's'}; staff-only literature is never available to the public chat.</p>
+            <p className="mt-1 text-xs text-ink-500">{visibleDocuments.length} active source{visibleDocuments.length === 1 ? '' : 's'}; staff-only literature is never available to the public chat.</p>
           </div>
+          {visibleDocuments.length === 0 && <p className="text-sm text-ink-400">No active sources match this document type.</p>}
           {groupedDocuments.map(([manufacturer, docs]) => (
             <div key={manufacturer} className="rounded-2xl border border-ink-700 bg-ink-900 p-4">
               <h3 className="mb-3 text-sm font-bold text-ink-200">{manufacturer}</h3>

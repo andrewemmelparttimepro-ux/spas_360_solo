@@ -78,7 +78,14 @@ export function useStaffTimeClock() {
       return;
     }
     const today = localDayKey();
-    const range = localDateRange(today, today)!;
+    const range = localDateRange(today, today);
+    if (!range) {
+      setEntries([]);
+      setActiveEntry(null);
+      setError('Unable to determine today\'s local time range.');
+      setIsLoading(false);
+      return;
+    }
     const [todayResult, activeResult] = await Promise.all([
       supabase.from('staff_time_entries').select('*')
         .eq('user_id', profile.id)

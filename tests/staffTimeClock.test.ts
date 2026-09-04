@@ -31,6 +31,21 @@ describe('staff attendance time clock', () => {
     assert.match(toLocalDateTimeInput('2026-09-03T14:30:00Z'), /^2026-09-03T\d{2}:30$/);
   });
 
+  it('stops safely when the current local date cannot produce a clock range', async () => {
+    const hook = await read('src/hooks/useStaffTimeClock.ts');
+    const rangeDeclaration = hook.indexOf('const range = localDateRange(today, today);');
+    const nullGuard = hook.indexOf('if (!range) {', rangeDeclaration);
+    const firstRangeRead = hook.indexOf(".gte('clock_in', range.start)", rangeDeclaration);
+
+    assert.ok(rangeDeclaration >= 0);
+    assert.ok(nullGuard > rangeDeclaration);
+    assert.ok(firstRangeRead > nullGuard);
+    assert.match(
+      hook.slice(nullGuard, firstRangeRead),
+      /setEntries\(\[\]\);[\s\S]*setActiveEntry\(null\);[\s\S]*setError\([\s\S]*setIsLoading\(false\);[\s\S]*return;/,
+    );
+  });
+
   it('puts a persistent Clock In/Out control beside notifications and prompts on the first daily login', async () => {
     const [header, control, hook] = await Promise.all([
       read('src/components/layout/Header.tsx'),

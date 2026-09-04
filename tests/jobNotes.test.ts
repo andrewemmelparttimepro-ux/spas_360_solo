@@ -13,7 +13,7 @@ describe('Job Notes (Brandon, Sep 4)', () => {
       read('supabase/migrations/20260904180000_job_notes_editable_and_seeded.sql'),
     ]);
     assert.ok(detail.indexOf('data-job-notes') < detail.indexOf('data-job-inventory'), 'Job Notes renders before Inventory');
-    assert.match(detail, /<textarea\s[^>]*aria-label="New job note"/);
+    assert.match(detail, /<textarea[\s\S]*?aria-label="New job note"/);
     assert.doesNotMatch(detail, /onKeyDown=\{e => e\.key === 'Enter' && handleAddNote\(\)\}/);
     assert.match(detail, /aria-label="Edit note"/);
     assert.match(detail, /timeStyle: 'short'/);

@@ -145,7 +145,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   }, []);
 
   return (
-    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-1.5 sm:gap-4 lg:gap-2 2xl:gap-4 shrink-0 z-40">
+    <header className="app-header h-14 bg-ink-900 border-b border-ink-700 flex items-center px-2 sm:px-5 gap-0.5 sm:gap-4 lg:gap-2 2xl:gap-4 shrink-0 z-40">
       {/* Menu — on desktop it holds Inbox, Citadel, Reports, Settings */}
       {!technician && (
         <button
@@ -160,7 +160,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
       {/* Brand */}
       <NavLink to={technician ? '/service' : '/dashboard'} className="flex items-center gap-2 shrink-0" aria-label={technician ? 'Go to Schedule' : 'Go to Dashboard'}>
-        <img src="/logo-mark.png" alt="SPAS 360" className="h-7 w-auto object-contain" />
+        <img src="/logo-mark.png" alt="SPAS 360" className="h-5 sm:h-7 w-auto object-contain" />
         <span className="text-[15px] font-bold text-ink-100 tracking-tight hidden 2xl:block">
           SPAS <span className="text-brand-400">360</span>
         </span>

@@ -12,10 +12,37 @@ export function localDayKey(now: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+function parseLocalDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  // Construct from numeric local-calendar parts instead of relying on browser
+  // parsing of a date string. setFullYear also avoids Date's 1900 offset for
+  // four-digit years below 0100.
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(0, 0, 0, 0);
+
+  // Date normalizes impossible dates (for example February 30), so round-trip
+  // the local calendar components before accepting the value.
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) return null;
+
+  return date;
+}
+
 export function localDateRange(startDate: string, endDate: string): { start: string; endExclusive: string } | null {
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (!startDate || !endDate || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null;
+  const start = parseLocalDateKey(startDate);
+  const end = parseLocalDateKey(endDate);
+  if (!start || !end || end < start) return null;
   end.setDate(end.getDate() + 1);
   return { start: start.toISOString(), endExclusive: end.toISOString() };
 }

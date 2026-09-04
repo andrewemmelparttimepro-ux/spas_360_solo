@@ -26,9 +26,29 @@ describe('staff attendance time clock', () => {
 
   it('builds inclusive local custom-date boundaries and editable local values', () => {
     const range = localDateRange('2026-09-01', '2026-09-03')!;
+    assert.equal(range.start, new Date(2026, 8, 1).toISOString());
+    assert.equal(range.endExclusive, new Date(2026, 8, 4).toISOString());
     assert.ok(new Date(range.endExclusive) > new Date(range.start));
+
+    const leapDay = localDateRange('2028-02-29', '2028-02-29')!;
+    assert.equal(leapDay.start, new Date(2028, 1, 29).toISOString());
+    assert.equal(leapDay.endExclusive, new Date(2028, 2, 1).toISOString());
+
+    assert.equal(localDateRange('2026-2-03', '2026-02-03'), null);
+    assert.equal(localDateRange('not-a-date', '2026-02-03'), null);
+    assert.equal(localDateRange('2026-00-01', '2026-01-01'), null);
+    assert.equal(localDateRange('2026-13-01', '2026-01-01'), null);
+    assert.equal(localDateRange('2026-02-30', '2026-03-01'), null);
+    assert.equal(localDateRange('2027-02-29', '2027-03-01'), null);
     assert.equal(localDateRange('2026-09-03', '2026-09-01'), null);
-    assert.match(toLocalDateTimeInput('2026-09-03T14:30:00Z'), /^2026-09-03T\d{2}:30$/);
+
+    const editableInstant = new Date('2026-09-03T14:30:00Z');
+    const expectedLocalInput = [
+      editableInstant.getFullYear(),
+      String(editableInstant.getMonth() + 1).padStart(2, '0'),
+      String(editableInstant.getDate()).padStart(2, '0'),
+    ].join('-') + `T${String(editableInstant.getHours()).padStart(2, '0')}:30`;
+    assert.equal(toLocalDateTimeInput(editableInstant.toISOString()), expectedLocalInput);
   });
 
   it('stops safely when the current local date cannot produce a clock range', async () => {

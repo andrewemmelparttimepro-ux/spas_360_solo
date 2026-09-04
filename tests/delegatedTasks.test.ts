@@ -8,6 +8,7 @@ import {
   defaultDelegatedView,
   delegatedTaskDueAt,
   filterDelegatedTasks,
+  groupDelegatedTasksByAssignee,
   isDelegatedTaskOverdue,
   parseDelegatedRequest,
   splitDelegatedSections,
@@ -63,6 +64,12 @@ describe('Delegated Tasks v2', () => {
     assert.deepEqual(sections.completed.map(t => t.id), ['b']);
   });
 
+  it('groups filtered tasks into one ordered bubble per assignee', () => {
+    const groups = groupDelegatedTasksByAssignee(tasks);
+    assert.deepEqual(groups.map(group => group.assignedTo), ['alex', 'ben']);
+    assert.deepEqual(groups.map(group => group.tasks.map(task => task.id)), [['a', 'b', 'd'], ['c']]);
+  });
+
   it('lets only the sender (or an owner) edit or delete, while the assignee completes and annotates', () => {
     const task = tasks[0];
     assert.equal(canEditDelegatedTask(task, { id: 'brandon', role: 'owner_manager' }), true);
@@ -97,6 +104,9 @@ describe('Delegated Tasks v2', () => {
     assert.match(panel, /<option value="completed">All Complete<\/option>/);
     assert.match(panel, /aria-label="Incomplete delegated tasks"/);
     assert.match(panel, /aria-label="Completed delegated tasks"/);
+    assert.match(panel, /groupDelegatedTasksByAssignee\(sections\.incomplete\)/);
+    assert.match(panel, /data-delegated-assignee-group=\{assignedTo\}/);
+    assert.match(panel, /<span className="font-bold">\{personName\(task\.assigned\)\}<\/span>/);
     assert.match(panel, /Completed tasks stay here as history/);
     assert.match(panel, /canEditDelegatedTask\(task, viewer\)/);
     assert.match(panel, /Delete this task\?/);

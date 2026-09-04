@@ -14,6 +14,7 @@ import {
   delegatedTaskDueAt,
   filterDelegatedTasks,
   formatDelegatedDue,
+  groupDelegatedTasksByAssignee,
   isDelegatedTaskOverdue,
   splitDelegatedSections,
   toDelegatedDueInput,
@@ -92,6 +93,10 @@ export default function DelegatedTasksPanel() {
     return filterDelegatedTasks(tasks, { view, userId: profile.id, assignedTo: staffFilter || undefined, status: statusFilter });
   }, [tasks, view, profile, staffFilter, statusFilter]);
   const sections = useMemo(() => splitDelegatedSections(visibleTasks), [visibleTasks]);
+  const groupedSections = useMemo(() => ({
+    incomplete: groupDelegatedTasksByAssignee(sections.incomplete),
+    completed: groupDelegatedTasksByAssignee(sections.completed),
+  }), [sections]);
   const myOpenCount = useMemo(
     () => profile ? tasks.filter(task => task.assigned_to === profile.id && task.status !== 'Completed').length : 0,
     [tasks, profile],
@@ -198,13 +203,10 @@ export default function DelegatedTasksPanel() {
     const busy = savingId === task.id;
     const mine = task.assigned_to === profile?.id;
     return (
-      <article
+      <div
         key={task.id}
         data-delegated-task={task.id}
-        className={cn(
-          'rounded-lg border bg-ink-850/70 p-3 transition-colors',
-          completed ? 'border-ink-700 opacity-90' : overdue ? 'border-red-500/40' : 'border-ink-700',
-        )}
+        className={cn('p-3 transition-colors', completed && 'opacity-90')}
       >
         <div className="flex items-start gap-3">
           <input
@@ -240,7 +242,11 @@ export default function DelegatedTasksPanel() {
             ) : (
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className={cn('text-sm font-semibold text-ink-100', completed && 'text-ink-500 line-through')}>{task.title}</p>
+                  <p className={cn('text-sm text-ink-100', completed && 'text-ink-500 line-through')}>
+                    <span className="font-bold">{personName(task.assigned)}</span>
+                    {' — '}
+                    <span className="font-semibold">{task.title}</span>
+                  </p>
                   {task.description && (
                     <p className={cn('mt-1 whitespace-pre-wrap text-sm text-ink-300', completed && 'text-ink-500')}>{task.description}</p>
                   )}
@@ -311,6 +317,25 @@ export default function DelegatedTasksPanel() {
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderAssigneeGroup = ({ assignedTo, tasks: assigneeTasks }: { assignedTo: string; tasks: DelegatedTask[] }) => {
+    const assignee = assigneeTasks[0]?.assigned;
+    const name = personName(assignee);
+    const hasOverdueTask = assigneeTasks.some(task => isDelegatedTaskOverdue(task));
+    return (
+      <article
+        key={assignedTo}
+        data-delegated-assignee-group={assignedTo}
+        aria-label={`${name} delegated tasks`}
+        className={cn(
+          'divide-y divide-ink-700 overflow-hidden rounded-lg border bg-ink-850/70',
+          hasOverdueTask ? 'border-red-500/40' : 'border-ink-700',
+        )}
+      >
+        {assigneeTasks.map(renderTask)}
       </article>
     );
   };
@@ -411,7 +436,7 @@ export default function DelegatedTasksPanel() {
                 </h3>
                 {sections.incomplete.length === 0
                   ? <p className="rounded-lg border border-dashed border-ink-700 px-3 py-4 text-center text-xs text-ink-500">Nothing outstanding.</p>
-                  : <div className="space-y-3">{sections.incomplete.map(renderTask)}</div>}
+                  : <div className="space-y-3">{groupedSections.incomplete.map(renderAssigneeGroup)}</div>}
               </section>
             )}
             {statusFilter !== 'incomplete' && (
@@ -421,7 +446,7 @@ export default function DelegatedTasksPanel() {
                 </h3>
                 {sections.completed.length === 0
                   ? <p className="rounded-lg border border-dashed border-ink-700 px-3 py-4 text-center text-xs text-ink-500">Completed tasks stay here as history.</p>
-                  : <div className="space-y-3">{sections.completed.map(renderTask)}</div>}
+                  : <div className="space-y-3">{groupedSections.completed.map(renderAssigneeGroup)}</div>}
               </section>
             )}
           </div>

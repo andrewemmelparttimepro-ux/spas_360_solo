@@ -31,6 +31,11 @@ export interface DelegatedViewer {
   role: UserRole | null | undefined;
 }
 
+export interface DelegatedTaskAssigneeGroup<T extends Pick<DelegatedTaskFilterItem, 'assigned_to'>> {
+  assignedTo: string;
+  tasks: T[];
+}
+
 /**
  * The "Please Complete" box is free text: the first line is the task, anything
  * after it is the detail. Overlong first lines are broken at a word boundary so
@@ -94,6 +99,23 @@ export function splitDelegatedSections<T extends DelegatedTaskFilterItem>(tasks:
     .filter(isDelegatedTaskCompleted)
     .sort((a, b) => (b.completed_at ?? b.created_at).localeCompare(a.completed_at ?? a.created_at));
   return { incomplete, completed };
+}
+
+/**
+ * Keep each employee's filtered tasks together without disturbing the order
+ * established by splitDelegatedSections. The first task for an assignee fixes
+ * that employee group's position and later tasks join the same group.
+ */
+export function groupDelegatedTasksByAssignee<T extends Pick<DelegatedTaskFilterItem, 'assigned_to'>>(
+  tasks: T[],
+): DelegatedTaskAssigneeGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  tasks.forEach(task => {
+    const group = groups.get(task.assigned_to);
+    if (group) group.push(task);
+    else groups.set(task.assigned_to, [task]);
+  });
+  return Array.from(groups, ([assignedTo, groupedTasks]) => ({ assignedTo, tasks: groupedTasks }));
 }
 
 export function delegatedTaskDueAt(localDateTime: string): string | null {

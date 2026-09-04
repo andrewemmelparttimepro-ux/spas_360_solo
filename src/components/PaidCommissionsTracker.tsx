@@ -87,7 +87,7 @@ export function PaidCommissionsTracker() {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-500">Owner workbook</p>
                 <h2 id="paid-commissions-workbook-title" className="mt-1 flex items-center gap-2 text-xl font-bold text-ink-100"><FileSpreadsheet className="h-5 w-5 text-amber-500" /> Paid Commissions</h2>
-                <p className="mt-1 text-sm text-ink-500">Choose a paid period, then use the bottom tabs to move between salesperson sheets.</p>
+                <p className="mt-1 text-sm text-ink-500">Choose a pay period, then use the bottom tabs to move between salesperson sheets.</p>
               </div>
               <button type="button" aria-label="Close Paid Commissions workbook" onClick={closeWorkbook} className="rounded-lg border border-ink-700 p-2 text-ink-400 hover:text-ink-100"><X className="h-4 w-4" /></button>
             </header>
@@ -95,9 +95,9 @@ export function PaidCommissionsTracker() {
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="border-b border-ink-700 bg-ink-950/45 px-4 py-3 sm:px-6">
                 <div className="flex flex-wrap items-end gap-3">
-                  <span className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-400"><CalendarDays className="h-4 w-4 text-amber-500" /> Paid period</span>
-                  <label className="text-xs font-semibold text-ink-400">Start date<input aria-label="Paid period start date" type="date" value={range.startDate} max={range.endDate || undefined} onChange={event => changeRange('startDate', event.target.value)} className={`mt-1 block ${inputClass}`} /></label>
-                  <label className="text-xs font-semibold text-ink-400">End date<input aria-label="Paid period end date" type="date" value={range.endDate} min={range.startDate || undefined} onChange={event => changeRange('endDate', event.target.value)} className={`mt-1 block ${inputClass}`} /></label>
+                  <span className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-400"><CalendarDays className="h-4 w-4 text-amber-500" /> Pay Period</span>
+                  <label className="text-xs font-semibold text-ink-400">Start date<input aria-label="Pay Period start date" type="date" value={range.startDate} max={range.endDate || undefined} onChange={event => changeRange('startDate', event.target.value)} className={`mt-1 block ${inputClass}`} /></label>
+                  <label className="text-xs font-semibold text-ink-400">End date<input aria-label="Pay Period end date" type="date" value={range.endDate} min={range.startDate || undefined} onChange={event => changeRange('endDate', event.target.value)} className={`mt-1 block ${inputClass}`} /></label>
                   {!rangeIsValid && <p role="alert" className="mb-2 text-sm font-semibold text-red-400">Start date must be on or before end date.</p>}
                 </div>
               </div>
@@ -105,7 +105,7 @@ export function PaidCommissionsTracker() {
               <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-5">
                 {commissions.error && <p role="alert" className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">Paid commissions could not be updated. ({commissions.error})</p>}
                 {!rangeIsValid ? (
-                  <p className="py-12 text-center text-sm text-ink-500">Choose a valid paid period to open the sheet.</p>
+                  <p className="py-12 text-center text-sm text-ink-500">Choose a valid pay period to open the sheet.</p>
                 ) : commissions.isLoading ? (
                   <p className="flex items-center justify-center gap-2 py-12 text-sm text-ink-500"><LoaderCircle className="h-4 w-4 animate-spin" /> Loading {activeSalesperson}&apos;s commissions…</p>
                 ) : (
@@ -171,11 +171,11 @@ function SalespersonCommissionSheet({ salesperson, entries, editor, paidPeriod, 
           <h3 className="font-bold text-ink-100">{salesperson}&apos;s sheet</h3>
           <p className="text-xs text-ink-500">{entries.length} {entries.length === 1 ? 'paid sale' : 'paid sales'} in this period</p>
         </div>
-        <button type="button" onClick={onAdd} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" /> Add sale</button>
+        <button type="button" onClick={onAdd} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" /> Add Commission Record</button>
       </header>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
-          <thead className="text-left text-[11px] uppercase tracking-wide text-ink-500"><tr><th className="px-3 py-2">Paid date</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2 text-right">Sale amount</th><th className="px-3 py-2 text-right">Commission %</th><th className="px-3 py-2 text-right">Commission amount</th><th className="w-20 px-3 py-2"><span className="sr-only">Actions</span></th></tr></thead>
+          <thead className="text-left text-[11px] uppercase tracking-wide text-ink-500"><tr><th className="px-3 py-2">Delivery Date</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2 text-right">Sale amount</th><th className="px-3 py-2 text-right">Commission %</th><th className="px-3 py-2 text-right">Commission amount</th><th className="w-20 px-3 py-2"><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>
             {entries.map(entry => <tr key={entry.id} className="border-t border-ink-800 text-ink-300"><td className="whitespace-nowrap px-3 py-2">{format(new Date(`${entry.paid_on}T12:00:00`), 'MMM d, yyyy')}</td><td className="px-3 py-2 font-medium text-ink-100">{entry.customer_name}</td><td className="px-3 py-2 text-right">{currency.format(Number(entry.sale_amount))}</td><td className="px-3 py-2 text-right">{percentage.format(Number(entry.commission_percentage))}%</td><td className="px-3 py-2 text-right font-bold text-ink-100">{currency.format(Number(entry.commission_amount))}</td><td className="px-3 py-2"><div className="flex justify-end gap-1"><button type="button" aria-label={`Edit ${entry.customer_name} commission`} onClick={() => onEdit(entry)} className="rounded p-1.5 text-ink-500 hover:bg-ink-800 hover:text-ink-200"><Pencil className="h-3.5 w-3.5" /></button><button type="button" aria-label={`Delete ${entry.customer_name} commission`} disabled={deletingId === entry.id} onClick={async () => { if (!window.confirm(`Delete ${entry.customer_name}'s paid commission?`)) return; setDeletingId(entry.id); await onDelete(entry.id); setDeletingId(null); }} className="rounded p-1.5 text-ink-500 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50">{deletingId === entry.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></div></td></tr>)}
             {!entries.length && <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-ink-500">No paid commissions in this period.</td></tr>}
@@ -199,16 +199,16 @@ function CommissionEditor({ entry, paidPeriod, onCancel, onSave }: { entry: Paid
   const valid = commissionPercentage.trim() !== '' && paidOnInPeriod && paidCommissionValuesValid(values);
   return (
     <form className="space-y-3 border-t border-ink-700 bg-ink-900 p-4" onSubmit={async event => { event.preventDefault(); if (!valid) return; setSaving(true); const saved = await onSave(values); if (!saved) setSaving(false); }}>
-      <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-ink-100">{entry ? 'Edit paid sale' : 'Add paid sale'}</h4><button type="button" aria-label="Close commission editor" onClick={onCancel} className="rounded p-1 text-ink-500 hover:text-ink-200"><X className="h-4 w-4" /></button></div>
+      <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-ink-100">{entry ? 'Edit paid sale' : 'Add Commission Record'}</h4><button type="button" aria-label="Close commission editor" onClick={onCancel} className="rounded p-1 text-ink-500 hover:text-ink-200"><X className="h-4 w-4" /></button></div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs font-semibold text-ink-400">Paid date<input autoFocus aria-label="Commission paid date" type="date" min={paidPeriod.startDate} max={paidPeriod.endDate} value={paidOn} onChange={event => setPaidOn(event.target.value)} className={`mt-1 ${inputClass}`} /></label>
+        <label className="text-xs font-semibold text-ink-400">Delivery Date<input autoFocus aria-label="Commission Delivery Date" type="date" min={paidPeriod.startDate} max={paidPeriod.endDate} value={paidOn} onChange={event => setPaidOn(event.target.value)} className={`mt-1 ${inputClass}`} /></label>
         <label className="text-xs font-semibold text-ink-400">Customer name<input aria-label="Commission customer name" value={customerName} maxLength={200} onChange={event => setCustomerName(event.target.value)} className={`mt-1 ${inputClass}`} /></label>
         <label className="text-xs font-semibold text-ink-400">Sale amount<input aria-label="Commission sale amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={saleAmount} onChange={event => setSaleAmount(event.target.value)} className={`mt-1 ${inputClass}`} /></label>
         <label className="text-xs font-semibold text-ink-400">Commission %<input aria-label="Commission percentage" type="number" min="0" max="100" step="0.0001" inputMode="decimal" value={commissionPercentage} onChange={event => setCommissionPercentage(event.target.value)} className={`mt-1 ${inputClass}`} /></label>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-400">Commission amount: <strong className="text-ink-100">{currency.format(commissionAmount(values.saleAmount, values.commissionPercentage))}</strong></p>
-        <div className="flex gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-ink-700 px-3 py-2 text-xs font-bold text-ink-300">Cancel</button><button type="submit" disabled={!valid || saving} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}{entry ? 'Save changes' : 'Add paid sale'}</button></div>
+        <div className="flex gap-2"><button type="button" onClick={onCancel} className="rounded-lg border border-ink-700 px-3 py-2 text-xs font-bold text-ink-300">Cancel</button><button type="submit" disabled={!valid || saving} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}{entry ? 'Save changes' : 'Add Commission Record'}</button></div>
       </div>
     </form>
   );

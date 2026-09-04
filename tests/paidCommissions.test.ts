@@ -77,7 +77,12 @@ describe('paid commissions tracker', () => {
     assert.match(hook, /\.delete\(\)[\s\S]*\.eq\('id', id\)[\s\S]*\.eq\('org_id', profile\.org_id\)/);
     assert.match(component, /aria-haspopup="dialog"[\s\S]*Open workbook/);
     assert.match(component, /role="dialog"[\s\S]*Paid Commissions/);
-    assert.match(component, /Paid period start date[\s\S]*type="date"[\s\S]*Paid period end date[\s\S]*type="date"/);
+    assert.match(component, /Pay Period start date[\s\S]*type="date"[\s\S]*Pay Period end date[\s\S]*type="date"/);
+    assert.match(component, /CalendarDays[\s\S]*Pay Period<\/span>/);
+    assert.match(component, /onClick=\{onAdd\}[\s\S]*Add Commission Record<\/button>/);
+    assert.match(component, /<th[^>]*>Delivery Date<\/th>/);
+    assert.match(component, /Delivery Date<input[\s\S]*aria-label="Commission Delivery Date"/);
+    assert.doesNotMatch(component, /> Paid period<\/span>|> Add sale<\/button>|>Paid date<\/th>/);
     assert.match(component, /paidCommissionDateRangeValid\(range\)/);
     assert.match(component, /Customer name[\s\S]*Sale amount[\s\S]*Commission %[\s\S]*Commission amount/);
     assert.match(component, /PAID_COMMISSION_SALESPEOPLE\.map/);

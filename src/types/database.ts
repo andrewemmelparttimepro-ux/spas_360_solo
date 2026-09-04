@@ -87,7 +87,7 @@ export interface InventoryItem {
   model: string | null; color_finish: string | null;
   status: InventoryStatus; cost: number | null; msrp: number | null;
   stock_state: InventoryStockState | null; order_date: string | null;
-  sale_price: number | null; customer_id: string | null;
+  sale_price: number | null; flooring_amount: number | null; customer_id: string | null;
   deal_id: string | null; job_id: string | null;
   date_received: string | null; date_sold: string | null;
   date_delivered: string | null; warranty_info: string | null;

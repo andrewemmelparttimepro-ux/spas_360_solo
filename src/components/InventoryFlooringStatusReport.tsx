@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet, LoaderCircle, X } from 'lucide-react';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useInventoryFlooringReport } from '@/hooks/useInventoryFlooringReport';
 import {
-  inventoryFlooringCostSummary,
+  inventoryFlooringAmountSummary,
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
   inventoryForFlooring,
@@ -21,7 +21,7 @@ export function InventoryFlooringStatusReport() {
     () => inventoryForFlooring(report.items, selectedFlooring),
     [report.items, selectedFlooring],
   );
-  const costSummary = inventoryFlooringCostSummary(visibleItems);
+  const amountSummary = inventoryFlooringAmountSummary(visibleItems);
 
   const closeReport = () => {
     setSelectedFlooring('');
@@ -42,7 +42,7 @@ export function InventoryFlooringStatusReport() {
         </span>
         <span className="min-w-0 flex-1">
           <span id="inventory-flooring-status-heading" className="block text-base font-bold text-ink-100 group-hover:text-amber-600">Inventory Flooring Status</span>
-          <span className="mt-1 block text-sm text-ink-500">Review every inventory item by flooring designation and see the filtered inventory cost.</span>
+          <span className="mt-1 block text-sm text-ink-500">Review every inventory item by flooring designation, enter its amount, and total the selected segment.</span>
         </span>
         <span className="rounded-lg border border-ink-700 px-3 py-2 text-xs font-bold text-ink-300 group-hover:border-amber-500/60 group-hover:text-amber-600">Open report</span>
       </button>
@@ -93,7 +93,7 @@ export function InventoryFlooringStatusReport() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
                       <thead className="text-left text-[11px] uppercase tracking-wide text-ink-500">
-                        <tr><th className="px-3 py-2">Inventory</th><th className="px-3 py-2">Store</th><th className="px-3 py-2">Serial number</th><th className="px-3 py-2">Flooring designation</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Inventory cost</th></tr>
+                        <tr><th className="px-3 py-2">Inventory</th><th className="px-3 py-2">Store</th><th className="px-3 py-2">Serial number</th><th className="px-3 py-2">Flooring designation</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Amount</th></tr>
                       </thead>
                       <tbody>
                         {visibleItems.map(item => {
@@ -105,7 +105,7 @@ export function InventoryFlooringStatusReport() {
                               <td className="px-3 py-2">{serial || '—'}</td>
                               <td className="px-3 py-2">{inventoryFlooringDesignation(item) || 'Unassigned'}</td>
                               <td className="px-3 py-2">{item.status}</td>
-                              <td className="px-3 py-2 text-right tabular-nums">{item.cost === null ? 'Not recorded' : currency.format(Number(item.cost))}</td>
+                              <td className="px-3 py-2 text-right"><FlooringAmountInput item={item} onSave={report.updateAmount} /></td>
                             </tr>
                           );
                         })}
@@ -114,10 +114,10 @@ export function InventoryFlooringStatusReport() {
                       <tfoot>
                         <tr className="border-t border-ink-700 bg-ink-950 font-bold text-ink-100">
                           <td colSpan={5} className="px-3 py-3 text-right">
-                            {selectedFlooring || 'All inventory'} total cost ({visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'})
-                            {costSummary.missingCount > 0 && <span className="mt-1 block text-xs font-normal text-amber-400">{costSummary.missingCount} {costSummary.missingCount === 1 ? 'item is' : 'items are'} missing cost; the total cannot be finalized.</span>}
+                            {selectedFlooring || 'All inventory'} total Amount ({visibleItems.length} {visibleItems.length === 1 ? 'item' : 'items'})
+                            {amountSummary.missingCount > 0 && <span className="mt-1 block text-xs font-normal text-amber-400">{amountSummary.missingCount} blank; total includes {amountSummary.recordedCount} entered {amountSummary.recordedCount === 1 ? 'amount' : 'amounts'} only.</span>}
                           </td>
-                          <td className="px-3 py-3 text-right tabular-nums">{costSummary.missingCount > 0 ? 'Not available' : currency.format(costSummary.total)}</td>
+                          <td className="px-3 py-3 text-right tabular-nums">{currency.format(amountSummary.total)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -129,5 +129,72 @@ export function InventoryFlooringStatusReport() {
         </div>
       )}
     </section>
+  );
+}
+
+type FlooringAmountInputProps = {
+  item: Parameters<typeof inventoryFlooringAmountSummary>[0][number];
+  onSave: (itemId: string, amount: number | null) => Promise<void>;
+};
+
+function FlooringAmountInput({ item, onSave }: FlooringAmountInputProps) {
+  const storedValue = item.flooring_amount === null ? '' : String(item.flooring_amount);
+  const [value, setValue] = useState(storedValue);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSaving) setValue(storedValue);
+  }, [isSaving, storedValue]);
+
+  const save = async () => {
+    const trimmed = value.trim();
+    const parsedAmount = trimmed === '' ? null : Number(trimmed);
+    const nextAmount = parsedAmount === null ? null : Math.round(parsedAmount * 100) / 100;
+    if (nextAmount !== null && (!Number.isFinite(nextAmount) || nextAmount < 0)) {
+      setError('Enter a non-negative amount or leave blank.');
+      return;
+    }
+    if (nextAmount === (item.flooring_amount === null ? null : Number(item.flooring_amount))) {
+      setError(null);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onSave(item.id, nextAmount);
+    } catch (saveError) {
+      setValue(storedValue);
+      setError(saveError instanceof Error ? saveError.message : 'Amount could not be saved.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="ml-auto w-36">
+      <div className="flex items-center rounded-lg border border-ink-700 bg-ink-900 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500/40">
+        <span className="pl-2 text-xs text-ink-500">$</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          aria-label={`Amount for ${item.model || item.product}`}
+          value={value}
+          disabled={isSaving}
+          placeholder="Blank"
+          onChange={event => setValue(event.target.value)}
+          onBlur={save}
+          onKeyDown={event => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+          }}
+          className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 text-right text-sm tabular-nums text-ink-100 outline-none disabled:opacity-60"
+        />
+      </div>
+      {isSaving && <span className="mt-1 block text-[10px] text-ink-500">Saving…</span>}
+      {error && <span role="alert" className="mt-1 block text-[10px] leading-tight text-red-400">{error}</span>}
+    </div>
   );
 }

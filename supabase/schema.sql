@@ -248,6 +248,8 @@ CREATE TABLE inventory_items (
   cost DECIMAL(10,2),
   msrp DECIMAL(10,2),
   sale_price DECIMAL(10,2),
+  flooring_amount DECIMAL(12,2)
+    CHECK (flooring_amount IS NULL OR flooring_amount >= 0),
   customer_id UUID REFERENCES contacts(id),
   deal_id UUID REFERENCES deals(id),
   job_id UUID REFERENCES jobs(id),

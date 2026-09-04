@@ -28,7 +28,7 @@ export function useInventoryFlooringReport(enabled = true) {
     for (let from = 0; ; from += PAGE_SIZE) {
       const result = await supabase
         .from('inventory_items')
-        .select('id, location_id, sku, product, brand, model, status, cost, notes, locations:location_id(name)')
+        .select('id, location_id, sku, product, brand, model, status, flooring_amount, notes, locations:location_id(name)')
         .eq('org_id', profile.org_id)
         .is('removed_at', null)
         .order('created_at', { ascending: false })
@@ -68,5 +68,25 @@ export function useInventoryFlooringReport(enabled = true) {
     return () => { supabase.removeChannel(channel); };
   }, [enabled, fetchItems, profile]);
 
-  return { items, isLoading, error, refresh: fetchItems };
+  const updateAmount = useCallback(async (itemId: string, flooringAmount: number | null) => {
+    if (!profile || profile.role !== 'owner_manager') {
+      throw new Error('Owner access is required to edit flooring amounts.');
+    }
+
+    const result = await supabase
+      .from('inventory_items')
+      .update({ flooring_amount: flooringAmount })
+      .eq('id', itemId)
+      .eq('org_id', profile.org_id)
+      .is('removed_at', null)
+      .select('id, flooring_amount')
+      .single();
+
+    if (result.error) throw new Error(result.error.message);
+    setItems(current => current.map(item => item.id === itemId
+      ? { ...item, flooring_amount: result.data.flooring_amount }
+      : item));
+  }, [profile]);
+
+  return { items, isLoading, error, refresh: fetchItems, updateAmount };
 }

@@ -26,6 +26,7 @@ const inventory = (id: string, sku: string): InventoryItem & { customer: null } 
   cost: null,
   msrp: null,
   sale_price: null,
+  flooring_amount: null,
   customer_id: null,
   deal_id: null,
   job_id: null,

@@ -3,7 +3,7 @@ import type { InventoryItem } from '../types/database.ts';
 
 export type InventoryFlooringReportItem = Pick<
   InventoryItem,
-  'id' | 'location_id' | 'sku' | 'product' | 'brand' | 'model' | 'status' | 'cost' | 'notes'
+  'id' | 'location_id' | 'sku' | 'product' | 'brand' | 'model' | 'status' | 'flooring_amount' | 'notes'
 > & {
   locations?: { name?: string | null } | null;
 };
@@ -39,26 +39,19 @@ export function inventoryForFlooring(
   );
 }
 
-export function inventoryFlooringCostTotal(items: InventoryFlooringReportItem[]) {
-  return items.reduce((total, item) => {
-    const cost = Number(item.cost);
-    return total + (Number.isFinite(cost) ? cost : 0);
-  }, 0);
-}
-
-export function inventoryFlooringCostSummary(items: InventoryFlooringReportItem[]) {
+export function inventoryFlooringAmountSummary(items: InventoryFlooringReportItem[]) {
   return items.reduce((summary, item) => {
-    if (item.cost === null || item.cost === undefined) {
+    if (item.flooring_amount === null || item.flooring_amount === undefined) {
       summary.missingCount += 1;
       return summary;
     }
-    const cost = Number(item.cost);
-    if (!Number.isFinite(cost)) {
+    const amount = Number(item.flooring_amount);
+    if (!Number.isFinite(amount)) {
       summary.missingCount += 1;
       return summary;
     }
     summary.recordedCount += 1;
-    summary.total += cost;
+    summary.total += amount;
     return summary;
   }, { total: 0, recordedCount: 0, missingCount: 0 });
 }

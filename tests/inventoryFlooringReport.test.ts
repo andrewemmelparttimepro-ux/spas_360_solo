@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
   INVENTORY_FLOORING_DESIGNATIONS,
+  canonicalInventoryFlooringStore,
   inventoryFlooringAmountSummary,
   inventoryFlooringDesignation,
   inventoryFlooringOptions,
@@ -16,8 +17,8 @@ const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 
 
 const items: InventoryFlooringReportItem[] = [
   { id: '1', location_id: 'a', sku: '100 "Wells Fargo"', product: 'Spa', brand: 'A', model: 'One', status: 'In Stock', flooring_amount: 10000, notes: null, locations: { name: 'Minot' } },
-  { id: '2', location_id: 'b', sku: '200 "MCHL TCCU"', product: 'Spa', brand: 'B', model: 'Two', status: 'On Order', flooring_amount: 20000, notes: null, locations: { name: 'Bismarck' } },
-  { id: '3', location_id: 'b', sku: '300 wells fargo', product: 'Spa', brand: 'C', model: 'Three', status: 'Sold', flooring_amount: null, notes: null, locations: { name: 'Bismarck' } },
+  { id: '2', location_id: 'b', sku: '200 "MCHL TCCU"', product: 'Spa', brand: 'B', model: 'Two', status: 'On Order', flooring_amount: 20000, notes: null, locations: { name: "Bismarck (Spa's Etc)" } },
+  { id: '3', location_id: 'b', sku: '300 wells fargo', product: 'Spa', brand: 'C', model: 'Three', status: 'Sold', flooring_amount: null, notes: null, locations: { name: "Bismarck (Spa's Etc)" } },
   { id: '4', location_id: 'a', sku: '400', product: 'Spa', brand: 'D', model: 'Four', status: 'Delivered', flooring_amount: 5000, notes: 'Imported · Flooring: Spas Etc TCCU · Customer: STOCK', locations: { name: 'Minot' } },
 ];
 
@@ -33,6 +34,9 @@ describe('Inventory Flooring Status report', () => {
   });
 
   it('filters rows by store without changing the source inventory and restores all stores', () => {
+    assert.equal(canonicalInventoryFlooringStore("Bismarck (Spa's Etc)"), 'Bismarck');
+    assert.equal(canonicalInventoryFlooringStore('Minot'), 'Minot');
+    assert.equal(canonicalInventoryFlooringStore('North Bismarck warehouse'), '');
     assert.deepEqual(inventoryForStore(items, 'Minot').map(item => item.id), ['1', '4']);
     assert.deepEqual(inventoryForStore(items, 'Bismarck').map(item => item.id), ['2', '3']);
     assert.deepEqual(inventoryForStore(items, ''), items);

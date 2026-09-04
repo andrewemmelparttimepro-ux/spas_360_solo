@@ -23,6 +23,15 @@ export const INVENTORY_FLOORING_DESIGNATIONS = [
 export type InventoryFlooringDesignation = typeof INVENTORY_FLOORING_DESIGNATIONS[number];
 export type InventoryFlooringStore = '' | 'Minot' | 'Bismarck';
 
+export const canonicalInventoryFlooringStore = (
+  storeName: string | null | undefined,
+): InventoryFlooringStore => {
+  const normalized = storeName?.trim().toLocaleLowerCase() ?? '';
+  if (/^minot(?:$|[\s(–—-])/.test(normalized)) return 'Minot';
+  if (/^bismarck(?:$|[\s(–—-])/.test(normalized)) return 'Bismarck';
+  return '';
+};
+
 export const isInventoryFlooringDesignation = (
   value: string,
 ): value is InventoryFlooringDesignation =>
@@ -40,7 +49,7 @@ const canonicalFlooringDesignation = (
   if (/^(?:mchl|magic\s+city\s+home\s+(?:leisure|ieisure)|owned\s+by\s+mchl)$/.test(normalized)) return 'Owned by MCHL';
   if (/^(?:spas\s+etc|owned\s+by\s+spas\s+etc)$/.test(normalized)) return 'Owned by Spas Etc';
   if (/^wells\s+fargo(?:\s+(?:minot|bismarck))?$/.test(normalized)) {
-    if (normalized.endsWith('bismarck') || storeName?.trim().toLocaleLowerCase() === 'bismarck') {
+    if (normalized.endsWith('bismarck') || canonicalInventoryFlooringStore(storeName) === 'Bismarck') {
       return 'Wells Fargo Bismarck';
     }
     return 'Wells Fargo Minot';
@@ -77,7 +86,7 @@ export function inventoryForStore(
 ) {
   const selected = store.trim().toLocaleLowerCase();
   if (!selected) return items;
-  return items.filter(item => item.locations?.name?.trim().toLocaleLowerCase() === selected);
+  return items.filter(item => canonicalInventoryFlooringStore(item.locations?.name).toLocaleLowerCase() === selected);
 }
 
 export function inventorySkuForFlooringDesignation(

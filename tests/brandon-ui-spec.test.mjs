@@ -176,7 +176,19 @@ describe('Brandon composite UI contract', () => {
     assert.match(contacts, /\.order\('updated_at', \{ ascending: false \}\)[\s\S]*\.order\('id', \{ ascending: true \}\)/);
     assert.match(contacts, /setContacts\(allContacts\.filter/);
     assert.match(customers, /onCreated=\{\(\) => refresh\(\)\}/);
-    assert.match(wizard, /const creationLocationId = activeLocationId \?\? profile\.location_id \?\? null/);
+    assert.match(wizard, /const creationLocationId = resolveCreationStore\(\{\s*selectedLocationId,\s*activeLocationId,\s*profileLocationId: profile\?\.location_id,\s*locations,\s*\}\)/);
+    assert.match(wizard, /id="new-customer-store"\s*value=\{creationLocationId\}\s*onChange=\{e => setSelectedLocationId\(e\.target\.value\)\}/);
+    const { resolveCreationStore } = await import('../src/lib/creationStore.ts');
+    const storeDefaults = {
+      selectedLocationId: null,
+      activeLocationId: 'bismarck',
+      profileLocationId: 'minot',
+      locations: [{ id: 'minot' }, { id: 'bismarck' }],
+    };
+    assert.equal(resolveCreationStore(storeDefaults), 'bismarck');
+    assert.equal(resolveCreationStore({ ...storeDefaults, activeLocationId: null }), 'minot');
+    assert.equal(resolveCreationStore({ ...storeDefaults, selectedLocationId: 'minot' }), 'minot');
+    assert.equal(resolveCreationStore({ ...storeDefaults, selectedLocationId: 'minot', locations: [...storeDefaults.locations] }), 'minot');
     assert.match(wizard, /p_location_id: creationLocationId/);
     assert.match(wizard, /location_id: creationLocationId/);
     assert.match(wizard, /await onCreated\?\.\(deal\.id\);[\s\S]*onClose\(\);/);

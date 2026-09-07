@@ -23,6 +23,7 @@ import StoreSwitcher from '@/components/StoreSwitcher';
 import { dashboardScheduleLink, dealershipDate, parseDashboardScheduleFilter, scheduleCalendarDate, type DashboardScheduleFilter } from '@/lib/dashboardSchedule';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
 import { canManageServiceSchedule, isServiceTechnician } from '@/lib/serviceTechAccess';
+import { scheduleStoreDefault } from '@/lib/scheduleStoreDefault';
 
 type ViewMode = 'day' | 'week' | 'month';
 type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | null };
@@ -251,7 +252,21 @@ export default function Service() {
   const navigate = useNavigate();
   const dashboardFilter = useMemo(() => parseDashboardScheduleFilter(location.search), [location.search]);
   const { jobs, unscheduledJobs, scheduledJobs, isLoading, loadError, refresh, createJob, updateJob } = useServiceJobs({ allStores: dashboardFilter !== null });
-  const { locations, profile, activeLocationId } = useAuth();
+  const { locations, profile, activeLocationId, setActiveLocation, isLoading: authLoading } = useAuth();
+  const storeEntryRef = useRef<string | null>(null);
+  useEffect(() => {
+    const selection = scheduleStoreDefault({
+      navigationKey: location.key,
+      previousEntry: storeEntryRef.current,
+      profile,
+      locations,
+      authLoading,
+      allStores: dashboardFilter !== null,
+    });
+    if (!selection) return;
+    storeEntryRef.current = selection.entry;
+    setActiveLocation(selection.locationId);
+  }, [location.key, profile, locations, authLoading, dashboardFilter, setActiveLocation]);
   const technician = isServiceTechnician(profile?.role);
   const canManageSchedule = canManageServiceSchedule(profile?.role);
   const { contacts } = useContacts(canManageSchedule);

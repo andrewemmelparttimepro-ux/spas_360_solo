@@ -144,13 +144,6 @@ export default function Dashboard() {
 
       <MorningSummaryPanel />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <DelegatedTasksPanel />
-        </div>
-        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} openDeals={openDeals} />
-      </div>
-
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statMeta.map((meta) => {
           const value = tileStats[meta.key];
@@ -168,6 +161,13 @@ export default function Dashboard() {
             </Link>
           );
         })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <DelegatedTasksPanel />
+        </div>
+        <UpcomingTasksPanel tasks={upcomingTasks} owners={taskOwners} openDeals={openDeals} />
       </div>
 
       <div className="dashboard-panel bg-ink-900 rounded-xl border border-ink-700 overflow-hidden">

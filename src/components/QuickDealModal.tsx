@@ -8,6 +8,7 @@ import type { Contact, DealLeadSource, DealPriority, PipelineStage } from '@/typ
 import { useModal } from '@/hooks/useModal';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import { resolveCreationStore } from '@/lib/creationStore';
+import { DEAL_SHOPPING_OPTIONS, dealShoppingInterests } from '@/lib/quickDealIntake';
 
 // Quick deal creation for an existing customer. Customer-specific entry points
 // preselect that customer; the Deals page uses the same form with customer search.
@@ -48,6 +49,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
         'px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors',
         active ? 'bg-brand-500/20 border-brand-500 text-brand-300' : 'bg-ink-950 border-ink-700 text-ink-400 hover:border-ink-500 hover:text-ink-200'
@@ -75,7 +77,10 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [stage, setStage] = useState<string>(stageId ?? '');
   const [dealOwners, setDealOwners] = useState<DealOwner[]>([]);
   const [dealOwner, setDealOwner] = useState(UNSELECTED_OWNER);
+  const [interests, setInterests] = useState<string[]>([]);
   const [interest, setInterest] = useState('');
+  const [notes, setNotes] = useState('');
+  const shoppingInterests = useMemo(() => dealShoppingInterests(interests, interest), [interests, interest]);
   const [leadSource, setLeadSource] = useState<DealLeadSourceChoice>('Walk-In');
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
@@ -174,9 +179,9 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   // Auto-title mirrors the wizard's "{Last} – {interest}" ritual; backs off once hand-edited
   useEffect(() => {
     if (titleTouched || !contact) return;
-    const trimmedInterest = interest.trim();
+    const trimmedInterest = shoppingInterests?.join(', ') ?? '';
     setTitle(trimmedInterest ? `${contact.last_name} – ${trimmedInterest}` : '');
-  }, [interest, contact, titleTouched]);
+  }, [shoppingInterests, contact, titleTouched]);
 
   const canCreate = useMemo(
     () => !!contact && !!stage && !!creationLocationId && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0 && expectedCloseDate.length > 0,
@@ -207,54 +212,30 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
 
       // Default to the customer's salesperson, while honoring the explicit Deal Owner field.
       const creditTo = dealOwner;
-      const enteredByOther = creditTo !== user.id;
 
-      const { data: deal, error: dealErr } = await supabase.from('deals').insert({
-        org_id: profile.org_id,
-        contact_id: contact.id,
-        stage_id: stage,
-        title: title.trim(),
-        amount: amount ? parseFloat(amount) : null,
-        priority,
-        lead_source: storedLeadSource,
-        product_interest: interest.trim() ? [interest.trim()] : null,
-        expected_close_date: expectedCloseDate,
-        assigned_to: creditTo,
-        location_id: creationLocationId,
-        position: 0,
-      }).select('id').single();
-      if (dealErr) throw new Error(dealErr.message);
-
-      // Mandatory follow-up — every deal gets one, no exceptions
-      const { error: taskErr } = await supabase.from('tasks').insert({
-        org_id: profile.org_id,
-        assigned_to: creditTo,
-        created_by: user.id,
-        contact_id: contact.id,
-        deal_id: deal.id,
-        title: `Follow up with ${contact.first_name}`,
-        due_at: `${nextActivityDate}T09:00:00`,
-        priority: priority === 'High' ? 'High' : priority === 'Low' ? 'Low' : 'Medium',
-        status: 'Pending',
-        task_type: 'Follow-up',
+      // The deal, optional notes and mandatory follow-up save in one transaction.
+      const { data: dealId, error: dealErr } = await supabase.rpc('create_quick_deal', {
+        p_deal: {
+          org_id: profile.org_id,
+          contact_id: contact.id,
+          stage_id: stage,
+          title: title.trim(),
+          amount: amount ? parseFloat(amount) : null,
+          priority,
+          lead_source: storedLeadSource,
+          product_interest: shoppingInterests,
+          expected_close_date: expectedCloseDate,
+          assigned_to: creditTo,
+          location_id: creationLocationId,
+        },
+        p_notes: notes.trim(),
+        p_next_activity_date: nextActivityDate,
       });
-      if (taskErr) {
-        // Do not leave an active deal behind without the required next activity.
-        await supabase.from('deals').delete().eq('id', deal.id);
-        throw new Error(taskErr.message);
-      }
-
-      if (enteredByOther) {
-        await supabase.from('notifications').insert({
-          user_id: creditTo, type: 'deal',
-          title: `New deal assigned to you: ${title.trim()}`,
-          body: `Entered by ${profile.first_name} ${profile.last_name}.`,
-          link: `/deals/${deal.id}`,
-        });
-      }
+      if (dealErr) throw new Error(dealErr.message);
+      if (!dealId) throw new Error('The saved deal could not be confirmed');
 
       toast(`Deal created for ${contact.first_name} — follow-up scheduled`, 'success');
-      onCreated?.(deal.id);
+      onCreated?.(dealId);
       onClose();
     } catch (err) {
       toast(`Couldn't create deal: ${(err as Error).message}`, 'error');
@@ -347,16 +328,38 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               <p className="mt-1.5 text-[11px] text-ink-500">Deliveries go to this store’s schedule. The customer’s store stays the same.</p>
             </div>
 
-            <div>
-              <label htmlFor="deal-interest" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+            <fieldset>
+              <legend className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
                 What are they shopping for?
-              </label>
+              </legend>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {DEAL_SHOPPING_OPTIONS.map(option => (
+                  <Chip key={option} active={interests.includes(option)} onClick={() => setInterests(current => current.includes(option) ? current.filter(value => value !== option) : [...current, option])}>
+                    {option}
+                  </Chip>
+                ))}
+              </div>
               <input
                 id="deal-interest"
+                aria-label="Shopping details (optional)"
                 value={interest}
                 onChange={e => setInterest(e.target.value)}
-                placeholder="e.g. Sundance Aspen or a replacement cover"
+                placeholder="Optional details, e.g. Sundance Aspen or a replacement cover"
                 className={inputClass}
+              />
+            </fieldset>
+
+            <div>
+              <label htmlFor="deal-notes" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+                Notes and Details
+              </label>
+              <textarea
+                id="deal-notes"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Optional notes and details about this deal"
+                className={`${inputClass} resize-y`}
               />
             </div>
 

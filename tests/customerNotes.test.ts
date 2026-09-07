@@ -41,9 +41,11 @@ test('customer notes render both author and created date', () => {
 });
 
 test('cross-owner deal creation still sends the assigned salesperson a notification', () => {
-  for (const path of ['../src/components/QuickDealModal.tsx', '../src/components/NewCustomerWizard.tsx']) {
-    const contents = source(path);
-    assert.match(contents, /from\(['"]notifications['"]\)\.insert\s*\(/, path);
-    assert.match(contents, /user_id:\s*creditTo/, path);
-  }
+  const quickDeal = source('../src/components/QuickDealModal.tsx');
+  assert.match(quickDeal, /rpc\('create_quick_deal'/);
+  const migration = source('../supabase/migrations/20260907174500_atomic_quick_deal.sql');
+  assert.match(migration, /if v_owner_id <> v_actor.id then[\s\S]*insert into public.notifications/);
+  const wizard = source('../src/components/NewCustomerWizard.tsx');
+  assert.match(wizard, /from\(['"]notifications['"]\)\.insert\s*\(/);
+  assert.match(wizard, /user_id:\s*creditTo/);
 });

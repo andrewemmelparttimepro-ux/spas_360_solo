@@ -22,7 +22,7 @@ export interface SummaryStaff {
   deals_created: number;
   deals_won: number;
   deals_lost: number;
-  must_dos: { title: string; due_at: string | null; priority: string; task_type: string | null; overdue: boolean }[];
+  must_dos: { id: string; title: string; due_at: string | null; priority: string; task_type: string | null; overdue: boolean }[];
 }
 
 export interface MorningSummary {

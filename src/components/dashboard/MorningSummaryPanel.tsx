@@ -13,6 +13,7 @@ import {
   type SummaryStaff,
 } from '@/lib/morningSummary';
 import { cn } from '@/lib/utils';
+import SummaryTaskEditor from './SummaryTaskEditor';
 
 type MorningSummaryContextValue = ReturnType<typeof useMorningSummary> & {
   day: string;
@@ -43,7 +44,7 @@ const metricCards = (person: SummaryStaff) => [
   { label: 'Deals lost', value: person.deals_lost, tone: person.deals_lost > 0 ? 'text-red-400' : undefined },
 ];
 
-function PersonSummary({ person, own }: { person: SummaryStaff; own: boolean }) {
+function PersonSummary({ person, own, onOpenTask }: { person: SummaryStaff; own: boolean; onOpenTask: (id: string) => void }) {
   return (
     <section aria-label={`${person.name} daily summary`} className="rounded-lg border border-ink-700 bg-ink-850/60 p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -69,8 +70,10 @@ function PersonSummary({ person, own }: { person: SummaryStaff; own: boolean }) 
         ) : (
           <ul className="mt-1 space-y-1 text-sm text-ink-300">
             {person.must_dos.map((task, index) => (
-              <li key={`${task.title}-${index}`} className={cn(task.overdue && 'font-semibold text-red-400')}>
-                {task.overdue ? 'Overdue · ' : ''}{task.title}
+              <li key={task.id ?? index} className={cn(task.overdue && 'font-semibold text-red-400')}>
+                <button type="button" onClick={() => onOpenTask(task.id)} disabled={!task.id} aria-haspopup="dialog" className="rounded text-left underline decoration-current/40 underline-offset-2 hover:decoration-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:no-underline">
+                  {task.overdue ? 'Overdue · ' : ''}{task.title}
+                </button>
               </li>
             ))}
           </ul>
@@ -85,11 +88,14 @@ export default function MorningSummaryPanel() {
   const { profile } = useAuth();
   const { day, setDay, summary, isLoading, error, refresh } = useDashboardMorningSummary();
   const [open, setOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('summary') === 'open') {
       setOpen(true);
+      const taskId = params.get('task');
+      if (taskId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(taskId)) setSelectedTaskId(taskId);
       document.getElementById('morning-summary-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [location.search]);
@@ -154,16 +160,17 @@ export default function MorningSummaryPanel() {
               </div>
             </section>
           )}
-          {ownSummary && <PersonSummary person={ownSummary} own />}
+          {ownSummary && <PersonSummary person={ownSummary} own onOpenTask={setSelectedTaskId} />}
           {summary?.owner_view && summary.staff.filter(person => person.id !== profile.id).length > 0 && (
             <section aria-label="Team individual summaries" className="space-y-3">
               <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-500">Team individual summaries</h3>
-              {summary.staff.filter(person => person.id !== profile.id).map(person => <PersonSummary key={person.id} person={person} own={false} />)}
+              {summary.staff.filter(person => person.id !== profile.id).map(person => <PersonSummary key={person.id} person={person} own={false} onOpenTask={setSelectedTaskId} />)}
             </section>
           )}
           {summary && <p className="text-[11px] text-ink-500">Performance covers {summaryDayLabel(summary.day)} in Minot time. Must-dos are reconstructed for {summaryDayLabel(day)} from recorded task dates and completion times.</p>}
         </div>
       )}
+      {selectedTaskId && <SummaryTaskEditor key={selectedTaskId} taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} onSaved={() => { void refresh(); }} />}
     </section>
   );
 }

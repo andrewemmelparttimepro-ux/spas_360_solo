@@ -91,7 +91,7 @@ describe('Owner Morning Summary', () => {
       id: 'x', name: 'Alex', role: 'salesperson', punches: [], minutes_total: 0,
       delegated_completed: [], delegated_open: [], delegated_sent: 0,
       leads_followed_up: 3, tasks_set: 2, deals_created: 1, deals_won: 1, deals_lost: 0,
-      must_dos: [{ title: 'Call Pat', due_at: '2026-09-03T15:00:00Z', priority: 'High', task_type: 'Sales Follow-Up', overdue: true }],
+      must_dos: [{ id: 'call-pat', title: 'Call Pat', due_at: '2026-09-03T15:00:00Z', priority: 'High', task_type: 'Sales Follow-Up', overdue: true }],
     });
     assert.equal(prose, '3 leads followed up · 2 tasks set · 1 new deal · 1 won · 0 lost. Nice work — keep that momentum going. You have 1 must-do for this day, including 1 overdue.');
   });

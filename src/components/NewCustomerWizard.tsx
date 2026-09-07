@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { useModal } from '@/hooks/useModal';
 import { normalizeCustomerAddress } from '@/lib/customerAddress';
+import { resolveCreationStore } from '@/lib/creationStore';
 
 /**
  * Guided new-customer flow: chips + progressive steps, every earlier answer
@@ -78,7 +79,7 @@ const inputClass = 'w-full px-3 py-2 bg-ink-950 border border-ink-700 rounded-lg
 
 export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () => void; onCreated?: (dealId: string | null) => void | Promise<void> }) {
   const { dialogRef, dialogProps } = useModal(onClose);
-  const { profile, user, activeLocationId } = useAuth();
+  const { profile, user, activeLocationId, locations } = useAuth();
   const { toast } = useToast();
 
   const [first, setFirst] = useState('');
@@ -100,6 +101,13 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   });
   const [firstNote, setFirstNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const creationLocationId = resolveCreationStore({
+    selectedLocationId,
+    activeLocationId,
+    profileLocationId: profile?.location_id,
+    locations,
+  });
 
   // Live typeahead — existing customers surface as you type (name or phone)
   const searchMatches = useCallback(async () => {
@@ -128,7 +136,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const step4Done = priority !== null && expectedCloseDate.length > 0;
   const step5Done = followupDate.length > 0 && firstNote.trim().length > 0;
   const doneCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
-  const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !saving;
+  const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !!creationLocationId && !saving;
 
   const toggleInterest = (i: string) =>
     setInterests(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
@@ -137,8 +145,6 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
     if (!profile || !user || !canCreate) return;
     setSaving(true);
     try {
-      const creationLocationId = activeLocationId ?? profile.location_id ?? null;
-
       // 1. Contact — reuse the existing record if one was selected
       let contactId = existing ? existing.id : null;
       let contactFirst = existing ? existing.first_name : first.trim();
@@ -291,6 +297,23 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                 className={cn(inputClass, 'resize-y')}
                 disabled={!!existing}
               />
+            </label>
+
+            <label className="mt-3 block" htmlFor="new-customer-store">
+              <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">{existing ? 'Deal Store *' : 'Customer & Deal Store *'}</span>
+              <select
+                id="new-customer-store"
+                value={creationLocationId}
+                onChange={e => setSelectedLocationId(e.target.value)}
+                className={inputClass}
+                required
+              >
+                <option value="" disabled>Choose a store</option>
+                {locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+              <span className="mt-1.5 block text-[11px] text-ink-500">
+                {existing ? 'Applies to this deal; the existing customer keeps their store.' : 'Assigns the new customer and their first deal to this store.'} Deliveries follow the deal’s store.
+              </span>
             </label>
 
             {/* Locked onto an existing customer */}

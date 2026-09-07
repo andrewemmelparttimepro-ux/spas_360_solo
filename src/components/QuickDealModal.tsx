@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import type { Contact, DealLeadSource, DealPriority, PipelineStage } from '@/types/database';
 import { useModal } from '@/hooks/useModal';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
+import { resolveCreationStore } from '@/lib/creationStore';
 
 // Quick deal creation for an existing customer. Customer-specific entry points
 // preselect that customer; the Deals page uses the same form with customer search.
@@ -64,7 +65,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   onCreated?: (dealId: string) => void;
 }) {
   const { dialogRef, dialogProps } = useModal(onClose);
-  const { profile, user, activeLocationId } = useAuth();
+  const { profile, user, activeLocationId, locations } = useAuth();
   const { toast } = useToast();
   const [contact, setContact] = useState<QuickDealContact | null>(null);
   const [customers, setCustomers] = useState<QuickDealContact[]>([]);
@@ -83,6 +84,13 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [priority, setPriority] = useState<DealPriority>('Medium');
   const [nextActivityDate, setNextActivityDate] = useState(nextLocalDate);
   const [saving, setSaving] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const creationLocationId = resolveCreationStore({
+    selectedLocationId,
+    customerLocationId: contact?.location_id,
+    profileLocationId: profile?.location_id,
+    locations,
+  });
 
   useEffect(() => {
     if (!profile) return;
@@ -171,8 +179,8 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   }, [interest, contact, titleTouched]);
 
   const canCreate = useMemo(
-    () => !!contact && !!stage && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0 && expectedCloseDate.length > 0,
-    [contact, stage, dealOwner, title, nextActivityDate, expectedCloseDate]
+    () => !!contact && !!stage && !!creationLocationId && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0 && expectedCloseDate.length > 0,
+    [contact, stage, creationLocationId, dealOwner, title, nextActivityDate, expectedCloseDate]
   );
 
   const matchingCustomers = useMemo(
@@ -212,7 +220,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
         product_interest: interest.trim() ? [interest.trim()] : null,
         expected_close_date: expectedCloseDate,
         assigned_to: creditTo,
-        location_id: contact.location_id ?? profile.location_id ?? null,
+        location_id: creationLocationId,
         position: 0,
       }).select('id').single();
       if (dealErr) throw new Error(dealErr.message);
@@ -321,6 +329,23 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
                 </div>
               </div>
             )}
+
+            <div>
+              <label htmlFor="deal-store" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">
+                Deal Store *
+              </label>
+              <select
+                id="deal-store"
+                value={creationLocationId}
+                onChange={e => setSelectedLocationId(e.target.value)}
+                className={inputClass}
+                required
+              >
+                <option value="" disabled>Choose a store</option>
+                {locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+              <p className="mt-1.5 text-[11px] text-ink-500">Deliveries go to this store’s schedule. The customer’s store stays the same.</p>
+            </div>
 
             <div>
               <label htmlFor="deal-interest" className="block text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">

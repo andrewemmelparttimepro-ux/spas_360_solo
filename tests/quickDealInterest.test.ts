@@ -39,8 +39,10 @@ test('customer New Deal shows the requested lead sources and stores the canonica
   ]);
   assert.match(modal, /useState<DealLeadSourceChoice>\('Walk-In'\)/);
   assert.match(modal, /<label htmlFor="deal-lead-source"[^>]*>[\s\S]*Lead Source[\s\S]*<select[\s\S]*id="deal-lead-source"[\s\S]*required/);
-  assert.match(modal, /LEAD_SOURCE_OPTIONS\.map\(option =>/);
-  assert.doesNotMatch(modal, /<option value=""/);
+  const leadSourceSelect = modal.match(/<select\b[^>]*id="deal-lead-source"[^>]*>[\s\S]*?<\/select>/)?.[0];
+  assert.ok(leadSourceSelect, 'The Lead Source select exists');
+  assert.match(leadSourceSelect, /LEAD_SOURCE_OPTIONS\.map\(option =>/);
+  assert.doesNotMatch(leadSourceSelect, /<option value=""/);
   assert.match(modal, /lead_source:\s*storedLeadSource/);
   assert.doesNotMatch(modal, /lead_source:\s*contact\.lead_source/);
   for (const value of options.map(option => option.storedValue)) {

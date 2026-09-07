@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Wrench, AlarmClock, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
+import { Users, Wrench, AlarmClock, Plus, BarChart3, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDashboardStats } from '@/hooks/useDashboard';
 import {
@@ -18,12 +18,12 @@ import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
 import TodayScheduleTiles from '@/components/dashboard/TodayScheduleTiles';
+import RevenueTile from '@/components/dashboard/RevenueTile';
 import MorningSummaryPanel, { MorningSummaryProvider } from '@/components/dashboard/MorningSummaryPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 
 const statMeta = [
-  { key: 'totalRevenue', title: 'Total Revenue', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/15', format: (v: number) => `$${v.toLocaleString()}`, link: '/deals' },
   { key: 'activeDeals', title: 'Active Deals', icon: Users, color: 'text-brand-400', bg: 'bg-brand-500/15', format: (v: number) => String(v), link: '/deals' },
   { key: 'unscheduledJobs', title: 'Unscheduled Jobs', icon: Wrench, color: 'text-amber-400', bg: 'bg-amber-500/15', format: (v: number) => String(v), link: '/service' },
   // A neutral count, not an alarm — red implied something was wrong at 0 parts
@@ -146,6 +146,7 @@ export default function Dashboard() {
       <MorningSummaryPanel />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <RevenueTile />
         {statMeta.map((meta) => {
           const value = tileStats[meta.key];
           return (

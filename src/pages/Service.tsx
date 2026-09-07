@@ -1,6 +1,6 @@
 import { Calendar as CalendarIcon, Check, ChevronDown, Clock, Plus, Search, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, type SetStateAction } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, eachDayOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ import DealInventorySelector from '@/components/DealInventorySelector';
 import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
 import JobContactDetails from '@/components/JobContactDetails';
 import StoreSwitcher from '@/components/StoreSwitcher';
+import { dashboardScheduleLink, dealershipDate, parseDashboardScheduleFilter, scheduleCalendarDate, type DashboardScheduleFilter } from '@/lib/dashboardSchedule';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
 import { canManageServiceSchedule, isServiceTechnician } from '@/lib/serviceTechAccess';
 
@@ -246,7 +247,10 @@ function JobCard({ job, saveJobStatus, technician }: { job: ServiceJob; saveJobS
 }
 
 export default function Service() {
-  const { jobs, unscheduledJobs, scheduledJobs, isLoading, createJob, updateJob } = useServiceJobs();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dashboardFilter = useMemo(() => parseDashboardScheduleFilter(location.search), [location.search]);
+  const { jobs, unscheduledJobs, scheduledJobs, isLoading, loadError, refresh, createJob, updateJob } = useServiceJobs({ allStores: dashboardFilter !== null });
   const { locations, profile, activeLocationId } = useAuth();
   const technician = isServiceTechnician(profile?.role);
   const canManageSchedule = canManageServiceSchedule(profile?.role);
@@ -254,11 +258,29 @@ export default function Service() {
   const { items: inventoryItems, isLoading: inventoryLoading, refresh: refreshInventory } = useInventory(canManageSchedule);
   const { toast } = useToast();
 
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [jobTypeFilter, setJobTypeFilter] = useState<Set<ScheduleJobType>>(new Set());
+  const [regularViewMode, setRegularViewMode] = useState<ViewMode>('month');
+  const [regularDate, setRegularDate] = useState(() => scheduleCalendarDate(dealershipDate())!);
+  const [regularTypeFilter, setRegularTypeFilter] = useState<Set<ScheduleJobType>>(new Set());
+  const viewMode = dashboardFilter?.view ?? regularViewMode;
+  const currentDate = useMemo(() => dashboardFilter ? scheduleCalendarDate(dashboardFilter.date)! : regularDate, [dashboardFilter, regularDate]);
+  const jobTypeFilter = useMemo(() => dashboardFilter ? new Set(dashboardFilter.types) : regularTypeFilter, [dashboardFilter, regularTypeFilter]);
+  const changeDashboardFilter = (changes: Partial<DashboardScheduleFilter>) => {
+    if (dashboardFilter) navigate(dashboardScheduleLink({ ...dashboardFilter, ...changes }));
+  };
+  const setViewMode = (view: ViewMode) => {
+    if (dashboardFilter) changeDashboardFilter({ view });
+    else setRegularViewMode(view);
+  };
+  const setCurrentDate = (value: SetStateAction<Date>) => {
+    const date = typeof value === 'function' ? value(currentDate) : value;
+    if (dashboardFilter) changeDashboardFilter({ date: format(date, 'yyyy-MM-dd') });
+    else setRegularDate(date);
+  };
+  const setJobTypeFilter = (value: SetStateAction<Set<ScheduleJobType>>) => {
+    const types = typeof value === 'function' ? value(jobTypeFilter) : value;
+    if (dashboardFilter) changeDashboardFilter({ types: [...types] });
+    else setRegularTypeFilter(types);
+  };
 
   const saveJobStatus = async (id: string, u: { status: JobStatus }) => {
     const ok = await updateJob(id, u);
@@ -309,7 +331,7 @@ export default function Service() {
     else if (viewMode === 'week') setCurrentDate(d => addWeeks(d, 1));
     else setCurrentDate(d => addMonths(d, 1));
   };
-  const goToday = () => setCurrentDate(new Date());
+  const goToday = () => setCurrentDate(scheduleCalendarDate(dealershipDate())!);
 
   // ─── Date range for current view ───────────────────────
   const { rangeStart, rangeEnd, dateLabel } = useMemo(() => {
@@ -440,7 +462,12 @@ export default function Service() {
   };
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+    return <div role="status" className="flex items-center justify-center gap-3 h-full"><div aria-hidden="true" className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" />Loading scheduled jobs…</div>;
+  }
+  if (loadError) {
+    return <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-red-300">
+      Scheduled jobs couldn't load. <button type="button" onClick={() => void refresh()} className="ml-3 rounded-lg border border-red-500/40 px-3 py-1.5 font-semibold">Retry</button>
+    </div>;
   }
 
   return (
@@ -467,7 +494,12 @@ export default function Service() {
       </div>
 
       <div className="mb-4 shrink-0 overflow-x-auto" aria-label="Schedule store selector">
-        <StoreSwitcher countSource="scheduledJobs" />
+        {dashboardFilter ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-sm">
+            <p className="text-ink-200"><strong>All stores</strong> · {filteredJobs.length} scheduled {filteredJobs.length === 1 ? 'job' : 'jobs'} · {dateLabel} · Central time</p>
+            <Link to="/service" className="font-semibold text-brand-400 underline underline-offset-2">Clear dashboard filters</Link>
+          </div>
+        ) : <StoreSwitcher countSource="scheduledJobs" />}
       </div>
 
       {technician && (
@@ -722,7 +754,10 @@ export default function Service() {
                             <div
                               ref={provided.innerRef}
                               {...provided.droppableProps}
-                              onClick={() => { setCurrentDate(day); setViewMode('day'); }}
+                              onClick={() => {
+                                if (dashboardFilter) changeDashboardFilter({ date: format(day, 'yyyy-MM-dd'), view: 'day' });
+                                else { setCurrentDate(day); setViewMode('day'); }
+                              }}
                               className={cn(
                                 'min-h-[104px] border-b border-r border-ink-800 p-1.5 cursor-pointer transition-colors',
                                 // Adjacent-month days stay distinct but readable — 50% opacity made them vanish on the dark board

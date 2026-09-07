@@ -17,6 +17,7 @@ import {
 import QuickCreate from '@/components/QuickCreate';
 import UpcomingTasksPanel from '@/components/dashboard/UpcomingTasksPanel';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
+import TodayScheduleTiles from '@/components/dashboard/TodayScheduleTiles';
 import MorningSummaryPanel, { MorningSummaryProvider } from '@/components/dashboard/MorningSummaryPanel';
 import { Skeleton, StatsSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -162,6 +163,8 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      <TodayScheduleTiles />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">

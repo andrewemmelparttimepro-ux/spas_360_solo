@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
+import { loadSchedulePages } from '@/lib/dashboardSchedule';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Job, JobStatus, ScheduleJobType } from '@/types/database';
 import { inventoryChoicesForJob, JOB_TYPE_OPTIONS } from '@/lib/jobSchedule';
@@ -80,32 +81,49 @@ export const jobTypeDotColors: Record<ScheduleJobType, string> = {
 export const JOB_STATUS_OPTIONS: JobStatus[] = ['Pending Confirm', 'In Progress', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'Completed', 'Cancelled'];
 export { JOB_TYPE_OPTIONS };
 
-export function useServiceJobs() {
+export function useServiceJobs({ allStores = false }: { allStores?: boolean } = {}) {
   const { profile, activeLocationId } = useAuth();
   const [jobs, setJobs] = useState<(Job & { assigned_techs?: string[] })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const sequence = useRef(0);
+  const orgId = profile?.org_id;
+  const locationId = allStores ? null : activeLocationId;
+  const scope = `${orgId}:${locationId ?? 'all'}`;
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
 
   const fetchJobs = useCallback(async () => {
-    if (!profile) return;
+    if (!orgId) return;
+    const request = ++sequence.current;
     setIsLoading(true);
-
-    let query = supabase
-      .from('jobs')
-      .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
-      .eq('org_id', profile.org_id)
-      .order('scheduled_at', { ascending: true, nullsFirst: true });
-
-    if (activeLocationId) {
-      query = query.eq('location_id', activeLocationId);
+    setLoadError(null);
+    try {
+      const data = await loadSchedulePages<Job & { assigned_techs?: string[] }>((offset, size) => {
+        let query = supabase
+          .from('jobs')
+          .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
+          .eq('org_id', orgId)
+          .order('scheduled_at', { ascending: true, nullsFirst: true })
+          .order('id', { ascending: true })
+          .range(offset, offset + size - 1);
+        if (locationId) query = query.eq('location_id', locationId);
+        return query;
+      });
+      if (request !== sequence.current) return;
+      setJobs(data);
+      setLoadedScope(scope);
+    } catch (cause) {
+      if (request !== sequence.current) return;
+      setLoadError(cause instanceof Error ? cause.message : 'Scheduled jobs could not load.');
+    } finally {
+      if (request === sequence.current) setIsLoading(false);
     }
+  }, [orgId, locationId, scope]);
 
-    const { data, error } = await query;
-    if (error) console.error('Error fetching jobs:', error);
-    setJobs(data ?? []);
-    setIsLoading(false);
-  }, [profile, activeLocationId]);
-
-  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  useEffect(() => {
+    void fetchJobs();
+    return () => { sequence.current += 1; };
+  }, [fetchJobs]);
 
   // Real-time updates
   useEffect(() => {
@@ -164,7 +182,8 @@ export function useServiceJobs() {
     unscheduledJobs,
     scheduledJobs,
     statusColors,
-    isLoading,
+    isLoading: isLoading || (!loadError && loadedScope !== scope),
+    loadError,
     createJob,
     updateJob,
     refresh: fetchJobs,

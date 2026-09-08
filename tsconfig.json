@@ -24,6 +24,10 @@
   },
   "exclude": [
     "integrations/**/functions/**",
-    "supabase/functions/**"
+    "supabase/functions/**",
+    "dist",
+    "public",
+    "node_modules",
+    ".vercel"
   ]
 }

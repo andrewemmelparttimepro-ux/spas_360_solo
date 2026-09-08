@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { Search, Phone, Send, Users, MessageSquare, UserPlus, Hash, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversations } from '@/hooks/useConversations';
@@ -5,6 +6,7 @@ import { useTeamChat, type TeamThread } from '@/hooks/useTeamChat';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { useState, useRef, useEffect } from 'react';
+import { useDraftState } from '@/hooks/useDraftState';
 import MentionInput from '@/components/MentionInput';
 import SmsApprovals from '@/components/SmsApprovals';
 import MentionText from '@/components/MentionText';
@@ -42,13 +44,17 @@ function colorForId(id: string) {
 function TeamChatPanel() {
   const {
     threads, activeThread, activeThreadId, setActiveThreadId,
-    messages, teamMembers, isLoading, sendMessage, ariThinking,
+    messages, teamMembers, isLoading, sendMessage, ariThinking, isSending, readError, sendError, retryRead,
     createThread, createGroupThread,
     getSenderName, getSenderInitials, getThreadDisplayName, senderMap,
   } = useTeamChat();
   const { user } = useAuth();
+  const [searchParams]=useSearchParams();
+  const linkedThread=searchParams.get('thread');
+  const openedLink=useRef<string|null>(null);
+  useEffect(()=>{const key=`${user?.id}:${linkedThread}`;if(linkedThread&&openedLink.current!==key&&threads.some(t=>t.id===linkedThread)){openedLink.current=key;setActiveThreadId(linkedThread);}},[linkedThread,threads,setActiveThreadId,user?.id]);
   const { toast } = useToast();
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useDraftState(`team-page-${user?.id??'out'}-${activeThreadId??'none'}`,'message','');
   const pickedRef = useRef<PickedMention[]>([]);
   const [showNewDM, setShowNewDM] = useState(false);
   const [search, setSearch] = useState('');
@@ -59,27 +65,27 @@ function TeamChatPanel() {
   }, [messages, ariThinking]);
 
   const handleSend = async () => {
-    if (!draft.trim()) return;
+    if (!draft.trim() || isSending) return;
     if (!activeThreadId) {
       toast('Select or start a conversation first', 'warning');
       return;
     }
     const body = composeMentionBody(draft, pickedRef.current);
-    pickedRef.current = [];
-    setDraft('');
-    await sendMessage(body);
+    if(await sendMessage(body)){pickedRef.current=[];setDraft(previous=>previous===draft?'':previous);}
   };
 
   const handleStartDM = async (memberId: string) => {
-    await createThread([memberId]);
+    if(!await createThread([memberId]))return;
     setShowNewDM(false);
     toast('Conversation started', 'success');
   };
 
   const handleNewGroup = async () => {
-    await createGroupThread('Team Channel');
+    if(!await createGroupThread('Team Channel'))return;
     toast('Team channel created', 'success');
   };
+
+  useEffect(()=>{pickedRef.current=[];},[user?.id,activeThreadId]);
 
   const otherMembers = teamMembers.filter(m => m.id !== user?.id);
 
@@ -88,7 +94,8 @@ function TeamChatPanel() {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex flex-wrap overflow-hidden" data-unsaved={draft.trim()?"true":undefined}>
+      {(readError||sendError)&&<div role="alert" className="w-full shrink-0 border-b border-amber-500/40 p-3 text-sm text-amber-600">{readError} {sendError} <button className="underline" onClick={()=>void retryRead()}>Retry loading</button></div>}
       {/* Sidebar: Threads + Team. On phones the list and the conversation swap — never share the row. */}
       <div className={cn(
         'w-full md:w-80 border-r border-ink-700 flex-col bg-ink-950 shrink-0',

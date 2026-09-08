@@ -1,3 +1,4 @@
+import { useDraftState } from '@/hooks/useDraftState';
 import DealReview from '@/components/DealReview';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck, LockKeyhole } from 'lucide-react';
@@ -73,11 +74,11 @@ export default function DealDetail() {
   const location = useLocation();
   const navigate = useNavigate();
   const { deal, isLoading, loadError, refresh:refreshDeal, updateDeal } = useDeal(id);
-  const { notes, createNote } = useNotes({ dealId: id });
+  const { notes, error:notesError, createNote, refresh:refreshNotes } = useNotes({ dealId: id });
   const { tasks, createTask, completeTask } = useTasks({ dealId: id });
   const { toast } = useToast();
   const { profile, activeLocationId } = useAuth();
-  const [newNote, setNewNote] = useState('');
+  const [newNote, setNewNote] = useDraftState(`note-${profile?.id??'out'}-${id}`,'body','');
   const pickedRef = useRef<PickedMention[]>([]);
   const [ariBusy, setAriBusy] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -311,9 +312,9 @@ export default function DealDetail() {
   const handleAddNote = async () => {
     if (!newNote.trim() || !profile) return;
     const body = composeMentionBody(newNote, pickedRef.current);
-    pickedRef.current = [];
-    setNewNote('');
-    await createNote(body, { dealId: deal.id });
+    const saved=await createNote(body, { dealId: deal.id });
+    if(!saved){toast('The note did not save. Your draft is kept.','error');return;}
+    pickedRef.current=[];setNewNote('');
 
     const senderName = `${profile.first_name} ${profile.last_name}`;
     await notifyMentionedUsers({
@@ -329,7 +330,7 @@ export default function DealDetail() {
       setAriBusy(true);
       try {
         const result = await runAriMention({ surface: 'deal', entityId: deal.id, request: body, requesterName: senderName });
-        await createNote(ARI_NOTE_PREFIX + result, { dealId: deal.id });
+        await refreshNotes();
         toast('Ari finished — his work is in the notes', 'success');
       } catch (err) {
         toast(friendlyAgentError((err as Error).message ?? ''), 'error');
@@ -343,7 +344,8 @@ export default function DealDetail() {
     if (!profile || ariBusy) return null;
     setAriBusy(true);
     try {
-      await createNote(`↳ Reply to Ari${outputFormat === 'note' ? '' : ` · ${outputFormat.toUpperCase()}`}: ${request}`, { dealId: deal.id });
+      const requestNote=await createNote(`↳ Reply to Ari${outputFormat === 'note' ? '' : ` · ${outputFormat.toUpperCase()}`}: ${request}`, { dealId: deal.id });
+      if(!requestNote)throw new Error('The request note could not save.');
       const result = await runAriMention({
         surface: 'deal',
         entityId: deal.id,
@@ -352,7 +354,7 @@ export default function DealDetail() {
         previousOutput,
         outputFormat,
       });
-      await createNote(ARI_NOTE_PREFIX + result, { dealId: deal.id });
+      await refreshNotes();
       toast(outputFormat === 'note' ? 'Ari replied here' : `Ari replied — building the ${outputFormat.toUpperCase()}`, 'success');
       return result;
     } catch (err) {
@@ -540,7 +542,7 @@ export default function DealDetail() {
           <DealReview deal={deal} onRefresh={refreshDeal}/>
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Notes & Activity</h2>
+              <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Notes & Activity</h2>{notesError&&<p role="alert" className="text-sm text-amber-600">{notesError} <button className="underline" onClick={()=>void refreshNotes()}>Retry loading</button></p>}
               <button onClick={openTaskComposer} className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-600">
                 <CalendarClock className="h-4 w-4" /> Set next task
               </button>

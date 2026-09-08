@@ -388,7 +388,7 @@ export default function JobDetail() {
     isSaving: inventorySaving,
     replaceInventory,
   } = useJobInventory(id, job?.location_id, canEditJob);
-  const { notes, createNote, updateNote } = useNotes({ jobId: id });
+  const { notes, error:notesError, refresh:refreshNotes, createNote, updateNote } = useNotes({ jobId: id });
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteBody, setEditingNoteBody] = useState('');
   const { tasks, createTask, completeTask } = useTasks({ jobId: id }, !technician);
@@ -589,7 +589,7 @@ export default function JobDetail() {
         <div className="lg:col-span-2 space-y-6">
           {/* Job Notes first: the most important thing on the job. Enter adds a line; only Add submits. */}
           <div data-job-notes className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Job Notes</h2>
+            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Job Notes</h2>{notesError&&<p role="alert" className="text-sm text-amber-600">{notesError} <button className="underline" onClick={()=>void refreshNotes()}>Retry loading</button></p>}
             <div className="flex items-start space-x-3 mb-4">
               <textarea
                 value={newNote}
@@ -602,7 +602,7 @@ export default function JobDetail() {
               <button onClick={handleAddNote} disabled={!newNote.trim()} className="px-4 py-2 bg-brand-500 text-white text-sm rounded-lg font-medium hover:bg-brand-600 disabled:opacity-50">Add</button>
             </div>
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {notes.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No notes yet</p> : notes.map(n => {
+              {notes.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">{notesError?'Notes are unavailable until loading succeeds.':'No notes yet'}</p> : notes.map(n => {
                 const canEditNote = profile?.id === n.created_by || profile?.role === 'owner_manager' || profile?.role === 'service_manager';
                 const editing = editingNoteId === n.id;
                 return (

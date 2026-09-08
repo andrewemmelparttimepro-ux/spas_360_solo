@@ -1,3 +1,4 @@
+import { useDraftState } from '@/hooks/useDraftState';
 import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Sparkles, ArrowLeft, Hash, User, History, SquarePen, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -67,7 +68,6 @@ export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<View>('chat');
   const [activeChat, setActiveChat] = useState<ActiveChat>('ari');
-  const [draft, setDraft] = useState('');
   const pickedRef = useRef<PickedMention[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -75,6 +75,9 @@ export default function ChatWidget() {
 
   const agent = useAgentChat();
   const team = useTeamChat();
+  const draftScope=`chat-widget-${user?.id??'out'}-${activeChat}-${activeChat==='ari'?(agent.activeThreadId??'new'):(team.activeThreadId??'none')}`;
+  const [draft,setDraft]=useDraftState(draftScope,'message','');
+  useEffect(()=>{pickedRef.current=[];},[draftScope]);
 
   const isMobile = useIsMobile();
   const vvHeight = useVisualViewportHeight(isOpen && isMobile);
@@ -110,13 +113,12 @@ export default function ChatWidget() {
     if (!draft.trim() || currentSending) return;
     // Picked @mentions become tokens in the stored body
     const msg = composeMentionBody(draft, pickedRef.current);
-    pickedRef.current = [];
-    setDraft('');
     if (isAri) {
+      pickedRef.current=[];setDraft('');
       await agent.sendMessage(msg);
     } else {
       if (!team.activeThreadId) return;
-      await team.sendMessage(msg);
+      if(await team.sendMessage(msg)){pickedRef.current=[];setDraft(previous=>previous===draft?'':previous);}
     }
   };
 
@@ -443,7 +445,7 @@ export default function ChatWidget() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
+              <div data-unsaved={draft.trim()?"true":undefined} className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
                   <MentionInput
                     value={draft}
@@ -473,7 +475,8 @@ export default function ChatWidget() {
           {view === 'chat' && !isAri && (
             <>
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3 bg-ink-950/50">
-                {team.messages.length === 0 && (
+                {(team.readError||team.sendError)&&<div role="alert" className="rounded-xl border border-amber-500/40 p-3 text-sm text-ink-200">{team.readError} {team.sendError} <button className="underline" onClick={()=>void team.retryRead()}>Retry loading</button></div>}
+                {team.messages.length === 0 && !team.readError && (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 bg-brand-500/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
                       {team.activeThread?.is_main
@@ -539,7 +542,7 @@ export default function ChatWidget() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
+              <div data-unsaved={draft.trim()?"true":undefined} className="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 border-t border-ink-700 bg-ink-900 shrink-0">
                 <div className="flex items-end space-x-2">
                   <MentionInput
                     value={draft}

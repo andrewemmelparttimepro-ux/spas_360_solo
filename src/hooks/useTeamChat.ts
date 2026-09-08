@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
-import { createNotification } from '@/hooks/useNotifications';
-import { parseMentions, stripMentions, notifyMentionedUsers } from '@/lib/mentions';
+import { parseMentions, stripMentions } from '@/lib/mentions';
 import { runAriChatMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
 
@@ -49,6 +48,15 @@ export function useTeamChat() {
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [readError,setReadError]=useState<string|null>(null);
+  const [sendError,setSendError]=useState<string|null>(null);
+  const scope=useRef('');scope.current=user?.id??'';
+  const sequences=useRef({members:0,threads:0,messages:0});
+  const loaded=useRef(false);
+  const sending=useRef(false);
+  const pending=useRef<{id:string;thread:string;content:string;user:string}|null>(null);
+  const active=useRef(activeThreadId);active.current=activeThreadId;
+  useEffect(()=>{sequences.current.members++;sequences.current.threads++;sequences.current.messages++;loaded.current=false;setMembers([]);setThreads([]);setMessages([]);setActiveThreadId(null);setReadError(null);setSendError(null);pending.current=null;},[user?.id]);
   const senderMapRef = useRef<Record<string, TeamMember>>({});
   // Unique per hook instance: ChatWidget + Communication page both mount this hook,
   // and supabase-js reuses channels by topic — a second .on() after subscribe() throws.
@@ -57,25 +65,29 @@ export function useTeamChat() {
   // ─── Fetch team members ────────────────────────────────
   const fetchMembers = useCallback(async () => {
     if (!profile?.org_id) return;
-    const { data } = await supabase
+    const request=++sequences.current.members;const account=scope.current;
+    const { data,error } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, role, avatar_url, email')
       .eq('org_id', profile.org_id)
-      .order('first_name');
+      .order('first_name').abortSignal(AbortSignal.timeout(15000));
+    if(request!==sequences.current.members||account!==scope.current)return;
+    if(error){setReadError('Team members could not refresh. The last loaded list is shown.');return;}
     if (data) {
       setMembers(data);
       const map: Record<string, TeamMember> = {};
       for (const m of data) map[m.id] = m;
       senderMapRef.current = map;
     }
-  }, [profile?.org_id]);
+  }, [profile?.org_id,user?.id]);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
   // ─── Fetch team threads ────────────────────────────────
   const fetchThreads = useCallback(async () => {
     if (!user || !profile?.org_id) return;
-    setIsLoading(true);
+    const request=++sequences.current.threads;const account=scope.current;
+    if(!loaded.current)setIsLoading(true);
     // Participation is filtered server-side — clients never download the
     // whole org's DM metadata just to throw most of it away.
     const { data, error } = await supabase
@@ -84,9 +96,10 @@ export function useTeamChat() {
       .eq('thread_type', 'team')
       .eq('org_id', profile.org_id)
       .or(`user_id.eq.${user.id},participants.cs.{${user.id}}`)
-      .order('last_message_at', { ascending: false, nullsFirst: false });
+      .order('last_message_at', { ascending: false, nullsFirst: false }).abortSignal(AbortSignal.timeout(15000));
+    if(request!==sequences.current.threads||account!==scope.current)return;
 
-    if (error) { console.error('Error fetching team threads:', error); setIsLoading(false); return; }
+    if (error) { setReadError('Conversations could not refresh. The last loaded list is shown. Retry loading.'); setIsLoading(false); return; }
     if (!data) { setThreads([]); setIsLoading(false); return; }
 
     const myThreads = data as TeamThread[];
@@ -110,6 +123,7 @@ export function useTeamChat() {
       return bt.localeCompare(at);
     });
 
+    loaded.current=true;
     setThreads(enriched);
     setIsLoading(false);
   }, [user, profile?.org_id, members]);
@@ -119,11 +133,14 @@ export function useTeamChat() {
   // ─── Fetch messages for active thread ──────────────────
   const fetchMessages = useCallback(async () => {
     if (!activeThreadId) { setMessages([]); return; }
-    const { data } = await supabase
+    const request=++sequences.current.messages;const account=scope.current;
+    const { data,error } = await supabase
       .from('agent_messages')
       .select('*')
       .eq('thread_id', activeThreadId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true }).abortSignal(AbortSignal.timeout(15000));
+    if(request!==sequences.current.messages||account!==scope.current||activeThreadId!==active.current)return;
+    if(error){setReadError('Messages could not refresh. The last loaded messages are shown. Retry loading.');return;}
 
     if (data) {
       setMessages(data.map(m => ({
@@ -132,9 +149,9 @@ export function useTeamChat() {
           : m.sender_id ? (senderMapRef.current[m.sender_id]?.first_name ?? 'Unknown') : undefined,
       })));
     }
-  }, [activeThreadId]);
+  }, [activeThreadId,user?.id]);
 
-  useEffect(() => { fetchMessages(); }, [fetchMessages]);
+  useEffect(() => {setMessages([]);void fetchMessages();return()=>{sequences.current.messages++;};}, [fetchMessages]);
 
   // ─── Real-time subscription ────────────────────────────
   useEffect(() => {
@@ -186,7 +203,7 @@ export function useTeamChat() {
       .select()
       .single();
 
-    if (error) { console.error('Error creating Main thread:', error); return null; }
+    if (error) { setSendError('The conversation could not open. Retry loading before creating another.'); return null; }
     await fetchThreads();
     setActiveThreadId(data.id);
     return data.id;
@@ -216,7 +233,7 @@ export function useTeamChat() {
       .select()
       .single();
 
-    if (error) { console.error('Error creating DM thread:', error); return null; }
+    if (error) { setSendError('The conversation could not open. Retry loading before creating another.'); return null; }
     await fetchThreads();
     setActiveThreadId(data.id);
     return data.id;
@@ -253,7 +270,7 @@ export function useTeamChat() {
       .select()
       .single();
 
-    if (error) { console.error('Error creating thread:', error); return null; }
+    if (error) { setSendError('The conversation could not open. Retry loading before creating another.'); return null; }
     await fetchThreads();
     setActiveThreadId(data.id);
     return data.id;
@@ -276,74 +293,44 @@ export function useTeamChat() {
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => `${m.role === 'assistant' ? 'Ari' : (m.sender_name ?? 'Teammate')}: ${stripMentions(m.content)}`);
       const reply = await runAriChatMention({ threadId: tid, channelTitle, senderName, message: content, recentLines });
-      await supabase.from('agent_messages').insert({ thread_id: tid, role: 'assistant', content: reply, sender_id: null });
+      // The server saves the answer with the operation receipt.
     } catch (err) {
-      // Fail loudly, in the thread, in plain English
-      await supabase.from('agent_messages').insert({
-        thread_id: tid, role: 'assistant', sender_id: null,
-        content: friendlyAgentError((err as Error).message ?? ''),
-      });
+      setSendError(friendlyAgentError((err as Error).message??''));
     } finally {
       setAriThinking(false);
-      await supabase.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', tid);
       await fetchMessages();
       await fetchThreads();
     }
   }, [profile, messages, fetchMessages, fetchThreads]);
 
-  // ─── Send message ──────────────────────────────────────
-  const sendMessage = useCallback(async (content: string, threadId?: string) => {
-    const tid = threadId || activeThreadId;
-    if (!tid || !user || isSending) return;
-    setIsSending(true);
-    try {
-      await supabase.from('agent_messages').insert({
-        thread_id: tid,
-        role: 'user',
-        content,
-        sender_id: user.id,
-      });
-      await supabase.from('agent_threads')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', tid);
-
-      const thread = threads.find(t => t.id === tid);
-      const senderName = profile ? `${profile.first_name} ${profile.last_name}` : 'A teammate';
-      const channelLabel = thread?.title || 'Team Chat';
-      const participants = (thread?.participants ?? []).filter(id => id && id !== user.id);
-      const preview = stripMentions(content);
-
-      // @-mentioned teammates get the louder "mentioned you"; everyone else
-      // in the thread gets the regular new-message ping (never both).
-      const mentioned = await notifyMentionedUsers({
-        body: content,
-        senderId: user.id,
-        senderName,
-        contextLabel: channelLabel,
-        link: '/communication',
-        onlyIds: participants,
-      });
-      const rest = participants.filter(id => !mentioned.includes(id));
-      await Promise.all(rest.map(rid => createNotification(rid, {
-        type: 'message',
-        title: `${senderName} · ${channelLabel}`,
-        body: preview.length > 80 ? preview.slice(0, 80) + '…' : preview,
-        link: '/communication',
-      })));
-
-      await fetchMessages();
-      await fetchThreads();
-
-      // @Ari answers in the thread — fired after send so the composer frees up
-      if (parseMentions(content).ari) {
-        void summonAri(tid, content, channelLabel);
-      }
-    } catch (err) {
-      console.error('Send team message error:', err);
-    } finally {
-      setIsSending(false);
-    }
-  }, [activeThreadId, user, profile, threads, isSending, fetchMessages, fetchThreads, summonAri]);
+  // Message identity survives lost responses. Retrying this draft reuses it;
+  // receipts live in the saved message, so notices are not sent twice.
+  const sendMessage = useCallback(async (content: string, threadId?: string):Promise<boolean> => {
+    const tid=threadId||activeThreadId;
+    if(!tid||!user||sending.current)return false;
+    const account=user.id;
+    const key=`spas:pending-team:${account}:${tid}`;
+    if(!pending.current){try{pending.current=JSON.parse(sessionStorage.getItem(key)||'null');}catch{/* storage optional */}}
+    if(pending.current?.user!==account||pending.current.thread!==tid||pending.current.content!==content)pending.current={id:crypto.randomUUID(),thread:tid,content,user:account};
+    const item=pending.current;
+    try{sessionStorage.setItem(key,JSON.stringify(item));}catch{/* retain in memory */}
+    sending.current=true;setIsSending(true);setSendError(null);
+    try{
+      const {error}=await supabase.rpc('send_team_message_once',{p_id:item.id,p_thread:tid,p_content:content}).abortSignal(AbortSignal.timeout(20000));
+      if(error)throw error;
+      try{sessionStorage.removeItem(key);}catch{/* optional */}
+      pending.current=null;
+      if(scope.current!==account)return true;
+      await Promise.all([fetchMessages(),fetchThreads()]);
+      const thread=threads.find(t=>t.id===tid);
+      if(parseMentions(content).ari)void summonAri(tid,content,thread?.title||'Team chat');
+      return true;
+    }catch{
+      if(scope.current===account)setSendError('The message is not confirmed saved. Your draft is kept. Retry the unchanged message to check its original receipt without sending it twice.');
+      return false;
+    }finally{sending.current=false;if(scope.current===account)setIsSending(false);}
+  },[activeThreadId,user,threads,fetchMessages,fetchThreads,summonAri]);
+  const retryRead=useCallback(async()=>{setReadError(null);await Promise.all([fetchMembers(),fetchThreads(),fetchMessages()]);},[fetchMembers,fetchThreads,fetchMessages]);
 
   // ─── Helper functions (Communication page) ─────────────
   const getSenderName = useCallback((senderId: string | null) => {
@@ -373,6 +360,7 @@ export function useTeamChat() {
 
   return {
     // Shared
+    readError,sendError,retryRead,
     threads,
     activeThread,
     activeThreadId,

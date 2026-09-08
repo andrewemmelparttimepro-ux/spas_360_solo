@@ -1,3 +1,4 @@
+import { useDraftState } from '@/hooks/useDraftState';
 import CustomerEquipment from '@/components/CustomerEquipment';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign, Handshake, Wrench, Package, Bot } from 'lucide-react';
@@ -89,11 +90,11 @@ export default function ContactDetail() {
   const { contact: rawContact, isLoading, updateContact } = useContact(id);
   const contact = rawContact as ContactWithAssigned | null;
   const { profile } = useAuth();
-  const { notes, createNote } = useNotes({ contactId: id });
+  const { notes, error:notesError, createNote, refresh:refreshNotes } = useNotes({ contactId: id });
   const { tasks, createTask, completeTask } = useTasks({ contactId: id });
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [newNote, setNewNote] = useState('');
+  const [newNote, setNewNote] = useDraftState(`note-${profile?.id??'out'}-${id}`,'body','');
   const pickedRef = useRef<PickedMention[]>([]);
   const [ariBusy, setAriBusy] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -170,9 +171,9 @@ export default function ContactDetail() {
   const handleAddNote = async () => {
     if (!newNote.trim() || !profile) return;
     const body = composeMentionBody(newNote, pickedRef.current);
-    pickedRef.current = [];
-    setNewNote('');
-    await createNote(body, { contactId: contact.id });
+    const saved=await createNote(body, { contactId: contact.id });
+    if(!saved){toast('The note did not save. Your draft is kept.','error');return;}
+    pickedRef.current=[];setNewNote('');
 
     const senderName = `${profile.first_name} ${profile.last_name}`;
     await notifyMentionedUsers({
@@ -188,7 +189,7 @@ export default function ContactDetail() {
       setAriBusy(true);
       try {
         const result = await runAriMention({ surface: 'contact', entityId: contact.id, request: body, requesterName: senderName });
-        await createNote(ARI_NOTE_PREFIX + result, { contactId: contact.id });
+        await refreshNotes();
         toast('Ari finished — his work is in the notes', 'success');
       } catch (err) {
         toast(friendlyAgentError((err as Error).message ?? ''), 'error');
@@ -202,7 +203,8 @@ export default function ContactDetail() {
     if (!profile || ariBusy) return null;
     setAriBusy(true);
     try {
-      await createNote(`↳ Reply to Ari${outputFormat === 'note' ? '' : ` · ${outputFormat.toUpperCase()}`}: ${request}`, { contactId: contact.id });
+      const requestNote=await createNote(`↳ Reply to Ari${outputFormat === 'note' ? '' : ` · ${outputFormat.toUpperCase()}`}: ${request}`, { contactId: contact.id });
+      if(!requestNote)throw new Error('The request note could not save.');
       const result = await runAriMention({
         surface: 'contact',
         entityId: contact.id,
@@ -211,7 +213,7 @@ export default function ContactDetail() {
         previousOutput,
         outputFormat,
       });
-      await createNote(ARI_NOTE_PREFIX + result, { contactId: contact.id });
+      await refreshNotes();
       toast(outputFormat === 'note' ? 'Ari replied here' : `Ari replied — building the ${outputFormat.toUpperCase()}`, 'success');
       return result;
     } catch (err) {
@@ -390,7 +392,7 @@ export default function ContactDetail() {
         </div>
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Notes</h2>
+            <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Notes</h2>{notesError&&<p role="alert" className="text-sm text-amber-600">{notesError} <button className="underline" onClick={()=>void refreshNotes()}>Retry loading</button></p>}
             <div className="flex items-start space-x-3 mb-4">
               <MentionInput
                 value={newNote}

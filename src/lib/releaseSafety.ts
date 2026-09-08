@@ -12,9 +12,8 @@ export function requestUpdateNotice() {
 // Always user initiated. Never reload on controllerchange or during a mutation.
 export function reloadWhenReady(): void {
   if (document.querySelector('[role="dialog"], [data-unsaved="true"], [aria-busy="true"]')) {
-    window.alert('Finish or close the open form before updating. Your current page will stay open.');
+    window.dispatchEvent(new Event('spas:update-blocked'));
     return;
   }
-  if (!window.confirm('Saved changes are safe. Finish any unsaved edits or uploads before continuing. Update SPAS 360 now?')) return;
   window.location.reload();
 }

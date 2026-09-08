@@ -1,4 +1,4 @@
-import{test}from'node:test';import assert from'node:assert/strict';import{exactPartApplication}from'../src/lib/partFitment.ts';
+import{test}from'node:test';import assert from'node:assert/strict';import{exactPartApplication}from'../src/lib/partFitment.js';
 const source={manufacturer:'Sundance Spas',model:'Optima',model_year_start:2009,model_year_end:2018,component:'Pillow, packaged',variant:'880 Series'};
 const request={manufacturer:'Sundance',model:'Optima',year:2011,component:'pillows'};
 test('exact manufacturer, model and covered year qualify the cited pillow application',()=>assert.equal(exactPartApplication(source,request),true));

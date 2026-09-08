@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import{knowledgeFreshness}from'../src/lib/knowledgeFreshness.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import{knowledgeFreshness}from'../src/lib/knowledgeFreshness.js';
 const now=Date.parse('2026-09-08T18:00:00Z');const current={status:'active',verified_at:'2026-09-01T00:00:00Z',review_due_at:'2026-10-01T00:00:00Z'};
 test('verified catalog references remain usable without inventing an expiry',()=>{assert.equal(knowledgeFreshness({...current,review_due_at:null},now).usable,true);});
 test('unverified, expired, overdue, withdrawn and future policies cannot support current claims',()=>{for(const change of [{verified_at:null},{expires_at:'2026-09-08T18:00:00Z'},{review_due_at:'2026-09-07'},{status:'archived'},{effective_at:'2026-10-01'},{review_required:true},{verified_at:'broken'}])assert.equal(knowledgeFreshness({...current,...change},now).usable,false);});

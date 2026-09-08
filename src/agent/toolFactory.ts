@@ -1,5 +1,5 @@
-import {exactPartApplication} from '../lib/partFitment.ts';
-import {knowledgeFreshness} from '../lib/knowledgeFreshness.ts';
+import {exactPartApplication} from '../lib/partFitment.js';
+import {knowledgeFreshness} from '../lib/knowledgeFreshness.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 async function reviewedKnowledge(client:SupabaseClient,rows:Record<string,unknown>[]){

@@ -33,14 +33,16 @@ type ViewMode = 'cards' | 'list';
 const VIEW_KEY = 'spas360.customersView';
 
 export default function Customers() {
-  const { cards, countsByType, isLoading, refresh } = useCustomerCards();
+  const { cards, countsByType, isLoading, loadError, refresh } = useCustomerCards();
   const { dragging } = useCustomerDrag();
   const [showWizard, setShowWizard] = useState(false);
   const [quickDealFor, setQuickDealFor] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [page,setPage]=useState(0);
+  const [pageSize,setPageSize]=useState(50);
   const [sort, setSort] = useState<CustomerSort>('recent');
   // List is the default; once someone chooses cards, remember that choice locally.
-  const [view, setView] = useState<ViewMode>(() => (localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list'));
+  const [view, setView] = useState<ViewMode>(() => {try{return localStorage.getItem(VIEW_KEY)==='cards'?'cards':'list';}catch{return 'list';}});
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -55,7 +57,7 @@ export default function Customers() {
 
   const switchView = (nextView: ViewMode) => {
     setView(nextView);
-    localStorage.setItem(VIEW_KEY, nextView);
+    try{localStorage.setItem(VIEW_KEY,nextView);}catch{/* Optional local preference. */}
   };
 
   const normalizedSearch = normalizeCustomerNameQuery(search);
@@ -68,6 +70,8 @@ export default function Customers() {
     return sorted;
   }, [cards, search, sort]);
 
+  const currentPage=Math.min(page,Math.max(0,Math.ceil(visible.length/pageSize)-1));
+  const pageRows=visible.slice(currentPage*pageSize,(currentPage+1)*pageSize);
   if (isLoading) {
     return (
       <div className="h-full max-w-[1600px] mx-auto space-y-4">
@@ -124,14 +128,14 @@ export default function Customers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => {setSearch(e.target.value);setPage(0);}}
             placeholder="Start typing a customer name…"
             className="w-56 sm:w-64 pl-9 pr-3 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
         <select
           value={sort}
-          onChange={e => setSort(e.target.value as CustomerSort)}
+          onChange={e => {setSort(e.target.value as CustomerSort);setPage(0);}}
           className="px-3 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm text-ink-300 outline-none focus:border-violet-500"
           aria-label="Sort customers"
         >
@@ -161,7 +165,12 @@ export default function Customers() {
         </div>
       </div>
 
-      {cards.length === 0 ? (
+      {loadError && <div role="alert" className="mb-3 rounded-lg border border-amber-500/40 p-3 text-sm text-amber-300">{loadError} <button onClick={()=>void refresh()} className="underline">Retry</button></div>}
+      {visible.length>0 && <nav aria-label="Customer pages" className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-ink-300">
+        <span>{currentPage*pageSize+1}–{Math.min((currentPage+1)*pageSize,visible.length)} of {visible.length} matching customers</span>
+        <div className="flex items-center gap-3"><label>Rows <select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0);}} className="rounded border border-ink-700 bg-ink-900 p-1"><option value={50}>50</option><option value={100}>100</option></select></label><button disabled={currentPage===0} onClick={()=>setPage(currentPage-1)} className="rounded border border-ink-700 px-3 py-1 disabled:opacity-40">Previous</button><button disabled={(currentPage+1)*pageSize>=visible.length} onClick={()=>setPage(currentPage+1)} className="rounded border border-ink-700 px-3 py-1 disabled:opacity-40">Next</button></div>
+      </nav>}
+      {cards.length === 0 && loadError ? null : cards.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-ink-500">
           <Users className="w-12 h-12 mb-3" />
           <p className="text-lg font-medium">No customers yet</p>
@@ -185,7 +194,7 @@ export default function Customers() {
           className={cn('flex-1 overflow-y-auto pb-4 transition-opacity', dragging && 'opacity-80')}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-            {visible.map(c => (
+            {pageRows.map(c => (
               <CustomerCardView key={c.id} customer={c} onNewDeal={() => setQuickDealFor(c.id)} />
             ))}
           </div>
@@ -195,21 +204,21 @@ export default function Customers() {
           key={`list:${normalizedSearch}`}
           className={cn('flex-1 overflow-auto pb-4 bg-ink-900 rounded-xl border border-ink-700 transition-opacity', dragging && 'opacity-80')}
         >
-          <table className="w-full min-w-[800px] table-fixed border-collapse text-left text-[10px]">
+          <table className="w-full min-w-[800px] table-fixed border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-ink-700 bg-ink-950 sticky top-0 z-10">
-                <th className="w-[14%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Customer</th>
-                <th className="w-[17%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Address</th>
-                <th className="w-[13%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Phone</th>
-                <th className="w-[12%] px-1.5 py-2 text-right text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">In Play</th>
-                <th className="w-[10%] px-1.5 py-2 text-right text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Lifetime Spend</th>
-                <th className="w-[17%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Major Units Purchased</th>
-                <th className="w-[9%] px-1.5 py-2 text-[8px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Owner</th>
+                <th className="w-[14%] px-1.5 py-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Customer</th>
+                <th className="w-[17%] px-1.5 py-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Address</th>
+                <th className="w-[13%] px-1.5 py-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Phone</th>
+                <th className="w-[12%] px-1.5 py-2 text-right text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">In Play</th>
+                <th className="w-[10%] px-1.5 py-2 text-right text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Lifetime Spend</th>
+                <th className="w-[17%] px-1.5 py-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Major Units Purchased</th>
+                <th className="w-[9%] px-1.5 py-2 text-[11px] font-semibold uppercase leading-tight tracking-wide text-ink-400">Owner</th>
                 <th className="w-[8%] px-1.5 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
-              {visible.map(c => (
+              {pageRows.map(c => (
                 <CustomerRow key={c.id} customer={c} onNewDeal={() => setQuickDealFor(c.id)} />
               ))}
             </tbody>
@@ -430,7 +439,7 @@ function CustomerCardView({ customer: c, onNewDeal }: { customer: CustomerCard; 
             <Snowflake className="w-3 h-3" />{idleDays}d quiet
           </span>
         ) : (
-          <span className="text-ink-500 shrink-0">{formatDistanceToNow(new Date(c.lastActivity), { addSuffix: true })}</span>
+          <span className="text-ink-500 shrink-0">{Number.isNaN(new Date(c.lastActivity).getTime())?'Activity date unknown':formatDistanceToNow(new Date(c.lastActivity), { addSuffix: true })}</span>
         )}
       </div>
 

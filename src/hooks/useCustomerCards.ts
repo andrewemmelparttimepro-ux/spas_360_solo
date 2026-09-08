@@ -39,10 +39,15 @@ export function useCustomerCards() {
   const [followUps, setFollowUps] = useState<Set<string>>(new Set()); // contact ids with an open task
   const [isLoading, setIsLoading] = useState(true);
   const fetchSeq = useRef(0);
+  const [loadError,setLoadError]=useState<string|null>(null);
+  const goodScope=useRef<string|null>(null);
+  const scope=`${profile?.id}:${activeLocationId??'all'}`;
 
   const fetchAll = useCallback(async () => {
     if (!profile) return;
-    setIsLoading(true);
+    setIsLoading(goodScope.current!==scope);
+    setLoadError(null);
+    const signal=AbortSignal.timeout(15000);
     const seq = ++fetchSeq.current; // stale realtime reads must not replace a newer post-create refresh
 
     const fetchEveryContact = async () => {
@@ -57,7 +62,7 @@ export function useCustomerCards() {
           // unstable tie order across page fetches duplicates/drops rows.
           .order('updated_at', { ascending: false })
           .order('id', { ascending: true })
-          .range(from, from + pageSize - 1);
+          .range(from, from + pageSize - 1).abortSignal(signal);
         if (activeLocationId) query = query.eq('location_id', activeLocationId);
         const { data, error } = await query;
         if (error) return { data: rows, error };
@@ -70,18 +75,21 @@ export function useCustomerCards() {
       }
     };
 
+    try {
     const [contactRes, stageRes, dealRes, jobRes, equipRes, taskRes] = await Promise.all([
       fetchEveryContact(),
-      supabase.from('pipeline_stages').select('id, name, is_won, is_lost').eq('org_id', profile.org_id),
-      supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id),
-      supabase.from('jobs').select('contact_id, status, amount_to_collect, service_level').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")'),
-      supabase.from('inventory_items').select('id, customer_id, brand, model, product, sku').eq('org_id', profile.org_id).not('customer_id', 'is', null),
-      supabase.from('tasks').select('contact_id, deal_id').eq('org_id', profile.org_id).in('status', ['Pending', 'In Progress']),
+      supabase.from('pipeline_stages').select('id, name, is_won, is_lost').eq('org_id', profile.org_id).abortSignal(signal),
+      supabase.from('deals').select('id, contact_id, amount, stage_id').eq('org_id', profile.org_id).abortSignal(signal),
+      supabase.from('jobs').select('contact_id, status, amount_to_collect, service_level').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")').abortSignal(signal),
+      supabase.from('inventory_items').select('id, customer_id, brand, model, product, sku').eq('org_id', profile.org_id).not('customer_id', 'is', null).abortSignal(signal),
+      supabase.from('tasks').select('contact_id, deal_id').eq('org_id', profile.org_id).in('status', ['Pending', 'In Progress']).abortSignal(signal),
     ]);
 
     if (seq !== fetchSeq.current) return;
 
-    if (contactRes.error) console.error('Error fetching customers:', contactRes.error);
+    const failed=[contactRes,stageRes,dealRes,jobRes,equipRes,taskRes].find(result=>result.error);
+    if(failed) throw new Error('Customer data could not fully refresh. The last complete view is shown.');
+    goodScope.current=scope;
     setContacts((contactRes.data as typeof contacts) ?? []);
 
     const stageFlags = new Map((stageRes.data ?? []).map(s => [s.id as string, { won: !!s.is_won, lost: !!s.is_lost }]));
@@ -142,10 +150,12 @@ export function useCustomerCards() {
     }
     setFollowUps(covered);
 
-    setIsLoading(false);
-  }, [profile, activeLocationId]);
+    } catch {
+      if(seq===fetchSeq.current) setLoadError(goodScope.current===scope?'Customer data could not refresh. This is the last complete view.':'Customer data could not load. Retry to view current records.');
+    } finally { if(seq===fetchSeq.current) setIsLoading(false); }
+  }, [profile, activeLocationId,scope]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { if(goodScope.current!==scope){setContacts([]);setDealAgg(new Map());setJobAgg(new Map());setEquipAgg(new Map());setFollowUps(new Set());}void fetchAll();return()=>{fetchSeq.current++;}; }, [fetchAll,scope]);
 
   // Real-time (channel name unique per hook instance — supabase-js reuses
   // channels by topic and a second .on() after subscribe() throws)
@@ -188,5 +198,5 @@ export function useCustomerCards() {
     return counts;
   }, [cards]);
 
-  return { cards, countsByType, isLoading, refresh: fetchAll };
+  return { cards, countsByType, isLoading, loadError, refresh: fetchAll };
 }

@@ -115,10 +115,10 @@ export default function RevenueTile() {
           {[...report.stores].sort((a, b) => revenueStoreLabel(a.name).localeCompare(revenueStoreLabel(b.name))).map(store => <div key={store.id} className="min-w-0">
             <p className="text-[11px] leading-[14px] font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>
             <p className="flex flex-wrap items-baseline gap-x-1 text-base leading-5 font-bold tabular-nums text-ink-100">
-              <span className="break-all">{money(store.total)}</span><CompactCompleteness missing={store.missingAmounts} />
+              <span className="inline-block whitespace-nowrap">{money(store.total)}</span><CompactCompleteness missing={store.missingAmounts} />
             </p>
             {comparison && store.previousYear && <p className="flex flex-wrap items-baseline gap-x-1 text-[11px] leading-[14px] tabular-nums text-ink-400">
-              <span>Last year’s {comparison.previousYearLabel}: <span className="break-all">{money(store.previousYear.total)}</span></span>
+              <span>Last year’s {comparison.previousYearLabel}: <span className="inline-block whitespace-nowrap">{money(store.previousYear.total)}</span></span>
               <CompactCompleteness missing={store.previousYear.missingAmounts} period="Last year" />
             </p>}
           </div>)}

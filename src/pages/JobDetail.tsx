@@ -4,7 +4,7 @@ import CollectionRequests from '@/components/CollectionRequests';
 import ServiceExceptionReview from '@/components/ServiceExceptionReview';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes, CheckCircle2, CalendarDays, Clock3 } from 'lucide-react';
-import { useJob, useJobInventory, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
+import { useJob, useJobInventory, statusColors, jobTypeChipColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
@@ -17,7 +17,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 import { useAuth } from '@/contexts/AuthContext';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
-import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError } from '@/lib/jobSchedule';
+import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError, scheduleJobType } from '@/lib/jobSchedule';
 import JobContactDetails from '@/components/JobContactDetails';
 import { canEditServiceJob, isServiceTechnician } from '@/lib/serviceTechAccess';
 
@@ -472,9 +472,9 @@ export default function JobDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center gap-4">
         <Link to="/service" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-48">
           <div role="heading" aria-level={1} className="text-ink-100">
             {canEditJob
               ? <EditableField label="job heading" value={job.title} field="title" onSave={saveJob} bold heading />
@@ -489,7 +489,7 @@ export default function JobDetail() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-end gap-3">
           {canDelete && (
             <button
               type="button"
@@ -499,28 +499,37 @@ export default function JobDetail() {
               <Trash2 className="h-4 w-4" />Delete
             </button>
           )}
-          {canEditJob ? (
-            <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
-          ) : technician ? (
-            job.status === 'Completed' ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-2 text-sm font-bold text-emerald-300">
-                <CheckCircle2 className="h-4 w-4" />Completed
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void handleCompleteJob()}
-                disabled={completingJob || job.status === 'Cancelled'}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
-              </button>
-            )
-          ) : (
-            <span className={cn('inline-flex rounded-lg border-l-4 px-3 py-1 text-sm font-bold', statusColors[job.status] ?? 'bg-ink-950')}>
-              {job.status}
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Job Type</p>
+            <span className={cn('inline-flex rounded-lg px-3 py-1 text-sm font-bold', jobTypeChipColors[scheduleJobType(job.job_type)])}>
+              {scheduleJobType(job.job_type)}
             </span>
-          )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Status</p>
+            {canEditJob ? (
+              <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
+            ) : technician ? (
+              job.status === 'Completed' ? (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-2 text-sm font-bold text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />Completed
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleCompleteJob()}
+                  disabled={completingJob || job.status === 'Cancelled'}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
+                </button>
+              )
+            ) : (
+              <span className={cn('inline-flex rounded-lg border-l-4 px-3 py-1 text-sm font-bold', statusColors[job.status] ?? 'bg-ink-950')}>
+                {job.status}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

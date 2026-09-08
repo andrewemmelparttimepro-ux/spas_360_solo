@@ -17,7 +17,7 @@ import {
 export const statusColors: Record<JobStatus, string> = {
   'Pending Confirm': 'border-l-amber-500 bg-amber-500/10 text-amber-200',
   'Delivery': 'border-l-red-500 bg-red-500/10 text-red-200',
-  'Parts on Order': 'border-l-ink-600 bg-black text-ink-300',
+  'Parts on Order': 'border-l-ink-600 bg-black text-white',
   'Warranty': 'border-l-purple-500 bg-purple-500/10 text-purple-200',
   'Ready for Pickup': 'border-l-emerald-500 bg-emerald-500/10 text-emerald-200',
   'In Progress': 'border-l-brand-400 bg-brand-500/10 text-brand-300',

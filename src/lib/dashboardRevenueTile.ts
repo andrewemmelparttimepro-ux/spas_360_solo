@@ -15,7 +15,8 @@ export interface RevenueTileRange extends DashboardDateRange {
 }
 export interface RevenueTileReport {
   total: number;
-  stores: { id: string; name: string; total: number }[];
+  missingAmounts: number | null;
+  stores: { id: string; name: string; total: number; missingAmounts: number | null }[];
   ownerOptions: DashboardRevenueFilterOption[];
   storeOptions: DashboardRevenueFilterOption[];
 }
@@ -68,6 +69,11 @@ export function revenueStoreLabel(name: string): string {
   return name.replace(/\s+\([^)]*\)$/, '');
 }
 
+function missingAmounts(data: unknown): number | null {
+  const value = (data as Record<string, unknown> | null)?.missing_amount_count;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 function revenueTotal(data: unknown): number {
   const value = data && typeof data === 'object' ? (data as Record<string, unknown>).total_revenue : undefined;
   if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim()) || !Number.isFinite(Number(value))) {
@@ -105,10 +111,10 @@ export async function loadRevenueTileReport(
   const stores = await Promise.all(storeOptions
     .filter(store => !params.p_location_id || store.id === params.p_location_id)
     .map(async store => {
-      if (params.p_location_id === store.id) return { ...store, total };
+      if (params.p_location_id === store.id) return { ...store, total, missingAmounts: missingAmounts(result.data) };
       const storeResult = await request({ ...params, p_location_id: store.id });
       if (storeResult.error) throw new Error(storeResult.error.message);
-      return { ...store, total: revenueTotal(storeResult.data) };
+      return { ...store, total: revenueTotal(storeResult.data), missingAmounts: missingAmounts(storeResult.data) };
     }));
-  return { total, stores, ownerOptions, storeOptions };
+  return { total, stores, ownerOptions, storeOptions, missingAmounts: missingAmounts(result.data) };
 }

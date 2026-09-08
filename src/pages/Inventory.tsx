@@ -19,7 +19,7 @@ import {
 } from '@/lib/inventoryFields';
 import { groupInventoryItems } from '@/lib/inventoryGrouping';
 import { ALL_INVENTORY_BRANDS, inventoryBrandOptions, inventoryMatchesBrand } from '@/lib/inventoryBrandFilter';
-import { inventoryAgeLabelForItem } from '@/lib/inventoryAge';
+import { inventoryAgeLabelForItem, inventoryAgeLabel } from '@/lib/inventoryAge';
 import { effectiveInventoryCustomer, hasManagedInventoryAssignment } from '@/lib/inventoryDealAssignment';
 
 const INVENTORY_HEADER_CELL_CLASS = 'px-3 py-2 text-[11px] font-semibold text-ink-400 uppercase tracking-wider whitespace-nowrap';
@@ -584,6 +584,7 @@ export default function Inventory() {
                         </td>
                         <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
                           {inventoryAgeLabelForItem(item.date_received, item.created_at)}
+                          {!item.date_received && <span className="block text-[11px] text-ink-500">Entered {inventoryAgeLabel(item.created_at)} ago</span>}
                         </td>
                         <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <CustomerCell item={item} onSave={updateItem} />

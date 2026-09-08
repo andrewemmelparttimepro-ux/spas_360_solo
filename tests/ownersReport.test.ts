@@ -138,7 +138,7 @@ describe('Owners Corner sales reports', () => {
     assert.match(page, /First comparison period[\s\S]*Compared to[\s\S]*Year[\s\S]*Start Date[\s\S]*End Date/);
     assert.match(page, /Comparison delta[\s\S]*First period minus Compared to/);
     assert.match(page, /First period deals[\s\S]*Compared to deals/);
-    assert.match(page, /Assigned Leads[\s\S]*Closed-Won[\s\S]*Rate/);
+    assert.match(page, /Created Leads[\s\S]*Closed-Won[\s\S]*Rate/);
     assert.match(page, /By Salesperson/);
     assert.match(page, /By Store/);
     assert.match(page, /View printable PDF/);

@@ -24,7 +24,7 @@ function RevenueDetailsDialog({ onClose }: { onClose: () => void }) {
         className="max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-ink-700 bg-ink-900 p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 id="revenue-details-title" className="text-xl font-bold text-ink-100">Total Revenue</h2>
+            <h2 id="revenue-details-title" className="text-xl font-bold text-ink-100">Recorded Sales</h2>
             <p id="revenue-details-description" className="mt-1 text-sm text-ink-400">Closed-Won deals by close date. Dates include the full day in Central time.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close revenue details" className="shrink-0 rounded-lg p-2 text-ink-400 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><X className="h-5 w-5" /></button>
@@ -83,12 +83,13 @@ function RevenueDetailsDialog({ onClose }: { onClose: () => void }) {
               <button type="button" onClick={() => void refresh()} className="mt-3 rounded-lg border border-red-500/40 px-3 py-1.5 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Retry revenue</button>
             </div>
             : report && <div className="rounded-xl border border-ink-700 bg-ink-950 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Closed-Won revenue</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Recorded Closed-Won sales</p>
               <p className="mt-1 break-words text-3xl font-bold tabular-nums text-ink-100">{money(report.total)}</p>
+              <Completeness missing={report.missingAmounts} />
               <dl className="mt-4 divide-y divide-ink-700">
                 {report.stores.map(store => <div key={store.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3 first:pt-0 last:pb-0">
                   <dt className="text-sm font-semibold text-ink-300">{revenueStoreLabel(store.name)}</dt>
-                  <dd className="break-words text-lg font-bold tabular-nums text-ink-100">{money(store.total)}</dd>
+                  <dd className="break-words text-lg font-bold tabular-nums text-ink-100">{money(store.total)}<Completeness missing={store.missingAmounts} /></dd>
                 </div>)}
               </dl>
             </div>}
@@ -106,17 +107,21 @@ export default function RevenueTile() {
     <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}
       className="dashboard-stat-card relative rounded-xl border border-ink-700 bg-ink-900 p-4 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:p-5">
       <ArrowUpRight aria-hidden="true" className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500" />
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Total Revenue</p>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Recorded Sales</p>
       <p className="mb-3 text-xs font-medium text-ink-400">This Month · Closed-Won</p>
       {isLoading ? <p role="status" className="text-sm text-ink-400">Loading revenue…</p>
         : error ? <p className="text-xs text-red-400">Revenue couldn't load. Open details to retry.</p>
-        : report && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        : report && <div className="grid grid-cols-1 gap-3 sm:grid-cols-1">
           {report.stores.map(store => <div key={store.id} className="min-w-0">
             <p className="text-xs font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>
-            <p className="mt-1 break-words text-base font-bold tabular-nums text-ink-100">{money(store.total)}</p>
+            <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-ink-100">{money(store.total)}</p><Completeness missing={store.missingAmounts} />
           </div>)}
         </div>}
     </button>
     {open && <RevenueDetailsDialog onClose={() => setOpen(false)} />}
   </>;
+}
+
+function Completeness({ missing }: { missing: number | null }) {
+  return missing === 0 ? null : <p className="mt-1 text-xs font-medium text-amber-600">{missing === null ? 'Amount completeness has not been verified.' : `Incomplete: ${missing} closed sale${missing === 1 ? '' : 's'} missing an amount.`}</p>;
 }

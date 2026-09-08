@@ -84,7 +84,7 @@ describe('Dashboard upcoming tasks', () => {
     ]);
 
     assert.match(dashboard, /<UpcomingTasksPanel tasks=\{upcomingTasks\} owners=\{taskOwners\} openDeals=\{openDeals\}/);
-    assert.match(panel, />Lead Follow Up Tasks</);
+    assert.match(panel, />Customer Follow-up Tasks</);
     assert.doesNotMatch(panel, />Upcoming Tasks</);
     assert.match(panel, /<option value=\{ALL_TASK_OWNERS\}>All Sales People<\/option>/);
     assert.match(panel, /<option value=\{ALL_TASKS\}>All Tasks<\/option>/);

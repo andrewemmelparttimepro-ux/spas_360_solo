@@ -80,6 +80,9 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [suggestionOpen, setSuggestionOpen] = useState(false);
+  useEffect(() => {
+    if (location.hash === '#suggestions') setSuggestionOpen(true);
+  }, [location.hash]);
   // Nudge until they decide either way; hides itself after grant/deny
   const [pushNudge, setPushNudge] = useState(() => pushSupported() && pushPermission() === 'default');
   const locRef = useRef<HTMLDivElement>(null);

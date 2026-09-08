@@ -228,7 +228,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
       doc.text(closedDate(deal.closed_at), columns[1].x + 5, y + 14);
       doc.text(storeLines, columns[2].x + 5, y + 14);
       doc.text(salespersonLines, columns[3].x + 5, y + 14);
-      doc.text(cleanPdfText(money.format(Number(deal.amount) || 0)), columns[4].x + columns[4].width - 5, y + 14, { align: 'right' });
+      doc.text(cleanPdfText(deal.amount == null ? 'Amount missing' : money.format(Number(deal.amount))), columns[4].x + columns[4].width - 5, y + 14, { align: 'right' });
       y += rowHeight;
     }
     y += 16;
@@ -245,7 +245,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.text(firstColumn, positions[0] + 5, y + 14);
-      doc.text('Assigned Leads', positions[2] - 5, y + 14, { align: 'right' });
+      doc.text('Created Leads', positions[2] - 5, y + 14, { align: 'right' });
       doc.text('Closed-Won', positions[3] - 5, y + 14, { align: 'right' });
       doc.text('Rate', positions[4] - 5, y + 14, { align: 'right' });
       y += 22;
@@ -255,7 +255,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
       doc.setTextColor(COLORS.muted);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.text('No assigned leads in this period.', margin + 5, y + 18);
+      doc.text('No created leads in this period.', margin + 5, y + 18);
       y += 30;
       return;
     }
@@ -335,7 +335,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
         doc.setFontSize(8.25);
         doc.text(titleLines, margin + 6, y + 14);
         doc.text(closedDate(deal.closed_at), margin + 354, y + 14);
-        doc.text(cleanPdfText(money.format(Number(deal.amount) || 0)), pageWidth - margin - 6, y + 14, { align: 'right' });
+        doc.text(cleanPdfText(deal.amount == null ? 'Amount missing' : money.format(Number(deal.amount))), pageWidth - margin - 6, y + 14, { align: 'right' });
         y += rowHeight;
       }
       ensureRoom(30);
@@ -396,6 +396,14 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   }
   y += 84;
 
+  doc.setFontSize(9);
+  doc.setTextColor(COLORS.muted);
+  const missingCurrent = input.current.deals.filter(deal => deal.amount == null).length;
+  const missingPrior = input.comparedTo?.deals.filter(deal => deal.amount == null).length;
+  const completeness = `Recorded sale amounts, not collected cash. Current: ${missingCurrent} missing${missingPrior == null ? '' : `; comparison: ${missingPrior} missing`}.`;
+  const completenessLines = doc.splitTextToSize(completeness, contentWidth);
+  ensureRoom(completenessLines.length * 12 + 10);
+  doc.text(completenessLines, margin, y); y += completenessLines.length * 12 + 10;
   drawGrossSalesRanking();
   drawDealTable(input.current);
   if (input.comparedTo) drawDealTable(input.comparedTo);
@@ -404,7 +412,7 @@ export async function buildOwnersReportPdf(input: OwnersReportPdfInput): Promise
   doc.setTextColor(COLORS.muted);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  const rateExplanation = `Deals assigned during ${cleanPdfText(input.current.range)}; rate is Closed-Won divided by assigned leads. Closing-rate rows respect the selected store and salesperson filters.`;
+  const rateExplanation = `Deals created during ${cleanPdfText(input.current.range)}; rate is currently Closed-Won divided by created leads, grouped by current owner/store. Closing-rate rows respect the selected store and salesperson filters.`;
   const explanationLines = doc.splitTextToSize(rateExplanation, contentWidth) as string[];
   doc.text(explanationLines, margin, y);
   y += explanationLines.length * 11 + 6;

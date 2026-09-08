@@ -52,11 +52,11 @@ export function inventoryAgeLabel(startedAt: string, now: Date = new Date()): st
   return `${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
-/** Prefer the explicit received date, falling back to when the inventory row was entered. */
+/** Floor age requires a received date. Entry age is not evidence of receipt. */
 export function inventoryAgeLabelForItem(
   dateReceived: string | null | undefined,
   createdAt: string,
   now: Date = new Date(),
 ): string {
-  return inventoryAgeLabel(dateReceived?.trim() || createdAt, now);
+  return dateReceived?.trim() ? inventoryAgeLabel(dateReceived.trim(), now) : 'Received date unknown';
 }

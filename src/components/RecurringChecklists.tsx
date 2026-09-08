@@ -105,7 +105,7 @@ export default function RecurringChecklists() {
       <header className="flex flex-col gap-2 border-b border-ink-700 bg-ink-850/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 id="recurring-checklists-title" className="flex items-center gap-2 text-lg font-bold text-ink-100"><CalendarCheck2 className="h-5 w-5 text-amber-500" /> Recurring Checklists</h2>
-          <p className="mt-1 text-xs text-ink-500">Opening and closing lists that land in Delegated Tasks every morning at 5:00 AM. Nobody clocks out past an unfinished one. {activeCount} active.</p>
+          <p className="mt-1 text-xs text-ink-500">Opening and closing lists that land in Delegated Tasks every morning at 5:00 AM. Staff can acknowledge unfinished work when clocking out. {activeCount} active.</p>
         </div>
         <button type="button" onClick={() => void runNow()} className="rounded-lg border border-ink-600 px-3 py-2 text-xs font-bold text-ink-200 hover:bg-ink-800">Create today's tasks now</button>
       </header>

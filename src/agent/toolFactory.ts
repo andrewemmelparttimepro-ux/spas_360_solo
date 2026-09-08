@@ -114,6 +114,15 @@ export function createAgentTools(
 ): ToolDefinition[] {
   return [
   {
+    name: 'owner_operations_overview',
+    description: 'Owner-only dealership oversight: credentialed staff, latest sign-ins within seven days, operational exceptions, push registration, feedback and scheduler history. Includes data cutoff and coverage limits; counts are not hours or a session census. The database enforces owner access.',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    execute: async () => {
+      const { data, error } = await client.rpc('owner_attention', { p_days: 7 });
+      return error ? { error: 'Owner overview is unavailable or this account lacks owner access.' } : data;
+    },
+  },
+  {
     name: 'lookup_service_parts',
     description: 'Look up a service part by manufacturer, model, model year, and needed component. Use this first for parts questions such as “2011 Sundance Optima pillows.” Verified fitments are returned before broader catalog candidates.',
     parameters: {

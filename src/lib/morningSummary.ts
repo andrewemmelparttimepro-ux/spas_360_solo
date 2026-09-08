@@ -122,7 +122,7 @@ export function staffAttentionFlags(staff: SummaryStaff): string[] {
 /** Deterministic coaching copy: candid, encouraging, and entirely sourced from counts. */
 export function personalPerformanceRead(staff: SummaryStaff): string {
   const activity = staff.leads_followed_up + staff.tasks_set + staff.deals_created + staff.deals_won + staff.deals_lost;
-  const opening = activity === 0 ? 'Yesterday was quiet in SPAS 360.' : [
+  const opening = activity === 0 ? 'No personal sales activity was recorded for you yesterday. This does not describe dealership-wide, service or delegated work.' : [
     `${staff.leads_followed_up} lead${staff.leads_followed_up === 1 ? '' : 's'} followed up`,
     `${staff.tasks_set} task${staff.tasks_set === 1 ? '' : 's'} set`,
     `${staff.deals_created} new deal${staff.deals_created === 1 ? '' : 's'}`,

@@ -86,7 +86,7 @@ describe('revenue aggregate report requests', () => {
       return { data: response('999.99'), error: null };
     });
     assert.deepEqual(calls, [params]);
-    assert.deepEqual(report.stores, [{ ...storeOptions[1], total: 999.99 }]);
+    assert.deepEqual(report.stores, [{ ...storeOptions[1], total: 999.99, missingAmounts: null }]);
     assert.equal(report.total, 999.99);
     assert.deepEqual(report.ownerOptions, ownerOptions);
     assert.deepEqual(report.storeOptions, storeOptions);

@@ -36,11 +36,11 @@ describe('inventory age', () => {
     assert.equal(inventoryAgeLabel('not-a-date', today), '—');
   });
 
-  it('prefers Date Received and falls back to the inventory-entered date', () => {
+  it('requires Date Received and keeps missing receipt dates explicitly unknown', () => {
     const today = new Date('2026-08-29T18:00:00Z');
     assert.equal(inventoryAgeLabelForItem('2026-08-28', '2026-08-20T18:00:00Z', today), '1 day');
-    assert.equal(inventoryAgeLabelForItem(null, '2026-08-26T18:00:00Z', today), '3 days');
-    assert.equal(inventoryAgeLabelForItem('', '2026-08-26T18:00:00Z', today), '3 days');
+    assert.equal(inventoryAgeLabelForItem(null, '2026-08-26T18:00:00Z', today), 'Received date unknown');
+    assert.equal(inventoryAgeLabelForItem('', '2026-08-26T18:00:00Z', today), 'Received date unknown');
     assert.equal(inventoryAgeLabelForItem('2026-08-30', '2026-08-20T18:00:00Z', today), '0 days');
     assert.equal(inventoryAgeLabelForItem('not-a-date', '2026-08-20T18:00:00Z', today), '—');
     assert.equal(inventoryAgeLabelForItem('2026-02-30', '2026-08-20T18:00:00Z', today), '—');

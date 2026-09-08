@@ -2,6 +2,11 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { ActivityQueue } from '@/lib/activityQueue';
+import { RELEASE_ID } from '@/lib/releaseSafety';
+
+const queue = new ActivityQueue();
+const sessions = new Map<string, string>();
 
 const areaNames: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -25,6 +30,29 @@ export default function ActivityTracker() {
 
   useEffect(() => {
     if (!profile) return;
+    let disposed = false;
+    const flush = async () => {
+      if (!navigator.onLine || disposed) return;
+      await queue.flush(profile.id, async event => {
+        if (disposed) return false;
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user.id !== event.userId) return false;
+        const { error } = await supabase.rpc('record_app_activity_v2', {
+          p_event_id: event.id, p_session_id: event.sessionId, p_route: event.route,
+          p_label: event.label, p_release: event.release, p_channel: 'web',
+        }).abortSignal(AbortSignal.timeout(8_000));
+        return !error;
+      });
+    };
+    window.addEventListener('spas:activity-queued', flush);
+    window.addEventListener('online', flush);
+    const timer = setInterval(flush, 10_000);
+    void flush();
+    return () => { disposed = true; clearInterval(timer); window.removeEventListener('online', flush); window.removeEventListener('spas:activity-queued', flush); };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!profile) return;
     const parts = location.pathname.split('/').filter(Boolean);
     const area = areaNames[parts[0] ?? 'dashboard'] ?? 'SPAS 360';
     const label = parts.length > 1 ? `${area} detail` : area;
@@ -32,11 +60,11 @@ export default function ActivityTracker() {
     if (lastRecorded.current === key) return;
     lastRecorded.current = key;
 
-    void supabase.rpc('record_app_activity', {
-      p_event_type: 'page_view',
-      p_label: label,
-      p_source: 'SPAS 360',
-    });
+    let sessionId = sessions.get(profile.id);
+    if (!sessionId) { sessionId = crypto.randomUUID(); sessions.set(profile.id, sessionId); }
+    const route = `/${areaNames[parts[0]] ? parts[0] : 'other'}${parts.length > 1 ? '/detail' : ''}`;
+    queue.enqueue({ id: crypto.randomUUID(), userId: profile.id, sessionId, route, label, release: RELEASE_ID, attempts: 0 });
+    window.dispatchEvent(new Event('spas:activity-queued'));
   }, [location.pathname, profile]);
 
   return null;

@@ -25,6 +25,7 @@ import { InventoryFlooringStatusReport } from '@/components/InventoryFlooringSta
 import { OwnerWorkbookLibrary } from '@/components/OwnerWorkbookLibrary';
 import StaffTimeReport from '@/components/StaffTimeReport';
 import RecurringChecklists from '@/components/RecurringChecklists';
+import OwnerAttention from '@/components/OwnerAttention';
 
 const OWNER_DESTINATIONS = [
   {
@@ -68,6 +69,7 @@ export default function OwnersCorner() {
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
             <p>Owner access is active. Each destination keeps its existing permissions and data controls.</p>
           </div>
+          <OwnerAttention />
           <OwnerWorkbookLibrary />
           <InventoryFlooringStatusReport />
           <PaidCommissionsTracker />
@@ -296,6 +298,7 @@ function OwnersPerformanceReport() {
             {ranges.prior && <OutcomeSummary title="Compared to" range={ranges.prior} count={priorTotals.count} amount={priorTotals.amount} outcome={outcome} />}
             {ranges.prior && <ComparisonDelta count={delta.count} amount={delta.amount} outcome={outcome} />}
           </div>
+          <p className="text-sm text-amber-600">Recorded amounts only. Current period: {currentDeals.filter(deal => deal.amount == null).length} amounts missing{ranges.prior ? `; comparison period: ${priorDeals.filter(deal => deal.amount == null).length} missing` : ''}. These are booked sales, not collected cash.</p>
           <div className="grid gap-4">
             <DealTable title={ranges.prior ? 'First period deals' : 'Matching deals'} deals={currentDeals} outcome={outcome} storeNames={storeNames} salespersonNames={salespersonNames} />
             {ranges.prior && <DealTable title="Compared to deals" deals={priorDeals} outcome={outcome} storeNames={storeNames} salespersonNames={salespersonNames} />}
@@ -303,7 +306,7 @@ function OwnersPerformanceReport() {
 
           <div className="pt-3">
             <h3 className="text-base font-bold text-ink-100">Closing Rate</h3>
-            <p className="mt-1 text-xs text-ink-500">Deals assigned during {rangeLabel(ranges.current)}; rate is Closed-Won divided by assigned leads.</p>
+            <p className="mt-1 text-xs text-ink-500">Deals created during {rangeLabel(ranges.current)}; rate is currently Closed-Won divided by created leads. Grouped by current salesperson and store, so reassignment can change attribution.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <ClosingRateTable title="By Salesperson" firstColumn="Salesperson" rows={salespersonRates} />
@@ -322,7 +325,7 @@ function ComparisonPeriodControls({ title, ariaPrefix, value, onChange }: { titl
 }
 
 function DealTable({ title, deals, outcome, storeNames, salespersonNames }: { title: string; deals: ReturnType<typeof closedDealsForRange>; outcome: OwnersReportOutcome; storeNames: Map<string, string>; salespersonNames: Map<string, string> }) {
-  return <div className="min-w-0 overflow-x-auto rounded-xl border border-ink-700"><h3 className="bg-ink-950 px-3 py-2 text-sm font-bold text-ink-100">{title}</h3><table className="w-full min-w-[620px] text-sm"><thead className="bg-ink-950 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-3 py-2">Deal</th><th className="px-3 py-2">Closed</th><th className="px-3 py-2">Store</th><th className="px-3 py-2">Salesperson</th><th className="px-3 py-2 text-right">Amount</th></tr></thead><tbody>{deals.length ? deals.map(deal => <tr key={deal.id} className="border-t border-ink-800 text-ink-300"><td className="px-3 py-2 font-medium text-ink-100">{deal.title}</td><td className="px-3 py-2">{deal.closed_at ? format(new Date(deal.closed_at), 'MMM d, yyyy') : '—'}</td><td className="px-3 py-2">{storeNames.get(deal.location_id ?? '') ?? 'Unassigned'}</td><td className="px-3 py-2">{salespersonNames.get(deal.assigned_to ?? '') ?? 'Unassigned'}</td><td className="px-3 py-2 text-right">{money.format(Number(deal.amount) || 0)}</td></tr>) : <tr><td colSpan={5} className="px-3 py-8 text-center text-ink-500">No {outcome === 'won' ? 'Closed-Won' : 'Closed-Lost'} deals match these filters.</td></tr>}</tbody></table></div>;
+  return <div className="min-w-0 overflow-x-auto rounded-xl border border-ink-700"><h3 className="bg-ink-950 px-3 py-2 text-sm font-bold text-ink-100">{title}</h3><table className="w-full min-w-[620px] text-sm"><thead className="bg-ink-950 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-3 py-2">Deal</th><th className="px-3 py-2">Closed</th><th className="px-3 py-2">Store</th><th className="px-3 py-2">Salesperson</th><th className="px-3 py-2 text-right">Amount</th></tr></thead><tbody>{deals.length ? deals.map(deal => <tr key={deal.id} className="border-t border-ink-800 text-ink-300"><td className="px-3 py-2 font-medium text-ink-100">{deal.title}</td><td className="px-3 py-2">{deal.closed_at ? format(new Date(deal.closed_at), 'MMM d, yyyy') : '—'}</td><td className="px-3 py-2">{storeNames.get(deal.location_id ?? '') ?? 'Unassigned'}</td><td className="px-3 py-2">{salespersonNames.get(deal.assigned_to ?? '') ?? 'Unassigned'}</td><td className="px-3 py-2 text-right">{deal.amount == null ? 'Amount missing' : money.format(Number(deal.amount))}</td></tr>) : <tr><td colSpan={5} className="px-3 py-8 text-center text-ink-500">No {outcome === 'won' ? 'Closed-Won' : 'Closed-Lost'} deals match these filters.</td></tr>}</tbody></table></div>;
 }
 
 function OutcomeSummary({ title, range, count, amount, outcome }: { title: string; range: OwnersReportRange; count: number; amount: number; outcome: OwnersReportOutcome }) {
@@ -336,5 +339,5 @@ function ComparisonDelta({ count, amount, outcome }: { count: number; amount: nu
 }
 
 function ClosingRateTable({ title, firstColumn, rows }: { title: string; firstColumn: string; rows: ReturnType<typeof closingRates> }) {
-  return <div className="overflow-x-auto rounded-xl border border-ink-700"><h4 className="bg-ink-950 px-3 py-2 text-sm font-bold text-ink-100">{title}</h4><table className="w-full text-sm"><thead className="text-left text-xs text-ink-500"><tr><th className="px-3 py-2">{firstColumn}</th><th className="px-3 py-2 text-right">Assigned Leads</th><th className="px-3 py-2 text-right">Closed-Won</th><th className="px-3 py-2 text-right">Rate</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="border-t border-ink-800 text-ink-300"><td className="px-3 py-2 font-medium text-ink-100">{row.name}</td><td className="px-3 py-2 text-right">{row.assigned}</td><td className="px-3 py-2 text-right">{row.won}</td><td className="px-3 py-2 text-right font-bold">{(row.rate * 100).toFixed(1)}%</td></tr>) : <tr><td colSpan={4} className="px-3 py-6 text-center text-ink-500">No assigned leads in this period.</td></tr>}</tbody></table></div>;
+  return <div className="overflow-x-auto rounded-xl border border-ink-700"><h4 className="bg-ink-950 px-3 py-2 text-sm font-bold text-ink-100">{title}</h4><table className="w-full text-sm"><thead className="text-left text-xs text-ink-500"><tr><th className="px-3 py-2">{firstColumn}</th><th className="px-3 py-2 text-right">Created Leads</th><th className="px-3 py-2 text-right">Closed-Won</th><th className="px-3 py-2 text-right">Rate</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id} className="border-t border-ink-800 text-ink-300"><td className="px-3 py-2 font-medium text-ink-100">{row.name}</td><td className="px-3 py-2 text-right">{row.assigned}</td><td className="px-3 py-2 text-right">{row.won}</td><td className="px-3 py-2 text-right font-bold">{(row.rate * 100).toFixed(1)}%</td></tr>) : <tr><td colSpan={4} className="px-3 py-6 text-center text-ink-500">No created leads in this period.</td></tr>}</tbody></table></div>;
 }

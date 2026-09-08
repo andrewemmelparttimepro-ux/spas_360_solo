@@ -4,14 +4,19 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import { execFileSync } from 'node:child_process';
 
-const release = process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const builtAt = new Date().toISOString();
+let sourceCommit = process.env.VERCEL_GIT_COMMIT_SHA || null;
+if (!sourceCommit) {
+  try { sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+  catch { /* CLI uploads do not include .git. Never invent a source SHA. */ }
+}
+const release = sourceCommit || process.env.VERCEL_URL || `build-${builtAt}`;
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), {
     name: 'spas-release-manifest',
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ release, builtAt }) });
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ release, sourceCommit, builtAt }) });
     },
   }],
   define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(release) },

@@ -86,7 +86,7 @@ function storedScheduleCalendarDate(value: string): string | null {
 
 // Convert a dealership wall-clock time to an instant without depending on the
 // browser's timezone. The short correction loop also handles CST/CDT offsets.
-function centralWallClockToIso(date: string, time: string): string | null {
+export function centralWallClockToIso(date: string, time: string): string | null {
   if (!validCalendarDate(date) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
   const [year, month, day] = date.split('-').map(Number);
   const [hour, minute] = time.split(':').map(Number);

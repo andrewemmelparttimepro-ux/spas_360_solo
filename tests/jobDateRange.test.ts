@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 import {
+  centralWallClockToIso,
   jobScheduleDraft,
   jobScheduleUpdatesFromDraft,
   jobOccursOnCalendarDay,
@@ -134,3 +135,9 @@ describe('job schedule date ranges', () => {
     assert.match(migration, /set scheduled_all_day = coalesce\(p_scheduled_all_day, false\)/i);
   });
 });
+
+ it('keeps intake follow-ups at 9 a.m. Central through summer and winter', async () => {
+  assert.equal(centralWallClockToIso('2026-09-10', '09:00'), '2026-09-10T14:00:00.000Z');
+  assert.equal(centralWallClockToIso('2026-12-10', '09:00'), '2026-12-10T15:00:00.000Z');
+  assert.match(await read('src/components/NewCustomerWizard.tsx'), /due_at: centralWallClockToIso\(followupDate, '09:00'\)/);
+ });

@@ -11,6 +11,7 @@ import { normalizeCustomerAddress } from '@/lib/customerAddress';
 import type { Contact } from '@/types/database';
 import { saveCustomerForDeal } from '@/lib/customerForDeal';
 import { resolveCreationStore } from '@/lib/creationStore';
+import { centralWallClockToIso } from '@/lib/jobSchedule';
 
 /**
  * Guided new-customer flow: chips + progressive steps, every earlier answer
@@ -261,7 +262,7 @@ export default function NewCustomerWizard({ onClose, onCreated, onCustomerSelect
         contact_id: contactId,
         deal_id: deal.id,
         title: `Follow up with ${contactFirst}`,
-        due_at: `${followupDate}T09:00:00`,
+        due_at: centralWallClockToIso(followupDate, '09:00'),
         priority: priority === 'High' ? 'High' : priority === 'Low' ? 'Low' : 'Medium',
         status: 'Pending',
         task_type: 'Follow-up',

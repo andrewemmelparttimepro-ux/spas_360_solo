@@ -1,3 +1,4 @@
+import CustomerEquipment from '@/components/CustomerEquipment';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign, Handshake, Wrench, Package, Bot } from 'lucide-react';
 import { useContact } from '@/hooks/useContacts';
@@ -373,6 +374,7 @@ export default function ContactDetail() {
         </div>
       </div>
 
+      <CustomerEquipment key={`equipment-${profile?.id}-${contact.id}`} contactId={contact.id} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Contact Details</h2><span className="text-[10px] text-ink-500">Click any value to edit</span></div>

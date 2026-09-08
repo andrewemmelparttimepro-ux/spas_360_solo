@@ -76,7 +76,7 @@ begin
   ) values (
     v_actor.org_id, v_owner_id, v_actor.id, v_contact.id, v_deal_id,
     'Follow up with ' || v_contact.first_name,
-    (p_next_activity_date + time '09:00:00')::timestamptz,
+    (p_next_activity_date + time '09:00:00') at time zone 'America/Chicago',
     v_priority, 'Pending', 'Follow-up'
   );
 

@@ -1,3 +1,6 @@
+import CustomerEquipment from '@/components/CustomerEquipment';
+import CollectionRequests from '@/components/CollectionRequests';
+import ServiceExceptionReview from '@/components/ServiceExceptionReview';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes, CheckCircle2, CalendarDays, Clock3 } from 'lucide-react';
 import { useJob, useJobInventory, statusColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
@@ -377,7 +380,7 @@ export default function JobDetail() {
   const { profile } = useAuth();
   const technician = isServiceTechnician(profile?.role);
   const canEditJob = canEditServiceJob(profile?.role);
-  const { job, isLoading, updateJob, deleteJob, completeJob } = useJob(id);
+  const { job, isLoading, error: jobError, refresh: refreshJob, updateJob, deleteJob, completeJob } = useJob(id);
   const {
     choices: inventoryChoices,
     selectedItems: attachedInventory,
@@ -410,7 +413,7 @@ export default function JobDetail() {
   }
 
   if (!job) {
-    return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Job not found</p><Link to="/service" className="text-brand-400 text-sm mt-2 hover:underline">Back to Service</Link></div>;
+    return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>{jobError || "Job not found"}</p>{jobError && <button onClick={() => void refreshJob()} className="text-brand-500 underline">Retry job details</button>}<Link to="/service" className="text-brand-400 text-sm mt-2 hover:underline">Back to Service</Link></div>;
   }
 
   const contact = (job as unknown as Record<string, unknown>).contacts as { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | undefined;
@@ -554,7 +557,10 @@ export default function JobDetail() {
       )}
 
       {/* Field capture: time clock front and center for techs */}
+      {jobError && <p role="alert" className="text-sm text-amber-600">{jobError} <button onClick={() => void refreshJob()} className="underline">Retry</button></p>}
       <TimeClockCard jobId={job.id} />
+      <ServiceExceptionReview key={`review-${job.id}`} job={job} onSave={saveJob} canEdit={canEditJob} />
+      <CustomerEquipment key={`equipment-${profile?.id}-${job.contact_id}`} contactId={job.contact_id} selectedId={job.equipment_id} onSelect={canEditJob ? value => saveJob({equipment_id:value}) : undefined} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6 space-y-5">
@@ -574,7 +580,8 @@ export default function JobDetail() {
               <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wider text-ink-500">Collect</h3>
               {canEditJob
                 ? <EditableField label="Collect" value={job.amount_to_collect} field="amount_to_collect" onSave={saveJob} icon={DollarSign} type="number" prefix="$" bold color="text-emerald-400" />
-                : <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />{job.amount_to_collect != null ? `$${Number(job.amount_to_collect).toLocaleString()}` : 'Nothing to collect yet'}</div>}
+                : <div className="flex items-center text-sm font-semibold text-emerald-400"><DollarSign className="mr-2 h-4 w-4" />{job.amount_to_collect != null ? `$${Number(job.amount_to_collect).toLocaleString()}` : 'Amount not recorded'}</div>}
+              <CollectionRequests key={job.id} jobId={job.id} canReview={canEditJob} onApplied={refreshJob} />
             </div>
           </div>
         </div>

@@ -193,21 +193,24 @@ export function useServiceJobs({ allStores = false }: { allStores?: boolean } = 
 export function useJob(id: string | undefined) {
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const sequence = useRef(0);
 
   const fetchJob = useCallback(async () => {
     if (!id) return;
-    setIsLoading(true);
+    const request = ++sequence.current;
     const { data, error } = await supabase
       .from('jobs')
       .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), properties:property_id(address), locations:location_id(name)')
       .eq('id', id)
       .single();
-    if (error) console.error('Error fetching job:', error);
-    setJob(data as Job);
+    if(request !== sequence.current) return;
+    if(error) setError('Job details could not refresh. Previously loaded details may be stale.');
+    else { setJob(data as Job); setError(null); }
     setIsLoading(false);
   }, [id]);
 
-  useEffect(() => { fetchJob(); }, [fetchJob]);
+  useEffect(() => { setJob(null); setIsLoading(true); void fetchJob(); return () => {sequence.current++;}; }, [fetchJob]);
 
   // Real-time: re-fetch when this job changes
   useEffect(() => {
@@ -253,7 +256,7 @@ export function useJob(id: string | undefined) {
     return { ok: true, error: null };
   }, [id, fetchJob]);
 
-  return { job, isLoading, updateJob, deleteJob, completeJob };
+  return { job, isLoading, error, refresh: fetchJob, updateJob, deleteJob, completeJob };
 }
 
 export function useJobInventory(jobId: string | undefined, locationId: string | undefined, canManageInventory = true) {

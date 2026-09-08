@@ -332,17 +332,19 @@ export function createAgentTools(
       required: ['contact_id'],
     },
     execute: async ({ contact_id }) => {
-      const [contactRes, dealsRes, jobsRes, notesRes] = await Promise.all([
+      const [contactRes, dealsRes, jobsRes, notesRes, equipmentRes] = await Promise.all([
         client.from('contacts').select('*').eq('id', contact_id).single(),
         client.from('deals').select('id, title, amount, priority, created_at, pipeline_stages(name)').eq('contact_id', contact_id),
         client.from('jobs').select('id, title, status, job_type, scheduled_at').eq('contact_id', contact_id),
         client.from('notes').select('body, created_at').eq('contact_id', contact_id).order('created_at', { ascending: false }).limit(5),
+        client.from('customer_equipment').select('id,manufacturer,model,serial_number,model_year,source_note,warranty_source,jobs(id,title,status)').eq('contact_id',contact_id).is('retired_at',null),
       ]);
       return {
         contact: contactRes.data,
         deals: dealsRes.data ?? [],
         jobs: jobsRes.data ?? [],
         recent_notes: notesRes.data ?? [],
+        equipment: equipmentRes.error ? {error:"Equipment unavailable; do not infer ownership or serials"} : equipmentRes.data ?? [],
       };
     },
   },

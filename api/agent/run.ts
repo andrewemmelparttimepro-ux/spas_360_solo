@@ -42,10 +42,10 @@ function bearer(req: VercelRequest): string | null {
   return match?.[1]?.trim() || null;
 }
 
-function clientFor(token: string): SupabaseClient {
+function clientFor(token: string, channel: string = 'web'): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_ANON, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { Authorization: `Bearer ${token}`, 'x-spas-client': channel } },
   });
 }
 
@@ -144,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = bearer(req);
   if (!token) return res.status(401).json({ error: 'Missing authorization' });
 
-  const client = clientFor(token);
+  const client = clientFor(token, ['native', 'sms'].includes(req.body?.client_channel) ? req.body.client_channel : 'web');
   const { data: userData, error: userError } = await client.auth.getUser(token);
   const userId = userData.user?.id;
   if (userError || !userId) return res.status(401).json({ error: 'Invalid or expired session' });

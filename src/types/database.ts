@@ -60,6 +60,9 @@ export interface Deal {
 }
 
 export interface Job {
+  equipment_id?: string | null;
+  exception_owner_id?: string | null; exception_reason?: string | null;
+  exception_next_action?: string | null; exception_due_at?: string | null; exception_reviewed_at?: string | null;
   id: string; org_id: string; contact_id: string; property_id: string | null;
   location_id: string; title: string; job_type: JobType; status: JobStatus;
   description: string | null; scheduled_at: string | null;
@@ -201,6 +204,8 @@ export interface FixItAttachment {
 }
 
 export interface Suggestion {
+  resolution_note?: string | null; resolution_release?: string | null;
+  resolution_recorded_by?: string | null; resolution_recorded_at?: string | null;
   id: string; org_id: string; body: string; created_by: string;
   status: SuggestionStatus; reviewed_by: string | null; reviewed_at: string | null;
   fix_it_post_id: string | null;

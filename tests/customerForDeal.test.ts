@@ -120,7 +120,8 @@ test('date-free intake preserves server authorization and mandatory atomic follo
   const definition = (sql: string) => sql.slice(sql.indexOf('create or replace function'));
   assert.equal(definition(after), definition(before)
     .replace('or v_expected_close is null or p_next_activity_date is null', 'or p_next_activity_date is null')
-    .replace('Deal title, expected close date and next activity date are required', 'Deal title and next activity date are required'));
+    .replace('Deal title, expected close date and next activity date are required', 'Deal title and next activity date are required')
+    .replace("(p_next_activity_date + time '09:00:00')::timestamptz", "(p_next_activity_date + time '09:00:00') at time zone 'America/Chicago'"));
   for (const form of [wizard, modal]) {
     assert.doesNotMatch(form, /expectedCloseDate|Expected close date|when could it close/i);
     assert.match(form, /expected_close_date: null/);

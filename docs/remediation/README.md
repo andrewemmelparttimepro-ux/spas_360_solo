@@ -39,3 +39,14 @@ F16: ordinary conversations remain in Threads; requested text starts as needs_in
 Migrations 20260908163000 and 164000 applied at 16:22:20 UTC after five rollback checks passed. Four new behavior tests pass; full web suite 403/403 and typecheck pass.
 
 Native source `4836333eaaac9fc3cdec27f0c3dc74cc888145cc`, version 1.4.0 build 6, signed and installed with original bundle preserved. Five native tests pass. Live native acceptance is waiting for Andrew to handle the macOS Keychain access prompt.
+
+
+## Service and staff handoff batch
+
+Conversation release 4f72541cef1724c0e2304936061783b67c5d669f is live at dpl_D8xyHEYH8oRG5BB1L1DkA2aJRVmf. All 164 retained assets matched checksums. Provider receipt reconciliation returned HTTP 401 for all ten historical provider IDs; delivery remains unverified. Provider dashboard authentication is unavailable in the audit browser. This does not establish whether sending is affected.
+
+Migrations 170000/171000/171500/172000 applied at 16:42:38 UTC. Equipment is recorded per customer and linked to individual jobs; collection changes use staff requests and atomic manager decisions; feedback supports owner resolution notes; service exceptions record responsible person, reason, next action and review date. Real authenticated-role rollback tests proved owner-ledger isolation, permitted staff requests, denied direct staff job changes, atomic manager review, and cross-customer equipment rejection. Activity now distinguishes authenticated and effective actors and reported client channel; historical rows remain unchanged.
+
+F07 correction: successful historical cron runs were empty runs, not proof of recovery. An eligible overdue fixture reproduced the guard failure. The applied narrow server transition allows only escalated_at marking; row locks make notification and escalation atomic. Four rollback checks proved one eligible escalation, no duplicates, and denied staff execution. No fixture notifications were committed.
+
+Integrated Fix-It intake and revenue changes supplied by the separately authorized Fix-It owner. Migration 173000 applied at 16:46:23 UTC: optional expected close date; retained atomic customer/deal/task behavior; explicit America/Chicago 09:00 follow-up. Authenticated salesperson rollback verified null close date and one correctly timed task. Canonical main reconciliation and deployed UI acceptance remain release gates.

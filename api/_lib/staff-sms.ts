@@ -72,7 +72,7 @@ export async function askAriAsStaff(origin: string, accessToken: string, message
   const response = await fetch(`${origin}/api/agent/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ message: `[Text message from my phone] ${message}` }),
+    body: JSON.stringify({ message: `[Text message from my phone] ${message}`, client_channel: 'sms' }),
     signal: AbortSignal.timeout(120_000),
   });
   const payload = await response.json().catch(() => null) as { message?: { content?: string }; error?: string } | null;

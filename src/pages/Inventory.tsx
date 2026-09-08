@@ -440,6 +440,9 @@ export default function Inventory() {
   // With every store on screen, each row must say which floor it's on
   const showStore = !activeLocationId;
   const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
+  const [columnPreset,setColumnPreset] = useState(() => {try {return localStorage.getItem(`spas:inventory-columns:${profile?.id}`) || 'all';} catch{return 'all';}});
+  const columnSets: Record<string,string[]> = {all:['model','color','serial','flooring','age','customer','status','order','received','delivery','onhand'],floor:['model','serial','flooring','age','status','onhand'],delivery:['model','serial','customer','status','delivery','onhand']};
+  const shown = new Set(columnSets[columnPreset] || columnSets.all);
   // Editor drawer: null = closed, 'new' = create, item = edit
   const [editorTarget, setEditorTarget] = useState<'new' | InventoryItem | null>(null);
 
@@ -457,7 +460,7 @@ export default function Inventory() {
   const brandOptions = inventoryBrandOptions(items);
   const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
   const groupedItems = groupInventoryItems(visibleItems);
-  const columnCount = showStore ? 12 : 11;
+  const columnCount = shown.size + (showStore ? 1 : 0);
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
   }
@@ -493,6 +496,7 @@ export default function Inventory() {
       <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-ink-700 flex flex-wrap items-center gap-3 bg-ink-950">
           <StoreSwitcher />
+          <label className="text-sm text-ink-400">Columns<select value={columnPreset} onChange={e=>{setColumnPreset(e.target.value);try{localStorage.setItem(`spas:inventory-columns:${profile?.id}`,e.target.value);}catch{/* Preference is optional. */}}} className="ml-2 rounded-lg border border-ink-700 bg-ink-900 p-2"><option value="all">All details</option><option value="floor">Floor review</option><option value="delivery">Delivery</option></select></label>
           <div className="relative flex-1 min-w-[220px] max-w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search serial number, model, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
@@ -517,16 +521,16 @@ export default function Inventory() {
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Model</th>
                 {showStore && <th className={INVENTORY_HEADER_CELL_CLASS}>Store</th>}
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Color Combination</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Serial Number</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Age</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Customer</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Status</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Order Date</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Date Received</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>
-                <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>
+                {shown.has('color') && <th className={INVENTORY_HEADER_CELL_CLASS}>Color Combination</th>}
+                {shown.has('serial') && <th className={INVENTORY_HEADER_CELL_CLASS}>Serial Number</th>}
+                {shown.has('flooring') && <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Flooring Status</th>}
+                {shown.has('age') && <th className={INVENTORY_HEADER_CELL_CLASS}>Inventory Age</th>}
+                {shown.has('customer') && <th className={INVENTORY_HEADER_CELL_CLASS}>Customer</th>}
+                {shown.has('status') && <th className={INVENTORY_HEADER_CELL_CLASS}>Status</th>}
+                {shown.has('order') && <th className={INVENTORY_HEADER_CELL_CLASS}>Order Date</th>}
+                {shown.has('received') && <th className={INVENTORY_HEADER_CELL_CLASS}>Date Received</th>}
+                {shown.has('delivery') && <th className={INVENTORY_HEADER_CELL_CLASS}>Delivery Date</th>}
+                {shown.has('onhand') && <th className={INVENTORY_HEADER_CELL_CLASS}>On Hand Y/N</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-800">
@@ -573,37 +577,37 @@ export default function Inventory() {
                             </span>
                           </td>
                         )}
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-400')}>
+                        {shown.has('color') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-400')}>
                           <EditableCell value={item.color_finish} field="color_finish" itemId={item.id} onSave={updateItem} />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('serial') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <InventoryTextCell item={item} part="serial" onSave={updateItem} />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('flooring') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <InventoryTextCell item={item} part="flooring" onSave={updateItem} />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
+                        </td>)}
+                        {shown.has('age') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300 tabular-nums whitespace-nowrap')}>
                           {inventoryAgeLabelForItem(item.date_received, item.created_at)}
                           {!item.date_received && <span className="block text-[11px] text-ink-500">Entered {inventoryAgeLabel(item.created_at)} ago</span>}
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('customer') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <CustomerCell item={item} onSave={updateItem} />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('status') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <StockStateCell item={item} onSave={updateItem} />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('order') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <EditableCell value={item.order_date} field="order_date" itemId={item.id} onSave={updateItem} type="date" />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('received') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <EditableCell value={item.date_received} field="date_received" itemId={item.id} onSave={updateItem} type="date" />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
+                        </td>)}
+                        {shown.has('delivery') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'text-ink-300')}>
                           <EditableCell value={item.date_delivered} field="date_delivered" itemId={item.id} onSave={updateItem} type="date" />
-                        </td>
-                        <td className={cn(INVENTORY_ROW_CELL_CLASS, 'font-semibold text-ink-200')}>
+                        </td>)}
+                        {shown.has('onhand') && (<td className={cn(INVENTORY_ROW_CELL_CLASS, 'font-semibold text-ink-200')}>
                           <OnHandCell item={item} onSave={updateItem} />
-                        </td>
+                        </td>)}
                       </tr>
                     );
                   })}

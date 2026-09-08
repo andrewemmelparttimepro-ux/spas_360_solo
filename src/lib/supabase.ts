@@ -12,4 +12,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Using untyped client — row-level type safety is enforced through
 // our interfaces in @/types/database.ts and explicit typing in hooks.
 // For full Supabase type generation, run: npx supabase gen types typescript
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { 'x-spas-client': 'web' } } });

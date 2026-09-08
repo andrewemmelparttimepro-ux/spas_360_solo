@@ -1,3 +1,4 @@
+import { RELEASE_ID } from '@/lib/releaseSafety';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Clock3, Hammer, Inbox, Loader2, MessageSquarePlus, Send, X, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,6 +36,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
   const { profile } = useAuth();
   const { toast } = useToast();
   const [body, setBody] = useState('');
+  const [resolutionDrafts,setResolutionDrafts] = useState<Record<string,string>>({});
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -50,7 +52,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
     const { data, error } = await supabase
       .from('suggestions')
       .select(`
-        id, org_id, body, created_by, status, reviewed_by, reviewed_at, fix_it_post_id, created_at, updated_at,
+        id, org_id, body, created_by, status, reviewed_by, reviewed_at, fix_it_post_id, created_at, updated_at, resolution_note, resolution_release, resolution_recorded_by, resolution_recorded_at,
         author:profiles!suggestions_created_by_fkey(first_name, last_name)
       `)
       .order('created_at', { ascending: false });
@@ -198,7 +200,7 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
             <div>
               <h2 id="suggestion-box-title" className="text-lg font-bold text-ink-100">Suggestion Box</h2>
               <p className="mt-0.5 text-xs leading-relaxed text-ink-400 sm:text-sm">
-                Share an improvement for Brandon and Matt to review. Approved ideas get built.
+                Share an improvement with the owners. Track the decision and its resolution note here.
               </p>
             </div>
           </div>
@@ -295,6 +297,8 @@ export default function SuggestionBox({ open, onClose }: SuggestionBoxProps) {
                       </div>
                       <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-200">{suggestion.body}</p>
 
+                      {suggestion.resolution_note && <div className="mt-3 rounded-lg bg-ink-950 p-3 text-xs text-ink-400"><p className="font-semibold text-ink-200">Owner decision / resolution</p><p className="whitespace-pre-wrap">{suggestion.resolution_note}</p><p>Recorded {suggestion.resolution_recorded_at ? new Date(suggestion.resolution_recorded_at).toLocaleString() : 'date unavailable'} · Release {suggestion.resolution_release?.slice(0,7) || 'not recorded'}</p></div>}
+                      {isManager && <div className="mt-3 space-y-2"><label className="block text-xs text-ink-400">Decision, next step, or verified fix<textarea value={resolutionDrafts[suggestion.id] ?? suggestion.resolution_note ?? ''} onChange={e=>setResolutionDrafts({...resolutionDrafts,[suggestion.id]:e.target.value})} maxLength={4000} className="mt-1 block w-full rounded-lg border border-ink-700 bg-ink-950 p-2"/></label><button type="button" disabled={updatingId!==null} onClick={async()=>{setUpdatingId(suggestion.id);const {error}=await supabase.from('suggestions').update({resolution_note:resolutionDrafts[suggestion.id] ?? suggestion.resolution_note ?? '',resolution_release:RELEASE_ID}).eq('id',suggestion.id).select('id').single();setUpdatingId(null);if(error)toast('Resolution note could not save.','error');else {toast('Resolution note saved.');await loadSuggestions();}}} className="rounded-lg border border-ink-700 px-3 py-2 text-xs text-ink-300">Save resolution note</button></div>}
                       {isManager && (
                         <div className="mt-4 flex flex-wrap gap-2 border-t border-ink-700 pt-3" aria-label="Review status">
                           {canPromote && suggestion.status !== 'promoted' && (

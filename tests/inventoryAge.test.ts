@@ -51,6 +51,6 @@ describe('inventory age', () => {
 
     assert.match(inventory, /Inventory Flooring Status<\/th>[\s\S]*Inventory Age<\/th>[\s\S]*Customer<\/th>[\s\S]*Status<\/th>[\s\S]*Order Date<\/th>[\s\S]*Date Received<\/th>/);
     assert.match(inventory, /inventoryAgeLabelForItem\(item\.date_received, item\.created_at\)/);
-    assert.match(inventory, /const columnCount = showStore \? 12 : 11;/);
+    assert.match(inventory, /const columnCount = shown\.size \+ \(showStore \? 1 : 0\);/);
   });
 });

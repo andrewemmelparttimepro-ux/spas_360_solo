@@ -49,6 +49,9 @@ export interface PipelineStage {
 }
 
 export interface Deal {
+  amount_exception_note?: string | null; amount_exception_by?: string | null; amount_exception_at?: string | null;
+  closed_credit_user_id?: string | null; lead_review_state?: 'active' | 'dormant' | null;
+  lead_review_note?: string | null; lead_review_due_at?: string | null; lead_reviewed_by?: string | null; lead_reviewed_at?: string | null;
   id: string; org_id: string; contact_id: string; stage_id: string;
   title: string; amount: number | null; priority: DealPriority;
   expected_close_date: string | null; assigned_to: string;
@@ -120,6 +123,7 @@ export interface Message {
 }
 
 export interface Task {
+  sales_phase?: 'pre_sale' | 'post_sale' | 'needs_review' | null;
   id: string; org_id: string; assigned_to: string;
   deal_id: string | null; contact_id: string | null; job_id: string | null;
   title: string; description: string | null; due_at: string | null;

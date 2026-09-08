@@ -1,3 +1,4 @@
+import {salesWorkPhase,salesWorkLabel} from '@/lib/salesWorkPhase';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
@@ -78,7 +79,7 @@ export function useDashboardStats(
       }),
       supabase
         .from('tasks')
-        .select('id, title, status, due_at, deal_id, contact_id, job_id, assigned_to, assigned:assigned_to(id, first_name, last_name)')
+        .select('id, title, status, due_at, sales_phase, deal_id, contact_id, job_id, assigned_to, deal:deal_id(stage:stage_id(is_won,is_lost)), assigned:assigned_to(id, first_name, last_name)')
         .eq('org_id', profile.org_id)
         .or(`task_type.is.null,task_type.neq.${DELEGATED_TASK_TYPE}`)
         .in('status', ['Pending', 'In Progress', 'Overdue'])
@@ -131,10 +132,13 @@ export function useDashboardStats(
         const assignedRelation = Array.isArray(row.assigned) ? row.assigned[0] : row.assigned;
         const assigned = assignedRelation as TaskOwnerOption | null;
         const assignedTo = row.assigned_to as string;
+        const related=(Array.isArray(row.deal)?row.deal[0]:row.deal) as {stage?:{is_won?:boolean;is_lost?:boolean}}|null;
+        const phase=salesWorkPhase(row.sales_phase,Boolean(row.deal_id),Boolean(related?.stage?.is_won||related?.stage?.is_lost));
         return {
           id: row.id as string,
           title: row.title as string,
-          desc: row.deal_id ? 'Deal follow-up' : row.contact_id ? 'Customer follow-up' : row.job_id ? 'Service task' : 'General task',
+          salesPhase:phase,
+          desc: row.deal_id ? salesWorkLabel(phase) : row.contact_id ? 'Customer follow-up' : row.job_id ? 'Service task' : 'General task',
           time: row.due_at ? formatRelativeTime(new Date(row.due_at as string)) : '',
           assignedTo,
           assignedName: assigned ? taskOwnerName(assigned) : 'Unassigned owner',

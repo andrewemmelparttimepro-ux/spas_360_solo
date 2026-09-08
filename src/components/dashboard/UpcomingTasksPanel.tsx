@@ -24,6 +24,7 @@ interface UpcomingTasksPanelProps {
 }
 
 export default function UpcomingTasksPanel({ tasks, owners, openDeals }: UpcomingTasksPanelProps) {
+  const [phaseFilter,setPhaseFilter]=useState('all');
   const [ownerFilter, setOwnerFilter] = useState<TaskOwnerFilter>(ALL_TASK_OWNERS);
   const [scheduleFilter, setScheduleFilter] = useState<TaskScheduleFilter>(ALL_TASKS);
   const [now, setNow] = useState(() => new Date());
@@ -50,8 +51,8 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
   }, [scheduleFilter]);
 
   const filteredTasks = useMemo(
-    () => filterUpcomingTasks(tasks, ownerFilter, scheduleFilter, now),
-    [tasks, ownerFilter, scheduleFilter, now],
+    () => filterUpcomingTasks(tasks, ownerFilter, scheduleFilter, now).filter(task=>phaseFilter==='all'||task.salesPhase===phaseFilter),
+    [tasks, ownerFilter, scheduleFilter, now,phaseFilter],
   );
   const selectedOwner = owners.find(owner => owner.id === ownerFilter);
   const dealsMissingTasks = useMemo(
@@ -85,6 +86,7 @@ export default function UpcomingTasksPanel({ tasks, owners, openDeals }: Upcomin
       <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-ink-700 bg-ink-850/70">
         <h2 id="lead-follow-up-tasks-heading" className="text-base font-semibold text-ink-100">Customer Follow-up Tasks</h2>
         <div className="flex min-w-0 flex-wrap justify-end gap-2">
+          <select aria-label="Filter follow-ups by purpose" value={phaseFilter} onChange={e=>setPhaseFilter(e.target.value)} className="min-w-0 rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs"><option value="all">All purposes</option><option value="pre_sale">Pre-sale</option><option value="post_sale">Post-sale</option><option value="needs_review">Purpose needs review</option><option value="other">Other work</option></select>
           <select
             aria-label="Filter upcoming tasks by salesperson"
             value={ownerFilter}

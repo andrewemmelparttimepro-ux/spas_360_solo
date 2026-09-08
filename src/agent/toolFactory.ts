@@ -925,6 +925,7 @@ export function createAgentTools(
       if (!contact) return { error: 'Contact not found.' };
 
       const when = localInstant(preferred_datetime);
+      if(Date.parse(when)<Date.now())return {error:'Choose a future appointment time before creating a customer service hold.'};
       const dayBounds = localDayBounds(new Date(when));
 
       // Same-day context so the hold lands on a realistic slot

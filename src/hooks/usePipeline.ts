@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
 import { useAuth } from '@/contexts/AuthContext';
@@ -198,20 +198,27 @@ export function usePipeline() {
 }
 
 export function useDeal(id: string | undefined) {
+  const {user}=useAuth();
+  const sequence=useRef(0);const loaded=useRef<string|null>(null);
+  const scope=`${user?.id??''}:${id??''}`;
+  const [loadError,setLoadError]=useState<string|null>(null);
   const [deal, setDeal] = useState<DealDetailRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchDeal = useCallback(async () => {
-    if (!id) return;
-    setIsLoading(true);
+    if(!id || !user){setIsLoading(false);return;}
+    const request=++sequence.current;
+    if(loaded.current!==scope)setIsLoading(true);
+    const signal=AbortSignal.timeout(15_000);
     const { data, error } = await supabase
       .from('deals')
       .select('*, contact:contact_id(first_name, last_name, phone), inventory_item:inventory_item_id(id,sku,product,brand,category,model,color_finish,status,stock_state,order_date,notes,created_at,customer_id,date_delivered,location_id,locations:location_id(name),customer:customer_id(first_name,last_name))')
       .eq('id', id)
-      .single();
+      .abortSignal(signal).single();
+    if(request!==sequence.current)return;
     if (error || !data) {
       if (error) console.error('Error fetching deal:', error);
-      setDeal(null);
+      setLoadError(error?'This deal could not refresh. Your last loaded version is still shown.':'Deal unavailable.');
       setIsLoading(false);
       return;
     }
@@ -226,20 +233,23 @@ export function useDeal(id: string | undefined) {
         .is('deal_id', null)
         .is('removed_at', null)
         .order('updated_at', { ascending: false })
-        .order('id', { ascending: true });
+        .order('id', { ascending: true }).abortSignal(signal);
+      if(request!==sequence.current)return;
 
       if (assignedUnitsError) {
-        console.error('Error fetching customer-assigned inventory:', assignedUnitsError);
+        setLoadError('Linked inventory could not refresh. Your last complete deal view is still shown.');setIsLoading(false);return;
       } else {
         customerInventory = (assignedUnits ?? []) as unknown as DealInventoryOption[];
       }
     }
 
+    if(request!==sequence.current)return;
+    loaded.current=scope;setLoadError(null);
     setDeal({ ...data, customer_inventory: customerInventory } as DealDetailRecord);
     setIsLoading(false);
-  }, [id]);
+  }, [id,user?.id,scope]);
 
-  useEffect(() => { fetchDeal(); }, [fetchDeal]);
+  useEffect(()=>{sequence.current++;loaded.current=null;setDeal(null);setLoadError(null);void fetchDeal();return()=>{sequence.current++;};},[fetchDeal]);
 
   // Real-time: re-fetch when this deal changes
   useEffect(() => {
@@ -273,5 +283,5 @@ export function useDeal(id: string | undefined) {
     return null;
   };
 
-  return { deal, isLoading, updateDeal };
+  return { deal, isLoading, loadError, refresh:fetchDeal, updateDeal };
 }

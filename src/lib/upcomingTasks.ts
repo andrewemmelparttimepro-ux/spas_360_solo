@@ -13,6 +13,7 @@ export type TaskScheduleFilter = typeof ALL_TASKS | typeof PAST_DUE_TASKS | type
 export type TaskOwnerOption = Pick<Profile, 'id' | 'first_name' | 'last_name'>;
 
 export interface UpcomingTaskItem {
+  salesPhase?: 'pre_sale'|'post_sale'|'needs_review'|'other';
   id: string;
   title: string;
   desc: string;

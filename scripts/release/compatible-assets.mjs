@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import {execFileSync} from 'node:child_process';
 
 // Run --capture <immutable deployment URL> before a release; commit the manifest.
 // Builds fail closed if exact prior asset bytes cannot be restored.
@@ -30,6 +31,12 @@ if (process.argv[2] === '--capture') {
   const origin = new URL(process.argv[3]);
   if (origin.protocol !== 'https:' || !/^spas360solo-[\w-]+\.vercel\.app$/.test(origin.hostname)) throw new Error('Use the verified immutable SPAS deployment URL');
   const fetchOrigin = process.argv[4] === '--via-production' ? new URL('https://spas360solo.vercel.app') : origin;
+  if(process.argv[4]==='--via-production'){
+    const pinned=JSON.parse(execFileSync('vercel',['curl','/version.json','--deployment',origin.href,'--scope','nd-ai','--','--silent','--show-error'],{encoding:'utf8',timeout:30_000}));
+    const current=await (await fetch(new URL('/version.json',fetchOrigin),{cache:'no-store',signal:AbortSignal.timeout(15_000)})).json();
+    if(!pinned.builtAt || pinned.builtAt!==current.builtAt || pinned.sourceCommit!==current.sourceCommit)throw new Error('The canonical alias is not this exact deployment. Capture the actual live deployment; a matching SHA alone is insufficient.');
+    manifest.previousBuild={sourceCommit:current.sourceCommit,builtAt:current.builtAt};
+  }
   const response = await fetch(fetchOrigin, { signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`Deployment unavailable: ${response.status}`);
   const initialHtml = await response.text();

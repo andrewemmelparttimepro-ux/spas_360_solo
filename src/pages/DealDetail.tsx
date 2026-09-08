@@ -1,3 +1,4 @@
+import DealReview from '@/components/DealReview';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Calendar, CalendarClock, User, Plus, Save, X, Pencil, Bot, Clock3, Loader2, PackageCheck, LockKeyhole } from 'lucide-react';
 import { useDeal } from '@/hooks/usePipeline';
@@ -71,7 +72,7 @@ export default function DealDetail() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { deal, isLoading, updateDeal } = useDeal(id);
+  const { deal, isLoading, loadError, refresh:refreshDeal, updateDeal } = useDeal(id);
   const { notes, createNote } = useNotes({ dealId: id });
   const { tasks, createTask, completeTask } = useTasks({ dealId: id });
   const { toast } = useToast();
@@ -92,6 +93,9 @@ export default function DealDetail() {
   const [availableInventory, setAvailableInventory] = useState<DealInventoryOption[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [closeSaleBusy, setCloseSaleBusy] = useState(false);
+  const [saleAmount,setSaleAmount]=useState('');
+  const [amountException,setAmountException]=useState('');
+  const [taskPhase,setTaskPhase]=useState('needs_review');
   const [closeSaleError, setCloseSaleError] = useState<string | null>(null);
   const [inventorySelectorContext, setInventorySelectorContext] = useState<'attach' | 'won' | null>(null);
   const handledCloseWonLocationKey = useRef<string | null>(null);
@@ -184,6 +188,7 @@ export default function DealDetail() {
 
   const openCloseSale = useCallback(async (stageId: string) => {
     if (!profile || !deal) return;
+    setSaleAmount(deal.amount?.toString()??'');setAmountException(deal.amount_exception_note??'');setTaskPhase('needs_review');
     setCloseSaleStageId(stageId);
     setFulfillmentType(deal.sale_fulfillment_type);
     setSelectedInventoryId(deal.inventory_item_id ?? '');
@@ -205,7 +210,7 @@ export default function DealDetail() {
   }, [deal, location.key, location.pathname, location.state, navigate, openCloseSale, profile, stages]);
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
-  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>Deal not found</p><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
+  if (!deal) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p>{loadError||'Deal not found'}</p><button className="text-brand-500" onClick={()=>void refreshDeal()}>Retry loading</button><Link to="/deals" className="text-brand-400 text-sm mt-2 hover:underline">Back to Deals</Link></div>;
 
   const purchasedUnit = dealInventoryForDisplay({
     fulfillmentType: deal.sale_fulfillment_type,
@@ -274,7 +279,9 @@ export default function DealDetail() {
 
     setCloseSaleBusy(true);
     try {
-      const { error } = await supabase.rpc('close_deal_sale', args);
+      if(saleAmount.trim() && (!Number.isFinite(Number(saleAmount)) || Number(saleAmount)<0))throw new Error('Enter a valid non-negative sale amount.');
+      if(!saleAmount.trim() && !amountException.trim())throw new Error('Enter the recorded sale amount, or ask an owner to approve a missing-amount exception.');
+      const { error } = await supabase.rpc('close_deal_sale_reviewed', {...args,p_amount:saleAmount.trim()?Number(saleAmount):null,p_exception:amountException.trim()||null,p_task_phase:taskPhase});
       if (error) throw error;
     } catch (error) {
       const message = `Couldn't close this sale: ${(error as Error).message || 'Network error'}`;
@@ -529,6 +536,8 @@ export default function DealDetail() {
           </div>
         </div>
         <div className="lg:col-span-2 space-y-6">
+          {loadError&&<div role="alert" className="rounded border border-amber-500/40 p-3 text-sm text-amber-600">{loadError} <button onClick={()=>void refreshDeal()} className="underline">Retry</button></div>}
+          <DealReview deal={deal} onRefresh={refreshDeal}/>
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Notes & Activity</h2>
@@ -684,7 +693,7 @@ export default function DealDetail() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="close-sale-title"
-            className="w-full max-w-xl rounded-2xl border border-ink-700 bg-ink-900 p-6 shadow-2xl"
+            className="max-h-[90dvh] overflow-y-auto w-full max-w-xl rounded-2xl border border-ink-700 bg-ink-900 p-6 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -695,6 +704,9 @@ export default function DealDetail() {
             </div>
 
             <div className="mt-5 space-y-3">
+              <label className="block text-sm text-ink-300">Recorded sale amount ($)<input inputMode="decimal" type="number" min="0" step="0.01" value={saleAmount} onChange={e=>setSaleAmount(e.target.value)} className="mt-1 block w-full rounded border border-ink-700 bg-ink-950 p-2"/></label>
+              {!saleAmount.trim() && <label className="block text-sm text-ink-300">Owner-approved missing-amount exception<textarea disabled={profile?.role!=='owner_manager'} value={amountException} onChange={e=>setAmountException(e.target.value)} placeholder="Why the amount is unknown and how it will be reconciled" className="mt-1 block w-full rounded border border-ink-700 bg-ink-950 p-2 disabled:opacity-50"/><span className="text-xs text-ink-500">An exception keeps revenue visibly incomplete. It never turns an unknown amount into $0.</span></label>}
+              <label className="block text-sm text-ink-300">Open sales follow-ups after closing<select value={taskPhase} onChange={e=>setTaskPhase(e.target.value)} className="mt-1 block w-full rounded border border-ink-700 bg-ink-950 p-2"><option value="needs_review">Keep open, needs purpose review</option><option value="post_sale">Keep as post-sale customer care</option></select></label>
               <div className={cn('block rounded-xl border p-4 transition', fulfillmentType === 'inventory' ? 'border-brand-500 bg-brand-500/10' : 'border-ink-700 hover:border-ink-600')}>
                 <label className="flex items-center gap-3 text-sm font-semibold text-ink-100">
                   <input

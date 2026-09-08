@@ -69,7 +69,8 @@ test('Deals New Deal opens the existing-customer form with the requested deal fi
   assert.match(modal, />Set Next Activity Date \*</);
   assert.match(modal, />Projected \$ Amount</);
   assert.match(modal, />Priority</);
-  assert.match(modal, />Expected close date \*</);
+  assert.doesNotMatch(modal, /Expected close date/i);
+  assert.match(modal, /Add New Customer/);
   assert.match(modal, /assigned_to: creditTo/);
   assert.match(modal, /p_next_activity_date: nextActivityDate/);
   assert.doesNotMatch(modal, /from\('contacts'\)\.insert/);

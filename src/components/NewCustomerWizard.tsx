@@ -1,5 +1,5 @@
 import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check, UserCheck, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,8 @@ import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { useModal } from '@/hooks/useModal';
 import { normalizeCustomerAddress } from '@/lib/customerAddress';
+import type { Contact } from '@/types/database';
+import { saveCustomerForDeal } from '@/lib/customerForDeal';
 import { resolveCreationStore } from '@/lib/creationStore';
 
 /**
@@ -78,17 +80,26 @@ function Chip({ active, onClick, children, hint }: { active: boolean; onClick: (
 
 const inputClass = 'w-full px-3 py-2 bg-ink-950 border border-ink-700 rounded-lg text-sm text-ink-100 placeholder-ink-500 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40 transition-all';
 
-export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () => void; onCreated?: (dealId: string | null) => void | Promise<void> }) {
-  const { dialogRef, dialogProps } = useModal(onClose);
+export default function NewCustomerWizard({ onClose, onCreated, onCustomerSelected }: {
+  onClose: () => void;
+  onCreated?: (dealId: string | null) => void | Promise<void>;
+  onCustomerSelected?: (customer: Contact) => void;
+}) {
+  const saveInFlight = useRef(false);
+  const close = () => { if (!saveInFlight.current) onClose(); };
+  const { dialogRef, dialogProps } = useModal(close);
   const { profile, user, activeLocationId, locations } = useAuth();
   const { toast } = useToast();
 
-  const draftScope = `customer:${profile?.id ?? 'signed-out'}`;
+  const customerOnly = !!onCustomerSelected;
+  const draftScope = `${customerOnly ? 'deal-customer' : 'customer'}:${profile?.id ?? 'signed-out'}`;
+  const [createdCustomerId, setCreatedCustomerId] = useDraftState<string | null>(draftScope, 'createdCustomerId', null);
   const [first, setFirst] = useDraftState(draftScope, 'first', '');
   const [last, setLast] = useDraftState(draftScope, 'last', '');
   const [phone, setPhone] = useDraftState(draftScope, 'phone', '');
   const [email, setEmail] = useDraftState(draftScope, 'email', '');
   const [address, setAddress] = useDraftState(draftScope, 'address', '');
+  const duplicateSearchVersion = useRef(0);
   const [matches, setMatches] = useState<DupeMatch[]>([]);
   const [existing, setExisting] = useState<DupeMatch | null>(null); // chosen existing customer
   const navigate = useNavigate();
@@ -96,7 +107,6 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const [interests, setInterests] = useDraftState<string[]>(draftScope, 'interests', []);
   const [amount, setAmount] = useDraftState(draftScope, 'amount', '');
   const [priority, setPriority] = useDraftState<string | null>(draftScope, 'priority', null);
-  const [expectedCloseDate, setExpectedCloseDate] = useDraftState(draftScope, 'expectedCloseDate', '');
   const [followupDate, setFollowupDate] = useDraftState(draftScope, 'followupDate', () => {
     const d = new Date(); d.setDate(d.getDate() + 2);
     return d.toISOString().split('T')[0];
@@ -113,7 +123,8 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
 
   // Live typeahead — existing customers surface as you type (name or phone)
   const searchMatches = useCallback(async () => {
-    if (existing) return; // already locked onto one
+    const version = ++duplicateSearchVersion.current;
+    if (existing || (customerOnly && createdCustomerId)) { setMatches([]); return; } // already locked onto one
     const digits = phone.replace(/\D/g, '');
     const name = (first + last).trim();
     if (digits.length < 3 && name.length < 2) { setMatches([]); return; }
@@ -124,29 +135,50 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       p_last_name: last || null,
       p_limit: 4,
     });
-    setMatches((data as unknown as DupeMatch[]) ?? []);
-  }, [phone, email, first, last, existing]);
+    if (version === duplicateSearchVersion.current) setMatches((data as unknown as DupeMatch[]) ?? []);
+  }, [phone, email, first, last, existing, customerOnly, createdCustomerId]);
 
   useEffect(() => {
     const t = setTimeout(searchMatches, 300);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); duplicateSearchVersion.current += 1; };
   }, [searchMatches]);
 
   const step1Done = !!existing || (first.trim().length > 0 && last.trim().length > 0 && phone.trim().length >= 7);
   const step2Done = source !== null;
   const step3Done = interests.length > 0;
-  const step4Done = priority !== null && expectedCloseDate.length > 0;
+  const step4Done = priority !== null;
   const step5Done = followupDate.length > 0 && firstNote.trim().length > 0;
-  const doneCount = [step1Done, step2Done, step3Done, step4Done, step5Done].filter(Boolean).length;
+  const steps = customerOnly ? [step1Done, step2Done] : [step1Done, step2Done, step3Done, step4Done, step5Done];
+  const doneCount = steps.filter(Boolean).length;
   const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !!creationLocationId && !saving;
+
+  const canSelectCustomer = step1Done && (step2Done || !!existing) && !!creationLocationId && !saving;
 
   const toggleInterest = (i: string) =>
     setInterests(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
 
   const handleCreate = async () => {
-    if (!profile || !user || !canCreate) return;
+    if (!profile || !user || saveInFlight.current || !(customerOnly ? canSelectCustomer : canCreate)) return;
+    saveInFlight.current = true;
     setSaving(true);
     try {
+      if (onCustomerSelected) {
+        const result = await saveCustomerForDeal(supabase, {
+          orgId: profile.org_id, userId: user.id, locationId: creationLocationId,
+          first, last, phone, email, address, source,
+          existingContactId: existing?.id ?? null, createdCustomerId,
+        }, setCreatedCustomerId);
+        if ('duplicates' in result) {
+          setMatches(result.duplicates);
+          toast('An exact phone or email match already exists. Choose that customer for this deal.', 'error');
+          return;
+        }
+        onCustomerSelected(result.contact);
+        clearDrafts(draftScope);
+        onClose();
+        return;
+      }
+
       // 1. Contact — reuse the existing record if one was selected
       let contactId = existing ? existing.id : null;
       let contactFirst = existing ? existing.first_name : first.trim();
@@ -202,7 +234,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
         priority,
         lead_source: source,
         product_interest: interests,
-        expected_close_date: expectedCloseDate,
+        expected_close_date: null,
         assigned_to: creditTo,
         location_id: creationLocationId,
         position: 0,
@@ -251,6 +283,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
     } catch (err) {
       toast(`Couldn't create customer: ${(err as Error).message}`, 'error');
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
@@ -262,17 +295,17 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold text-ink-100">New Customer</h2>
-              <p className="text-xs text-ink-500 mt-0.5">Guided clicks — every answer stays changeable.</p>
+              <p className="text-xs text-ink-500 mt-0.5">{customerOnly ? 'Save or select a customer, then finish your deal and its follow-up.' : 'Guided clicks — every answer stays changeable.'}</p>
             </div>
-            <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
+            <button onClick={close} disabled={saving} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
           <div className="mt-3.5">
             <div className="flex justify-between items-baseline text-[10px] font-semibold mb-1.5">
-              <span className="text-ink-400">{doneCount} of 5 complete</span>
-              {step5Done && doneCount < 5 && <span className="text-brand-400">Follow-up details complete ✓</span>}
+              <span className="text-ink-400">{doneCount} of {steps.length} complete</span>
+              {!customerOnly && step5Done && doneCount < 5 && <span className="text-brand-400">Follow-up details complete ✓</span>}
             </div>
             <div className="h-1.5 bg-ink-800 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${(doneCount / 5) * 100}%` }} />
+              <div className="h-full bg-brand-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -282,12 +315,12 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
           <section>
             <StepHeader n={1} title="Who is this?" done={step1Done} />
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <input placeholder="First name *" value={first} onChange={e => setFirst(e.target.value)} className={inputClass} disabled={!!existing} />
-              <input placeholder="Last name *" value={last} onChange={e => setLast(e.target.value)} className={inputClass} disabled={!!existing} />
+              <input placeholder="First name *" value={first} onChange={e => setFirst(e.target.value)} className={inputClass} disabled={!!existing || (customerOnly && !!createdCustomerId)} />
+              <input placeholder="Last name *" value={last} onChange={e => setLast(e.target.value)} className={inputClass} disabled={!!existing || (customerOnly && !!createdCustomerId)} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <input placeholder="Phone *" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} disabled={!!existing} />
-              <input placeholder="Email (optional)" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} disabled={!!existing} />
+              <input placeholder="Phone *" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} disabled={!!existing || (customerOnly && !!createdCustomerId)} />
+              <input placeholder="Email (optional)" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} disabled={!!existing || (customerOnly && !!createdCustomerId)} />
             </div>
             <label className="mt-3 block" htmlFor="new-customer-address">
               <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">Customer Address (Optional)</span>
@@ -303,7 +336,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             </label>
 
             <label className="mt-3 block" htmlFor="new-customer-store">
-              <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">{existing ? 'Deal Store *' : 'Customer & Deal Store *'}</span>
+              <span className="mb-1.5 block text-[11px] font-semibold text-ink-400">{customerOnly ? 'Customer Store *' : existing ? 'Deal Store *' : 'Customer & Deal Store *'}</span>
               <select
                 id="new-customer-store"
                 value={creationLocationId}
@@ -315,9 +348,13 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                 {locations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
               </select>
               <span className="mt-1.5 block text-[11px] text-ink-500">
-                {existing ? 'Applies to this deal; the existing customer keeps their store.' : 'Assigns the new customer and their first deal to this store.'} Deliveries follow the deal’s store.
+                {customerOnly ? 'New customers are assigned to this store. Existing customers keep their store.' : `${existing ? 'Applies to this deal; the existing customer keeps their store.' : 'Assigns the new customer and their first deal to this store.'} Deliveries follow the deal’s store.`}
               </span>
             </label>
+
+            {customerOnly && createdCustomerId && !existing && (
+              <p className="mt-3 text-xs text-brand-300">This customer is saved. Continue to finish saving their address and return to your deal.</p>
+            )}
 
             {/* Locked onto an existing customer */}
             {existing && (
@@ -329,7 +366,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                     {existing.assigned && <> · {existing.assigned.first_name} {existing.assigned.last_name}'s customer — they keep the commission</>}
                   </span>
                 </span>
-                <button onClick={() => setExisting(null)} className="text-xs font-semibold text-emerald-300 underline underline-offset-2 shrink-0 hover:opacity-80">
+                <button disabled={saving} onClick={() => setExisting(null)} className="text-xs font-semibold text-emerald-300 underline underline-offset-2 shrink-0 hover:opacity-80">
                   Unlink
                 </button>
               </div>
@@ -344,9 +381,10 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                 {matches.map(m => (
                   <div key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 border-t border-amber-500/10 hover:bg-amber-500/10 transition-colors">
                     <button
-                      onClick={() => { onClose(); navigate(`/customers/${m.id}`); }}
+                      disabled={saving}
+                      onClick={() => { if (customerOnly) { setExisting(m); setMatches([]); } else { onClose(); navigate(`/customers/${m.id}`); } }}
                       className="min-w-0 flex-1 text-left group"
-                      title="Open customer card"
+                      title={customerOnly ? 'Use this customer' : 'Open customer card'}
                     >
                       <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-100 group-hover:text-brand-300 group-hover:underline underline-offset-2">
                         {m.first_name} {m.last_name}
@@ -358,6 +396,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
                       </span>
                     </button>
                     <button
+                      disabled={saving}
                       onClick={() => { setExisting(m); setMatches([]); }}
                       className="text-xs font-bold text-brand-300 bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg shrink-0 transition-colors"
                     >
@@ -377,6 +416,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             </div>
           </section>
 
+          {!customerOnly && <>
           {/* Step 3 — interest */}
           <section>
             <StepHeader n={3} title="What are they interested in?" done={step3Done} />
@@ -389,25 +429,13 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
             </label>
           </section>
 
-          {/* Step 4 — priority and an explicit forecast date */}
+          {/* Step 4 — priority */}
           <section>
-            <StepHeader n={4} title="How hot is this lead, and when could it close?" done={step4Done} />
+            <StepHeader n={4} title="How hot is this lead?" done={step4Done} />
             <div className="grid grid-cols-3 gap-2">
               {PRIORITIES.map(p => (
                 <Chip key={p.value} active={priority === p.value} onClick={() => setPriority(p.value)} hint={p.hint}>{p.label}</Chip>
               ))}
-            </div>
-            <div className="mt-3 max-w-[240px]">
-              <label className="block text-[11px] font-semibold text-ink-400 mb-1.5" htmlFor="new-customer-expected-close">
-                Expected close date *
-              </label>
-              <input
-                id="new-customer-expected-close"
-                type="date"
-                value={expectedCloseDate}
-                onChange={e => setExpectedCloseDate(e.target.value)}
-                className={inputClass}
-              />
             </div>
           </section>
 
@@ -440,16 +468,17 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
               </label>
             </div>
           </section>
+          </>}
         </div>
 
         <div className="px-6 py-4 border-t border-ink-700 flex justify-end gap-3 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 rounded-lg transition-colors">Cancel</button>
+          <button onClick={close} disabled={saving} className="px-4 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 rounded-lg transition-colors">Cancel</button>
           <button
             onClick={handleCreate}
-            disabled={!canCreate}
+            disabled={customerOnly ? !canSelectCustomer : !canCreate}
             className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
           >
-            {saving ? 'Creating…' : 'Create Customer'}
+            {saving ? 'Saving…' : customerOnly ? (existing ? 'Use Customer for Deal' : 'Save Customer & Return to Deal') : 'Create Customer'}
           </button>
         </div>
       </div>

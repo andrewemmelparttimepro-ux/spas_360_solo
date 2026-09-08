@@ -10,7 +10,7 @@ describe('New Customer required follow-up details', () => {
 
     assert.match(wizard, /const step5Done = followupDate\.length > 0 && firstNote\.trim\(\)\.length > 0;/);
     assert.match(wizard, /const canCreate = step1Done && step2Done && step3Done && step4Done && step5Done && !!creationLocationId && !saving;/);
-    assert.match(wizard, /<button[\s\S]*onClick=\{handleCreate\}[\s\S]*disabled=\{!canCreate\}/);
+    assert.match(wizard, /<button[\s\S]*onClick=\{handleCreate\}[\s\S]*disabled=\{customerOnly \? !canSelectCustomer : !canCreate\}/);
   });
 
   it('labels the required field exactly and saves its trimmed value', async () => {

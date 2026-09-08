@@ -1,6 +1,6 @@
 import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
-import { useEffect, useMemo, useState } from 'react';
-import { X, Handshake, Search } from 'lucide-react';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { X, Handshake, Search, UserPlus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
@@ -9,6 +9,7 @@ import type { Contact, DealLeadSource, DealPriority, PipelineStage } from '@/typ
 import { useModal } from '@/hooks/useModal';
 import { filterCustomersByNamePrefix } from '@/lib/customerSearch';
 import { resolveCreationStore } from '@/lib/creationStore';
+import NewCustomerWizard from '@/components/NewCustomerWizard';
 import { DEAL_SHOPPING_OPTIONS, dealShoppingInterests } from '@/lib/quickDealIntake';
 
 // Quick deal creation for an existing customer. Customer-specific entry points
@@ -67,7 +68,10 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   onClose: () => void;
   onCreated?: (dealId: string) => void;
 }) {
-  const { dialogRef, dialogProps } = useModal(onClose);
+  const saveInFlight = useRef(false);
+  const close = () => { if (!saveInFlight.current) onClose(); };
+  const [addingCustomer, setAddingCustomer] = useState(false);
+  const { dialogRef, dialogProps } = useModal(close, !addingCustomer);
   const { profile, user, activeLocationId, locations } = useAuth();
   const { toast } = useToast();
   const [contact, setContact] = useState<QuickDealContact | null>(null);
@@ -79,6 +83,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [dealOwners, setDealOwners] = useState<DealOwner[]>([]);
   const [dealOwner, setDealOwner] = useState(UNSELECTED_OWNER);
   const draftScope = `deal:${profile?.id ?? 'signed-out'}:${contactId ?? 'any'}`;
+  const [selectedCustomerId, setSelectedCustomerId] = useDraftState<string | null>(draftScope, 'selectedCustomerId', null);
   const [interests, setInterests] = useDraftState<string[]>(draftScope, 'interests', []);
   const [interest, setInterest] = useDraftState(draftScope, 'interest', '');
   const [notes, setNotes] = useDraftState(draftScope, 'notes', '');
@@ -87,7 +92,6 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [title, setTitle] = useDraftState(draftScope, 'title', '');
   const [titleTouched, setTitleTouched] = useDraftState(draftScope, 'titleTouched', false);
   const [amount, setAmount] = useDraftState(draftScope, 'amount', '');
-  const [expectedCloseDate, setExpectedCloseDate] = useDraftState(draftScope, 'expectedCloseDate', '');
   const [priority, setPriority] = useDraftState<DealPriority>(draftScope, 'priority', 'Medium');
   const [nextActivityDate, setNextActivityDate] = useDraftState(draftScope, 'nextActivityDate', nextLocalDate);
   const [saving, setSaving] = useState(false);
@@ -178,6 +182,23 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId, profile?.org_id, activeLocationId]);
 
+  // Restore the selected customer independently of the current store's search list.
+  useEffect(() => {
+    if (contactId || !selectedCustomerId || !profile || contact?.id === selectedCustomerId) return;
+    let cancelled = false;
+    void supabase.from('contacts').select('*, assigned:assigned_to(first_name, last_name)')
+      .eq('org_id', profile.org_id).eq('id', selectedCustomerId).single()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          toast('Choose the customer again to resume this deal', 'error');
+          return;
+        }
+        chooseCustomer(data as QuickDealContact);
+      });
+    return () => { cancelled = true; };
+  }, [contactId, selectedCustomerId, profile?.org_id]);
+
   // Auto-title mirrors the wizard's "{Last} – {interest}" ritual; backs off once hand-edited
   useEffect(() => {
     if (titleTouched || !contact) return;
@@ -186,8 +207,8 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   }, [shoppingInterests, contact, titleTouched]);
 
   const canCreate = useMemo(
-    () => !!contact && !!stage && !!creationLocationId && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0 && expectedCloseDate.length > 0,
-    [contact, stage, creationLocationId, dealOwner, title, nextActivityDate, expectedCloseDate]
+    () => !!contact && !!stage && !!creationLocationId && dealOwner !== UNSELECTED_OWNER && title.trim().length > 0 && nextActivityDate.length > 0,
+    [contact, stage, creationLocationId, dealOwner, title, nextActivityDate]
   );
 
   const matchingCustomers = useMemo(
@@ -201,12 +222,14 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
 
   const chooseCustomer = (selection: QuickDealContact) => {
     setContact(selection);
+    setSelectedCustomerId(selection.id);
     setDealOwner(selection.assigned_to ?? user?.id ?? UNSELECTED_OWNER);
     setCustomerSearch(`${selection.first_name} ${selection.last_name}`.trim());
   };
 
   const handleCreate = async () => {
-    if (!profile || !user || !contact || !canCreate || saving) return;
+    if (!profile || !user || !contact || !canCreate || saveInFlight.current) return;
+    saveInFlight.current = true;
     setSaving(true);
     try {
       const storedLeadSource = LEAD_SOURCE_OPTIONS.find(option => option.label === leadSource)?.storedValue;
@@ -226,7 +249,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
           priority,
           lead_source: storedLeadSource,
           product_interest: shoppingInterests,
-          expected_close_date: expectedCloseDate,
+          expected_close_date: null,
           assigned_to: creditTo,
           location_id: creationLocationId,
         },
@@ -243,11 +266,22 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
     } catch (err) {
       toast(`Couldn't create deal: ${(err as Error).message}`, 'error');
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
 
   const inputClass = 'w-full px-3 py-2 bg-ink-950 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500';
+
+  if (addingCustomer) {
+    return <NewCustomerWizard
+      onClose={() => setAddingCustomer(false)}
+      onCustomerSelected={customer => {
+        setCustomers(current => [customer, ...current.filter(item => item.id !== customer.id)]);
+        chooseCustomer(customer);
+      }}
+    />;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
@@ -264,7 +298,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
                 : 'Lands on the pipeline with a follow-up already set'}
             </p>
           </div>
-          <button onClick={onClose} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
+          <button onClick={close} disabled={saving} className="p-1 text-ink-500 hover:text-ink-300" aria-label="Close"><X className="w-5 h-5" /></button>
         </div>
 
         {contactId && !contact ? (
@@ -283,7 +317,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
                   <input
                     id="deal-customer-search"
                     value={customerSearch}
-                    onChange={e => { setCustomerSearch(e.target.value); setContact(null); }}
+                    onChange={e => { setCustomerSearch(e.target.value); setContact(null); setSelectedCustomerId(null); }}
                     placeholder="Start typing a customer name…"
                     aria-label="Search existing customers"
                     autoComplete="off"
@@ -311,6 +345,14 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setAddingCustomer(true)}
+                  disabled={saving}
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-500/30 px-3 py-2 text-sm font-semibold text-brand-300 hover:bg-brand-500/10"
+                >
+                  <UserPlus className="h-4 w-4" /> Add New Customer
+                </button>
               </div>
             )}
 
@@ -422,17 +464,11 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
               </div>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-2">Expected close date *</p>
-              <input type="date" value={expectedCloseDate} onChange={e => setExpectedCloseDate(e.target.value)} className={inputClass} />
-              <p className="mt-1.5 text-[11px] text-ink-500">Required for an honest pipeline forecast; leave the deal uncreated if the date is not known yet.</p>
-            </div>
-
           </div>
         )}
 
         <div className="px-6 py-4 border-t border-ink-700 shrink-0 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-ink-400 hover:text-ink-200">Cancel</button>
+          <button onClick={close} disabled={saving} className="px-4 py-2 text-sm text-ink-400 hover:text-ink-200">Cancel</button>
           <button
             onClick={handleCreate}
             disabled={!canCreate || saving}

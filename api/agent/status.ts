@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     : req.headers.authorization;
   if (!authHeader || !supabaseUrl || !anonKey) return res.status(401).json({ error: 'Missing authorization' });
   const auth = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: anonKey, Authorization: authHeader },
+    headers: { apikey: anonKey, Authorization: authHeader }, signal: AbortSignal.timeout(8_000),
   });
   if (!auth.ok) return res.status(401).json({ error: 'Invalid or expired session' });
 
@@ -22,13 +22,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const r = await fetch(
       `${supabaseUrl}/rest/v1/agent_config?select=enabled,provider,model&limit=1`,
-      { headers: { apikey: anonKey, Authorization: authHeader, Accept: 'application/json' } }
+      { headers: { apikey: anonKey, Authorization: authHeader, Accept: 'application/json' }, signal: AbortSignal.timeout(8_000) }
     );
+    if (!r.ok) return res.status(503).json({ ok: false, error: 'Runtime configuration could not be read' });
     if (r.ok) {
       const rows = (await r.json()) as typeof configured[];
       if (Array.isArray(rows) && rows[0]) configured = rows[0];
     }
-  } catch { /* env fallback */ }
+  } catch { return res.status(503).json({ ok: false, error: 'Runtime configuration check timed out' }); }
 
   const provider = (configured.provider || envValue(process.env.AI_PROVIDER, 'gemini')).toLowerCase();
   const envModel = provider === 'thrawn'
@@ -69,6 +70,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     model,
     config_source: configured.provider || configured.model ? 'org-config' : 'env',
     providers_available,
+    model_reachability: 'not_checked',
+    health_note: 'Configuration and key presence only. A completed command is required to establish model execution.',
+    release: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || 'development',
     capabilities: ['tools', 'threads', 'citadel', 'sms_approval', 'service_holds'],
     server_time: new Date().toISOString(),
   });

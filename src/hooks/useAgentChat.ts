@@ -17,7 +17,7 @@ export interface AgentDeliverable {
   id: string;
   title: string;
   kind: string;
-  status: 'draft' | 'blocked' | 'rendering' | 'ready' | 'failed';
+  status: 'draft' | 'needs_input' | 'reviewed' | 'sent' | 'blocked' | 'rendering' | 'ready' | 'failed';
   artifact_format: 'pdf' | 'jpg' | 'png' | null;
   file_name: string | null;
   mime_type: string | null;

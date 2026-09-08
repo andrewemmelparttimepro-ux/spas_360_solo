@@ -1,3 +1,4 @@
+import { textDeliverableState } from '../_lib/deliverableState.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -60,18 +61,6 @@ function blockedArtifactMessage(missing: MissingField[]): string {
   return `I stopped this before making a customer-facing file because the source data is incomplete.\n\n${list}\n\nThe blocked draft is saved in Citadel. Fill those fields, then ask me to rebuild it.`;
 }
 
-function inferKind(request: string, content: string): string {
-  const text = `${request}\n${content}`.toLowerCase();
-  if (/\b(email|subject line)\b/.test(text)) return 'email';
-  if (/\b(sms|text message)\b/.test(text)) return 'sms';
-  if (/\bproposal\b/.test(text)) return 'proposal';
-  if (/\b(one[- ]pager|1[- ]page|one page)\b/.test(text)) return 'one_pager';
-  if (/\b(summary|recap|brief)\b/.test(text)) return 'summary';
-  if (/\b(sales tool|objection|battle card|follow-up cadence)\b/.test(text)) return 'sales_tool';
-  if (/\b(document|special offer|trade-in offer|quote)\b/.test(text)) return 'document';
-  return 'other';
-}
-
 function compactTitle(value: string): string {
   const clean = value.replace(/\[\[(?:ari|user|customer):[^\]]+\]\]/gi, '').replace(/\s+/g, ' ').trim();
   return clean.length > 140 ? `${clean.slice(0, 137)}...` : clean || 'Ari output';
@@ -90,6 +79,7 @@ async function queueSmsWith(
       requested_by: userId,
       customer_id: input.contactId,
       kind: 'sms',
+      status: 'draft',
       title: `Text to ${input.contactName} (pending approval)`,
       content: input.body,
       content_format: 'markdown',
@@ -338,17 +328,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           responseContent = 'I saved the draft in Citadel, but the PDF renderer could not finish the file. Nothing was sent. Try rebuilding it once the connection is stable.';
         }
       }
-    } else {
-      const { error: archiveError } = await client.from('agent_deliverables').insert({
+    } else if (textDeliverableState(message, answer)) {
+      const textState = textDeliverableState(message, answer)!;
+      const { data: textDraft, error: archiveError } = await client.from('agent_deliverables').insert({
         org_id: orgId,
         thread_id: threadId,
         requested_by: userId,
-        kind: inferKind(message, answer),
+        kind: textState.kind,
+        status: textState.status,
+        source_snapshot: { request: message, outcome: textState.status },
         title: compactTitle(message),
         content: answer,
         content_format: 'markdown',
         delivery_channels: ['citadel', 'agent-os'],
-      });
+      }).select('id, title, kind, status, artifact_format, file_name, mime_type, file_size_bytes, missing_fields, created_at').single();
+      if (textDraft) artifact = textDraft;
       if (archiveError) throw new Error(archiveError.message);
     }
 

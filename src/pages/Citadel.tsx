@@ -14,14 +14,16 @@ export default function Citadel() {
   const [items, setItems] = useState<CitadelItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error: readError } = await supabase
       .from('agent_deliverables')
       .select('id, title, kind, content, content_format, delivery_channels, status, artifact_format, file_name, mime_type, file_size_bytes, missing_fields, created_at')
       .order('created_at', { ascending: false })
       .limit(200);
-    setItems((data ?? []) as CitadelItem[]);
+    setError(readError ? 'Citadel could not refresh. Previously loaded items remain visible.' : null);
+    if (!readError) setItems((data ?? []) as CitadelItem[]);
     setLoading(false);
   }, []);
 
@@ -46,7 +48,7 @@ export default function Citadel() {
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-400">Canonical cloud workspace</p>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100"><Building2 className="h-6 w-6 text-violet-400" />Citadel</h1>
-          <p className="mt-1 text-sm text-ink-500">Every Ari output lives here in real time on every signed-in device.</p>
+          <p className="mt-1 text-sm text-ink-500">Files and working drafts. Older text entries are conversation snapshots, not proof of a finished or sent message.</p>
         </div>
         <label className="relative block w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
@@ -54,6 +56,7 @@ export default function Citadel() {
         </label>
       </div>
 
+      {error && <p role="alert" className="text-sm text-amber-600">{error} <button onClick={() => void load()} className="underline">Retry</button></p>}
       {loading ? (
         <div className="flex min-h-80 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-ink-700 border-t-violet-500" /></div>
       ) : filtered.length === 0 ? (
@@ -72,7 +75,7 @@ export default function Citadel() {
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300"><FileText className="h-4 w-4" /></span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-ink-100">{item.title}</p>
-                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-500">{item.kind.replaceAll('_', ' ')} · {new Date(item.created_at).toLocaleString()}</p>
+                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-500">{item.status === 'needs_input' ? 'Needs input' : item.status === 'draft' ? 'Draft · not sent' : 'Unreviewed text snapshot · delivery not established'} · {item.kind.replaceAll('_', ' ')} · {new Date(item.created_at).toLocaleString()}</p>
                 </div>
                 <button onClick={() => navigator.clipboard.writeText(item.content)} className="rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-ink-200" title="Copy output"><Copy className="h-4 w-4" /></button>
               </div>

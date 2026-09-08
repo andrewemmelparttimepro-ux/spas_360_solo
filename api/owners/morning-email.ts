@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { submitMorningEmail, type EmailPayload } from '../_lib/morningDelivery.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { mintStaffAccessToken } from '../_lib/staff-sms.js';
@@ -29,21 +31,11 @@ function secretOk(req: VercelRequest): boolean {
   return mismatch === 0;
 }
 
-async function sendViaResend(to: string, subject: string, html: string, text: string, from: string = FROM): Promise<{ id: string } | { error: string }> {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json', 'User-Agent': 'spas360-morning-summary' },
-    body: JSON.stringify({ from, to: [to], subject, html, text, tags: [{ name: 'app', value: 'spas360' }, { name: 'kind', value: 'morning-summary' }] }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const payload = await response.json().catch(() => null) as { id?: string; message?: string; name?: string } | null;
-  if (!response.ok || !payload?.id) return { error: payload?.message ?? `Resend HTTP ${response.status}` };
-  return { id: payload.id };
+function emailPayload(to: string, subject: string, html: string, text: string, from = FROM): EmailPayload {
+  return { from, to: [to], subject, html, text, tags: [{ name: 'app', value: 'spas360' }, { name: 'kind', value: 'morning-summary' }] };
 }
 
 async function narrationFor(service: SupabaseClient, anon: SupabaseClient, orgId: string, day: string, ownerEmail: string): Promise<string | null> {
-  const { data: cached } = await service.from('morning_summary_narrations').select('narration').eq('org_id', orgId).eq('day', day).maybeSingle();
-  if (cached?.narration) return cached.narration as string;
   try {
     const token = await mintStaffAccessToken(service, anon, ownerEmail);
     const response = await fetch(`${APP_URL}/api/owners/morning-narration?day=${day}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(70_000) });
@@ -79,6 +71,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const query = req.query as Record<string, string | string[] | undefined>;
+  if (query.receipts === '1') {
+    let receiptQuery = service.from('morning_summary_emails').select('id,org_id,day,to_email,provider_id,status,provider_event,provider_checked_at,error').order('created_at', { ascending: false }).limit(20);
+    if (callerOrg) receiptQuery = receiptQuery.eq('org_id', callerOrg);
+    const { data: rows, error: readError } = await receiptQuery;
+    if (readError) return res.status(503).json({ error: 'Email receipts could not load' });
+    const receipts = [];
+    for (const row of rows ?? []) {
+      if (!row.provider_id) { receipts.push(row); continue; }
+      try {
+        const reply = await fetch(`https://api.resend.com/emails/${encodeURIComponent(row.provider_id as string)}`, {
+          headers: { Authorization: `Bearer ${RESEND_API_KEY}` }, signal: AbortSignal.timeout(4_000),
+        });
+        const receipt = await reply.json() as { last_event?: string };
+        if (!reply.ok || !receipt.last_event) { receipts.push({ ...row, verification_error: `Provider receipt unavailable (${reply.status})` }); continue; }
+        const update = { provider_event: receipt.last_event, provider_checked_at: new Date().toISOString() };
+        await service.from('morning_summary_emails').update(update).eq('id', row.id);
+        receipts.push({ ...row, ...update });
+      } catch { receipts.push({ ...row, verification_error: 'Provider receipt check timed out' }); }
+    }
+    return res.status(200).json({ receipts, note: 'Sent means provider accepted. Delivered means recipient mail server accepted; it does not prove the recipient read it.' });
+  }
+
   const test = query.test === '1';
   const testTo = typeof query.to === 'string' ? query.to : null;
   // Test sends may use Resend's onboarding sender until spas360.ndai.pro is verified.
@@ -113,20 +127,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (test) {
       const to = testTo ?? callerEmail;
       if (!to) { results.push({ org: orgId, error: 'test needs ?to=' }); continue; }
-      const sent = await sendViaResend(to, `[TEST] ${subject}`, html, text, testFrom);
+      const sent = await submitMorningEmail(RESEND_API_KEY, emailPayload(to, `[TEST] ${subject}`, html, text, testFrom), `spas360/test/${randomUUID()}`);
       results.push({ org: orgId, test: true, to, ...sent });
       continue;
     }
 
     for (const owner of recipients) {
-      const { data: already } = await service.from('morning_summary_emails').select('id').eq('org_id', orgId).eq('day', typed.day).eq('user_id', owner.id as string).maybeSingle();
-      if (already) { results.push({ org: orgId, to: owner.email, skipped: 'already sent' }); continue; }
-      const sent = await sendViaResend(owner.email as string, subject, html, text);
-      await service.from('morning_summary_emails').insert({
-        org_id: orgId, day: typed.day, user_id: owner.id as string, to_email: owner.email as string,
-        provider_id: 'id' in sent ? sent.id : null, status: 'id' in sent ? 'sent' : 'failed', error: 'error' in sent ? sent.error : null,
+      const { data: claim, error: claimError } = await service.rpc('claim_morning_delivery', {
+        p_org: orgId, p_day: typed.day, p_user: owner.id,
+        p_payload: emailPayload(owner.email as string, subject, html, text),
       });
-      results.push({ org: orgId, to: owner.email, ...sent });
+      if (claimError || !claim?.claimed) {
+        results.push({ org: orgId, to: owner.email, skipped: claim?.reason ?? 'Delivery claim unavailable', error: claimError?.message });
+        continue;
+      }
+      const sent = await submitMorningEmail(RESEND_API_KEY, claim.payload as EmailPayload, claim.idempotency_key as string);
+      const { data: recorded, error: receiptError } = await service.rpc('finish_morning_delivery', {
+        p_email: claim.email_id, p_lease: claim.lease_token,
+        p_provider: 'id' in sent ? sent.id : null, p_error: 'error' in sent ? sent.error : null,
+      });
+      results.push({ org: orgId, to: owner.email, ...sent, receipt_recorded: !receiptError && recorded === true });
     }
   }
 

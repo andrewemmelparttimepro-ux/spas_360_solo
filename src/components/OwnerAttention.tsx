@@ -1,3 +1,4 @@
+import MorningDeliveryReceipts from './MorningDeliveryReceipts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -46,6 +47,7 @@ export default function OwnerAttention() {
       {snapshot.issue_count > snapshot.items.length && <p className="text-xs text-amber-600">Showing the first {snapshot.items.length} of {snapshot.issue_count} items. Open the relevant workspace for the complete queue.</p>}
       <details><summary className="cursor-pointer text-sm font-semibold text-ink-100">Staff access and delivery readiness</summary><div className="mt-3 space-y-2">{snapshot.staff.map(person => <div key={person.id} className="rounded-lg bg-ink-950 p-3 text-xs text-ink-400"><p className="font-semibold text-ink-100">{person.name} · {person.role.replaceAll('_', ' ')}</p><p>Latest sign-in: {date(person.last_sign_in_at)}</p><p>{person.registered_devices} registered devices · {person.unread_notifications} unread notices · Morning email: {person.email_eligibility}</p></div>)}</div><p className="mt-2 text-xs text-ink-500">Each staff member can enable alerts from their own signed-in device. Device registration does not prove a lock-screen delivery.</p></details>
       <details><summary className="cursor-pointer text-sm font-semibold text-ink-100">Background work and workflow enrollment</summary><div className="mt-3 space-y-2">{snapshot.scheduler.map(job => <div key={job.name} className="rounded-lg bg-ink-950 p-3 text-xs text-ink-400"><p className="font-semibold text-ink-100">{job.name}</p><p>{job.active ? 'Enabled' : 'Paused'} · Latest database run: {job.last_status ?? 'Not recorded'} · {date(job.last_finished)}</p><p>{job.failures_7d} failures in 7 days. A successful HTTP dispatch does not establish downstream email delivery.</p></div>)}</div><p className="mt-2 text-xs text-ink-500">{snapshot.attendance_entries === 0 ? 'No attendance entries: workflow use is not established; this is not employee absence.' : `${snapshot.attendance_entries} attendance entries recorded.`} {snapshot.checklist_templates} active checklist templates.</p></details>
+      <MorningDeliveryReceipts />
       <p className="text-xs leading-relaxed text-ink-500">{snapshot.coverage}</p>
     </>}
   </section>;

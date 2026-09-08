@@ -1,3 +1,4 @@
+import { summaryHash, reusableNarration } from '../_lib/summaryProvenance.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
@@ -22,7 +23,7 @@ export function narrationPrompt(summary: Record<string, unknown>): string {
     'You are Ari, reading the Morning Summary to the dealership owner before the store opens.',
     'Write at most three short sentences in plain spoken English, no bullet points, no headings, no markdown.',
     'Lead with anything that needs the owner today (tasks left open at clock-out, overdue delegated work, a deal won or lost, a missed punch). If the day was quiet, say so in one sentence.',
-    'Use first names only. Never invent numbers; every figure must come from the JSON below.',
+    'Use staff names. This narration is shared with every owner: never say you, your, or yours. Never infer store inactivity or employee absence from zero personal sales or zero punches. Never invent numbers; every figure must come from the JSON below.',
     '',
     '### Morning Summary JSON',
     JSON.stringify(summary),
@@ -49,15 +50,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (summaryError || !summary) return res.status(500).json({ error: summaryError?.message ?? 'Summary unavailable' });
   const summaryDay = String((summary as { day?: string }).day ?? day ?? '');
 
+  const sourceHash = summaryHash(summary);
+  const dataAsOf = new Date().toISOString();
   const service = createClient(SUPABASE_URL, SUPABASE_SERVICE, options);
   if (!refresh) {
     const { data: cached } = await service
       .from('morning_summary_narrations')
-      .select('narration, model, created_at')
+      .select('narration, model, created_at, source_hash, data_as_of')
       .eq('org_id', profile.org_id)
       .eq('day', summaryDay)
       .maybeSingle();
-    if (cached?.narration) return res.status(200).json({ day: summaryDay, narration: cached.narration, model: cached.model, cached: true });
+    if (reusableNarration(cached, sourceHash)) return res.status(200).json({ day: summaryDay, narration: cached!.narration, model: cached!.model, cached: true, data_as_of: cached!.data_as_of });
   }
 
   let narration = '';
@@ -76,11 +79,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     return res.status(502).json({ error: error instanceof Error ? error.message : 'Ari could not narrate the summary' });
   }
+  if (/\b(you|your|yours)\b/i.test(narration)) return res.status(502).json({ error: 'The narration used a personal reference. Read the named staff summary instead.' });
   if (!narration) return res.status(502).json({ error: 'Ari returned an empty narration' });
 
   await service.from('morning_summary_narrations').upsert(
-    { org_id: profile.org_id, day: summaryDay, narration, model, created_by: userId },
+    { org_id: profile.org_id, day: summaryDay, narration, model, created_by: userId, source_hash: sourceHash, data_as_of: dataAsOf, created_at: dataAsOf },
     { onConflict: 'org_id,day' },
   );
-  return res.status(200).json({ day: summaryDay, narration, model, cached: false });
+  return res.status(200).json({ day: summaryDay, narration, model, cached: false, data_as_of: dataAsOf });
 }

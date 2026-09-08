@@ -14,11 +14,17 @@ const areaNames: Record<string, string> = {
   contacts: 'Customers',
   deals: 'Deals',
   crm: 'Deals',
-  service: 'Service',
   inventory: 'Inventory',
   communication: 'Communications',
   reports: 'Reports',
   settings: 'Settings',
+  'owners-corner': 'Owners Corner',
+  citadel: 'Citadel',
+  parts: 'Parts',
+  media: 'Media',
+  documents: 'Documents',
+  knowledge: 'Knowledge',
+  service: 'Service',
 };
 
 /** Owner-visible route ledger. Regular staff can create these events through a

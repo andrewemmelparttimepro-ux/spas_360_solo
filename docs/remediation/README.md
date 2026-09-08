@@ -29,3 +29,13 @@ Production deployment `dpl_487a3kRWLsJwMSduD7KZZNKdWwcV`, release `8a28434dcccab
 F02: bounded retry queue and deduplicated page events, stable session/release metadata. F05/F06: missing-amount metadata and recorded-sales labels. F08: scoped, atomic checklist generation. F14/F15: shared owner-only overview and authorized Ari oversight tool. F18/F19/F25: truthful enrollment, personal-scope and inventory-age language. F23: responsive revenue values. These are implemented; full acceptance remains open where it needs business records, devices or broader role proof.
 
 Migrations 20260908160000 / 161000 / 162000 applied at 16:08:45 UTC after ten transactional rehearsal checks passed and rolled back. No existing business records were backfilled. Web check suite: 399 checks; one old literal-label expectation updated and its suite rerun. Typecheck and build pass. Native owner overview and server-filter work compile; installation and live acceptance pending.
+
+Oversight release `c07a4001733ddfaa20f7622f8e1db292c284199c` is live at deployment `dpl_Hq6qCgE8mYubnGY81XWbvKUqfinX`. All 113 older assets matched SHA-256 on the staged production deployment. Signed-in web overview showed 45 review items, 7/7 latest human sign-ins within 7 days, one person with registered push, and 18 unverified knowledge documents. Suggestion deep-link opened the feed. Old tab navigated Customers after promotion. At 16:17:39 UTC: two new web page events, zero app errors since 16:15 UTC. Owners Corner was initially categorized as /other; next release corrects the route map.
+
+## Conversation and delivery batch
+
+F16: ordinary conversations remain in Threads; requested text starts as needs_input or draft, never proof of sending. Legacy text displays as an unreviewed snapshot. F19: narration cache checks source hash and 15-minute freshness and rejects shared personal references. F20: atomic email claims, frozen payload, stable Resend key, bounded retries and read-only provider receipt checks. Keys expire after 24h per https://resend.com/docs/dashboard/emails/idempotency-keys; ambiguous automatic retries stop at 22h. Existing recipient policy is displayed and preserved. No acceptance emails were sent. F21: configuration read failures are visible and key presence is explicitly distinct from model reachability.
+
+Migrations 20260908163000 and 164000 applied at 16:22:20 UTC after five rollback checks passed. Four new behavior tests pass; full web suite 403/403 and typecheck pass.
+
+Native source `4836333eaaac9fc3cdec27f0c3dc74cc888145cc`, version 1.4.0 build 6, signed and installed with original bundle preserved. Five native tests pass. Live native acceptance is waiting for Andrew to handle the macOS Keychain access prompt.

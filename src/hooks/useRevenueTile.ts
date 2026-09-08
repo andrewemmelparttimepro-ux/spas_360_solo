@@ -2,7 +2,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
-import { defaultRevenueTileFilters, loadRevenueTileReport, revenueTileMonthComparison, revenueTileRange, revenueTileRpcParams, type RevenueTileFilters, type RevenueTileReport } from '@/lib/dashboardRevenueTile';
+import { defaultRevenueTileFilters, loadRevenueTileReport, revenueTileMonthComparison, revenueTileRange, revenueTileRpcParams, type HistoricalRevenueComparison, type RevenueTileFilters, type RevenueTileReport } from '@/lib/dashboardRevenueTile';
+import { dealershipDate } from '@/lib/dashboardSchedule';
+
+async function loadHistoricalComparison(previousStart: string): Promise<HistoricalRevenueComparison | null> {
+  const month = dealershipDate(new Date(previousStart)).slice(0, 7);
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) throw new Error('Sign in again to load historical sales.');
+  const response = await fetch(`/api/dashboard/historical-sales?month=${month}`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || 'Historical sales could not load.');
+  if (data?.month !== month || data?.locationId !== '00000000-0000-0000-0000-000000000010') throw new Error('Historical sales response could not be verified.');
+  if (data.sales === null) return null;
+  if (typeof data.sales?.total !== 'number' || !Number.isFinite(data.sales.total)
+    || !Number.isSafeInteger(data.sales.missingAmounts) || data.sales.missingAmounts < 0) {
+    throw new Error('Historical sales response was incomplete.');
+  }
+  return { locationId: data.locationId, ...data.sales };
+}
 
 export function useRevenueTile(filters: RevenueTileFilters, comparePreviousYear = false) {
   const { profile } = useAuth();
@@ -47,10 +67,14 @@ export function useRevenueTile(filters: RevenueTileFilters, comparePreviousYear 
     setIsFetching(true);
     setFailure(null);
     try {
+      const historicalComparison = previousStart && !filters.assignedTo
+        && (!filters.locationId || filters.locationId === '00000000-0000-0000-0000-000000000010')
+        ? await loadHistoricalComparison(previousStart) : null;
       const report = await loadRevenueTileReport(
         revenueTileRpcParams({ start: new Date(start), end: new Date(end) }, filters),
         params => supabase.rpc('dashboard_revenue_summary', params),
         previousStart && previousEnd ? { start: new Date(previousStart), end: new Date(previousEnd) } : undefined,
+        historicalComparison,
       );
       if (request !== sequence.current) return;
       setResult({ key, orgId, report });
@@ -72,6 +96,7 @@ export function useRevenueTile(filters: RevenueTileFilters, comparePreviousYear 
     const refetch = debounceRefetch(refresh);
     const channel = supabase.channel(`revenue-tile-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deals', filter: `org_id=eq.${orgId}` }, refetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'owner_workbooks', filter: `org_id=eq.${orgId}` }, refetch)
       .subscribe();
     window.addEventListener('focus', refetch);
     return () => {

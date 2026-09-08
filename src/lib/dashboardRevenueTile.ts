@@ -21,6 +21,7 @@ export interface RevenueTileReport {
   storeOptions: DashboardRevenueFilterOption[];
 }
 export type RevenueTileRpcParams = ReturnType<typeof dashboardRevenueRpcParams>;
+export type HistoricalRevenueComparison = { locationId: string; total: number; missingAmounts: number };
 
 export function revenueMonthDates(now = new Date()) {
   const date = dealershipDate(now);
@@ -109,6 +110,7 @@ export async function loadRevenueTileReport(
   params: RevenueTileRpcParams,
   request: (params: RevenueTileRpcParams) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
   previousYearRange?: DashboardDateRange,
+  historicalComparison?: HistoricalRevenueComparison | null,
 ): Promise<RevenueTileReport> {
   const result = await request(params);
   if (result.error) throw new Error(result.error.message);
@@ -128,6 +130,11 @@ export async function loadRevenueTileReport(
       if (storeResult.error) throw new Error(storeResult.error.message);
       const current = { ...store, total: revenueTotal(storeResult.data), missingAmounts: missingAmounts(storeResult.data) };
       if (!previousYearRange) return current;
+      // The historical workbook is the complete month for this store. Replace
+      // its deal comparison; adding both could count an imported sale twice.
+      if (historicalComparison?.locationId === store.id && !params.p_assigned_to) {
+        return { ...current, previousYear: { total: historicalComparison.total, missingAmounts: historicalComparison.missingAmounts } };
+      }
       const previousResult = await request({
         ...params,
         p_location_id: store.id,

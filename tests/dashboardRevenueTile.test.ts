@@ -84,6 +84,23 @@ describe('monthly revenue tile date and filter contract', () => {
 describe('revenue aggregate report requests', () => {
   const previousRange = () => revenueTileMonthComparison(revenueTileRange(defaultRevenueTileFilters(now), now)!).previousYearRange;
 
+  it('uses the complete historical Minot month instead of adding potentially imported deals, preserving Bismarck zero', async () => {
+    const calls: ReturnType<typeof defaultParams>[] = [];
+    const report = await loadRevenueTileReport(defaultParams(), async params => {
+      calls.push(params);
+      return { data: response(params.p_start.startsWith('2025') ? 0 : 500), error: null };
+    }, previousRange(), { locationId: 'store-minot', total: 132439, missingAmounts: 0 });
+    assert.equal(report.total, 500);
+    assert.deepEqual(report.stores.map(store => store.previousYear?.total), [0, 132439]);
+    assert.deepEqual(report.stores[1].previousYear, { total: 132439, missingAmounts: 0 });
+    assert.equal(calls.filter(call => call.p_start.startsWith('2025') && call.p_location_id === 'store-minot').length, 0);
+  });
+
+  it('never substitutes an all-salespeople worksheet total into a selected salesperson comparison', async () => {
+    const report = await loadRevenueTileReport({ ...defaultParams(), p_assigned_to: 'owner-brandon' }, async () => ({ data: response(500), error: null }), previousRange(), { locationId: 'store-minot', total: 132439, missingAmounts: 0 });
+    assert.equal(report.stores[1].previousYear?.total, 500);
+  });
+
   it('compares each store using all prior-month Closed-Won amounts and the same owner, preserving missing amounts', async () => {
     const deals = [
       { store: 'store-minot', owner: 'owner-brandon', won: true, closed: '2026-09-03T12:00:00Z', amount: 500 },

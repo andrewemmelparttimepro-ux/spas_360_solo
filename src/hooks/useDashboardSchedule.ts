@@ -40,7 +40,7 @@ export function useDashboardSchedule() {
     setError(null);
     try {
       const bounds = scheduleDayBounds(date);
-      const rows = await loadSchedulePages<ScheduleCountJob>((offset, size) => supabase
+      const rows = await loadSchedulePages((offset, size) => supabase
         .from('jobs')
         .select('id, job_type, status, scheduled_at, scheduled_end_date')
         .eq('org_id', orgId)
@@ -50,7 +50,7 @@ export function useDashboardSchedule() {
         .order('id', { ascending: true })
         .range(offset, offset + size - 1));
       if (request !== sequence.current) return;
-      setResult({ key, counts: countScheduledJobs(rows, date) });
+      setResult({ key, counts: countScheduledJobs(rows as ScheduleCountJob[], date) });
     } catch (cause) {
       if (request !== sequence.current) return;
       setError(cause instanceof Error ? cause.message : 'Scheduled jobs could not load.');

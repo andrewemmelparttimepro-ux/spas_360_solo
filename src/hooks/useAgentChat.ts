@@ -35,6 +35,15 @@ interface AgentThread {
   created_at: string;
 }
 
+function parseToolCalls(value:unknown):ChatMessage['tool_calls']{
+  if(value==null)return undefined;
+  if(!Array.isArray(value))throw new Error('Invalid saved tool receipt');
+  return value.map(item=>{
+    if(!item||typeof item!=='object'||typeof item.id!=='string'||!item.function||typeof item.function.name!=='string'||typeof item.function.arguments!=='string')throw new Error('Invalid saved tool receipt');
+    return{id:item.id,function:{name:item.function.name,arguments:item.function.arguments}};
+  });
+}
+
 export function useAgentChat() {
   const { user, profile } = useAuth();
   const [threads, setThreads] = useState<AgentThread[]>([]);
@@ -78,7 +87,7 @@ export function useAgentChat() {
         .abortSignal(AbortSignal.timeout(15_000));
       if(error)throw error;
       if(userRef.current!==actor || sequence!==threadSequence.current)return;
-      setThreads(data??[]);
+      setThreads((data??[]).map(row=>({...row,thread_type:'agent' as const})));
     } catch {
       if(userRef.current===actor && sequence===threadSequence.current)setReadError('Conversation list could not refresh. Your last loaded list is still shown. Retry.');
     }
@@ -97,7 +106,11 @@ export function useAgentChat() {
       const {data,error}=await supabase.from('agent_messages').select('*').eq('thread_id',threadId)
         .order('created_at',{ascending:true}).abortSignal(signal);
       if(error)throw error;
-      const rows=(data??[]) as ChatMessage[];
+      const rows:ChatMessage[]=(data??[]).map(row=>{
+        if(!['user','assistant','system','tool'].includes(row.role))throw new Error('Unrecognized message role');
+        const {tool_calls,...message}=row;
+        return {...message,role:row.role as ChatMessage['role'],tool_calls:parseToolCalls(tool_calls)};
+      });
       const ids=[...new Set(rows.map(row=>row.deliverable_id).filter((id):id is string=>Boolean(id)))];
       let artifacts:Record<string,AgentDeliverable>={};
       if(ids.length){

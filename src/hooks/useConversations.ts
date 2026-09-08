@@ -70,7 +70,7 @@ export function useConversations() {
       .eq('thread_id', activeThreadId)
       .order('created_at', { ascending: true });
     if (error) console.error('Error fetching messages:', error);
-    setMessages(data ?? []);
+    setMessages((data ?? []) as Message[]);
     if (!error) {
       const { error: readError } = await supabase.rpc('mark_communication_thread_read', { p_thread_id: activeThreadId });
       if (readError) console.error('Error marking conversation read:', readError);

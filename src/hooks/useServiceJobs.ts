@@ -98,7 +98,7 @@ export function useServiceJobs({ allStores = false }: { allStores?: boolean } = 
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await loadSchedulePages<Job & { assigned_techs?: string[] }>((offset, size) => {
+      const data = await loadSchedulePages((offset, size) => {
         let query = supabase
           .from('jobs')
           .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
@@ -110,7 +110,7 @@ export function useServiceJobs({ allStores = false }: { allStores?: boolean } = 
         return query;
       });
       if (request !== sequence.current) return;
-      setJobs(data);
+      setJobs(data as (Job & { assigned_techs?: string[] })[]);
       setLoadedScope(scope);
     } catch (cause) {
       if (request !== sequence.current) return;

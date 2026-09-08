@@ -57,19 +57,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const currentUser = useRef<string | null>(null);
   const loadedUser = useRef<string | null>(null);
   const loadSequence = useRef(0);
+  const authEventSequence = useRef(0);
 
   // Fetch profile + locations for authenticated user
   const fetchProfile = useCallback(async (userId: string) => {
     const sequence = ++loadSequence.current;
     try {
-    const [profileRes, locRes] = await Promise.all([
+    const read = () => Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).abortSignal(AbortSignal.timeout(12_000)).single(),
       supabase.from('locations').select('*').order('name').abortSignal(AbortSignal.timeout(12_000)),
     ]);
+    let [profileRes, locRes] = await read();
+    const transientMessage = `${profileRes.error?.message ?? ''} ${locRes.error?.message ?? ''}`;
+    if (sequence === loadSequence.current && currentUser.current === userId && navigator.onLine
+      && /AbortError|TimeoutError|Failed to fetch|fetch failed|NetworkError/i.test(transientMessage)) {
+      // One bounded read retry. This never replays an application write.
+      [profileRes, locRes] = await read();
+    }
     if (sequence !== loadSequence.current || currentUser.current !== userId) return;
     if (profileRes.error || !profileRes.data || locRes.error) throw new Error(profileRes.error?.message || locRes.error?.message || 'Staff profile unavailable');
     if (profileRes.data) {
-      setProfile(profileRes.data);
+      if (!['owner_manager','service_manager','salesperson','technician'].includes(profileRes.data.role)) throw new Error('Your account role is not supported. Ask an owner to review your access.');
+      setProfile(profileRes.data as Profile);
       if (loadedUser.current !== userId) setActiveLocationId(profileRes.data.location_id);
       loadedUser.current = userId;
     }
@@ -95,32 +104,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (UI_PREVIEW) return; // dev preview: keep the stubbed session
     // Get initial session
     let disposed = false;
+    const initialAuthVersion = authEventSequence.current;
     const timeout = setTimeout(() => {
       if (!disposed) { setIsLoading(false); setAuthError('Sign-in is taking longer than expected. Reconnect and retry.'); }
     }, 15_000);
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
-      if (disposed) return;
+      if (disposed || initialAuthVersion !== authEventSequence.current) return;
       clearTimeout(timeout);
       if (error) { setAuthError('Your session could not load. Reconnect and retry.'); setIsLoading(false); return; }
       currentUser.current = s?.user.id ?? null;
       setSession(s);
       if (s?.user) {
-        fetchProfile(s.user.id).finally(() => setIsLoading(false));
+        void fetchProfile(s.user.id);
       } else {
         setIsLoading(false);
       }
-    }).catch(() => { if (!disposed) { clearTimeout(timeout); setIsLoading(false); setAuthError('Your session could not load. Reconnect and retry.'); } });
+    }).catch(() => { if (!disposed && initialAuthVersion === authEventSequence.current) { clearTimeout(timeout); setIsLoading(false); setAuthError('Your session could not load. Reconnect and retry.'); } });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      currentUser.current = s?.user.id ?? null;
+      clearTimeout(timeout);
+      authEventSequence.current++;
+      const nextUser = s?.user.id ?? null;
+      if (currentUser.current !== nextUser) {
+        loadSequence.current++;
+        loadedUser.current = null;
+        setProfile(null);setLocations([]);setActiveLocationId(null);
+        setAuthError(null);setIsLoading(Boolean(nextUser));
+      }
+      currentUser.current = nextUser;
       setSession(s);
       if (s?.user) {
-        fetchProfile(s.user.id);
+        // Leave the auth client's event callback before queries acquire its
+        // session lock. The sequence/account guards still reject stale replies.
+        setTimeout(() => { if (!disposed && currentUser.current === s.user.id) void fetchProfile(s.user.id); }, 0);
       } else {
         loadSequence.current += 1;
         loadedUser.current = null;
-        clearDrafts();
+        // Expired sessions retain per-user drafts for reauthentication. The
+        // explicit Sign out action below clears them on a shared computer.
         setProfile(null);
         setLocations([]);
         setActiveLocationId(null);

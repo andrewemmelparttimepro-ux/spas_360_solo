@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase.generated';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -9,7 +10,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// Using untyped client — row-level type safety is enforced through
-// our interfaces in @/types/database.ts and explicit typing in hooks.
-// For full Supabase type generation, run: npx supabase gen types typescript
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { 'x-spas-client': 'web' } } });
+// Generated from the linked production schema; refresh after migrations.
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, { global: { headers: { 'x-spas-client': 'web' } } });

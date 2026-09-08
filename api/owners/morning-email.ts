@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { submitMorningEmail, type EmailPayload } from '../_lib/morningDelivery.js';
+import { receiptReadError } from '../_lib/emailReceipts.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { mintStaffAccessToken } from '../_lib/staff-sms.js';
@@ -14,6 +15,7 @@ const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_ANON = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 const SUPABASE_SERVICE = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
+const RESEND_READ_API_KEY = (process.env.RESEND_READ_API_KEY || '').trim();
 const FROM = (process.env.MORNING_SUMMARY_FROM || 'Ari at SPAS 360 <ari@spas360.ndai.pro>').trim();
 const SECRET = (process.env.MORNING_SUMMARY_SECRET || '').trim();
 const APP_URL = (process.env.AGENT_API_BASE_URL || 'https://spas360solo.vercel.app').replace(/\/$/, '');
@@ -49,7 +51,6 @@ async function narrationFor(service: SupabaseClient, anon: SupabaseClient, orgId
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'POST only' });
   if (!SUPABASE_URL || !SUPABASE_ANON || !SUPABASE_SERVICE) return res.status(500).json({ error: 'Supabase not configured' });
-  if (!RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY missing' });
 
   const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
   const service = createClient(SUPABASE_URL, SUPABASE_SERVICE, options);
@@ -77,21 +78,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: rows, error: readError } = await receiptQuery;
     if (readError) return res.status(503).json({ error: 'Email receipts could not load' });
     const receipts = [];
+    let readBlocked = !(RESEND_READ_API_KEY || RESEND_API_KEY) ? 'A receipt-read credential or signed delivery webhook is required to verify delivery.' : null;
     for (const row of rows ?? []) {
       if (!row.provider_id) { receipts.push(row); continue; }
+      if (row.provider_event && ['delivered','bounced','complained','failed','suppressed'].includes(row.provider_event)) { receipts.push(row); continue; }
+      if (readBlocked) { receipts.push({...row,verification_error:readBlocked}); continue; }
       try {
         const reply = await fetch(`https://api.resend.com/emails/${encodeURIComponent(row.provider_id as string)}`, {
-          headers: { Authorization: `Bearer ${RESEND_API_KEY}` }, signal: AbortSignal.timeout(4_000),
+          headers: { Authorization: `Bearer ${RESEND_READ_API_KEY || RESEND_API_KEY}` }, signal: AbortSignal.timeout(4_000),
         });
-        const receipt = await reply.json() as { last_event?: string };
-        if (!reply.ok || !receipt.last_event) { receipts.push({ ...row, verification_error: `Provider receipt unavailable (${reply.status})` }); continue; }
+        const receipt = await reply.json() as { last_event?: string; name?: string };
+        if (!reply.ok || !receipt.last_event) { const reason=receiptReadError(reply.status,receipt.name); if([401,403,429].includes(reply.status))readBlocked=reason; receipts.push({ ...row, verification_error: reason }); continue; }
         const update = { provider_event: receipt.last_event, provider_checked_at: new Date().toISOString() };
-        await service.from('morning_summary_emails').update(update).eq('id', row.id);
-        receipts.push({ ...row, ...update });
+        const {error: saveError}=await service.from('morning_summary_emails').update(update).eq('id', row.id);
+        receipts.push({ ...row, ...update, ...(saveError?{verification_error:'Provider status was read, but could not be saved. Retry this check.'}:{}) });
       } catch { receipts.push({ ...row, verification_error: 'Provider receipt check timed out' }); }
     }
     return res.status(200).json({ receipts, note: 'Sent means provider accepted. Delivered means recipient mail server accepted; it does not prove the recipient read it.' });
   }
+
+  if (!RESEND_API_KEY) return res.status(500).json({ error: 'Email sending is not configured' });
 
   const test = query.test === '1';
   const testTo = typeof query.to === 'string' ? query.to : null;

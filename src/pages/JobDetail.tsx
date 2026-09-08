@@ -1,3 +1,4 @@
+import { useDraftState } from '@/hooks/useDraftState';
 import CustomerEquipment from '@/components/CustomerEquipment';
 import CollectionRequests from '@/components/CollectionRequests';
 import ServiceExceptionReview from '@/components/ServiceExceptionReview';
@@ -391,11 +392,11 @@ export default function JobDetail() {
   const { notes, error:notesError, refresh:refreshNotes, createNote, updateNote } = useNotes({ jobId: id });
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteBody, setEditingNoteBody] = useState('');
-  const { tasks, createTask, completeTask } = useTasks({ jobId: id }, !technician);
+  const { tasks, createTask, completeTask, error: taskError, refresh: retryTasks } = useTasks({ jobId: id }, !technician);
   const { toast } = useToast();
-  const [newNote, setNewNote] = useState('');
+  const [newNote, setNewNote] = useDraftState(`note-${profile?.id??'out'}-${id}`,'body','');
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useDraftState(`task-${profile?.id??'out'}-${id}`,'title','');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingJob, setDeletingJob] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -422,13 +423,14 @@ export default function JobDetail() {
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
-    await createNote(newNote, { jobId: job.id });
-    setNewNote('');
+    const saved=await createNote(newNote, { jobId: job.id });
+    if(saved)setNewNote('');
   };
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
-    await createTask({ title: newTaskTitle, job_id: job.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' });
+    const saved=await createTask({ title: newTaskTitle, job_id: job.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' },{relativeDue:true});
+    if(!saved)return;
     setNewTaskTitle('');
     setShowTaskForm(false);
   };
@@ -682,6 +684,7 @@ export default function JobDetail() {
               </div>
             )}
             <div className="space-y-2">
+              {taskError && <p role="alert" className="mb-2 text-sm text-amber-600">{taskError} <button onClick={()=>void retryTasks()} className="underline">Retry loading tasks</button></p>}
               {tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No tasks</p> : tasks.map(t => (
                 <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800">
                   <input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" />

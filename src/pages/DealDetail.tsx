@@ -75,16 +75,16 @@ export default function DealDetail() {
   const navigate = useNavigate();
   const { deal, isLoading, loadError, refresh:refreshDeal, updateDeal } = useDeal(id);
   const { notes, error:notesError, createNote, refresh:refreshNotes } = useNotes({ dealId: id });
-  const { tasks, createTask, completeTask } = useTasks({ dealId: id });
+  const { tasks, createTask, completeTask, error: taskError, refresh: retryTasks } = useTasks({ dealId: id });
   const { toast } = useToast();
   const { profile, activeLocationId } = useAuth();
   const [newNote, setNewNote] = useDraftState(`note-${profile?.id??'out'}-${id}`,'body','');
   const pickedRef = useRef<PickedMention[]>([]);
   const [ariBusy, setAriBusy] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDueAt, setNewTaskDueAt] = useState(() => defaultFollowUpInputValue());
-  const [newTaskPriority, setNewTaskPriority] = useState<DealPriority>('Medium');
+  const [newTaskTitle, setNewTaskTitle] = useDraftState(`task-${profile?.id??'out'}-${id}`,'title','');
+  const [newTaskDueAt, setNewTaskDueAt] = useDraftState(`task-${profile?.id??'out'}-${id}`,'due',() => defaultFollowUpInputValue());
+  const [newTaskPriority, setNewTaskPriority] = useDraftState<DealPriority>(`task-${profile?.id??'out'}-${id}`,'priority','Medium');
   const taskSectionRef = useRef<HTMLDivElement>(null);
   // Stage lives here too — closing a deal shouldn't require going back to the list
   const [stages, setStages] = useState<{ id: string; name: string; is_won: boolean; is_lost: boolean }[]>([]);
@@ -645,6 +645,7 @@ export default function DealDetail() {
               </div>
             )}
             <div className="space-y-2">
+              {taskError && <p role="alert" className="mb-2 text-sm text-amber-600">{taskError} <button onClick={()=>void retryTasks()} className="underline">Retry loading tasks</button></p>}
               {tasks.length === 0 ? (
                 <button onClick={openTaskComposer} className="w-full rounded-xl border border-dashed border-red-500/30 bg-red-500/5 px-4 py-5 text-center text-sm font-medium text-red-300 transition hover:bg-red-500/10">
                   No next activity scheduled — set the salesperson’s next step

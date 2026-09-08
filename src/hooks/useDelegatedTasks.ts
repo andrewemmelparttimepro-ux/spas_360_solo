@@ -155,7 +155,7 @@ export function useDelegatedTasks(enabled = true) {
 
   const updateTask = useCallback(async (id: string, edit: DelegatedTaskEdit): Promise<Result> => {
     if (!profile) return { ok: false, message: 'Sign in to update this task.' };
-    const updates: Record<string, unknown> = {};
+    const updates: import('@/types/supabase.generated').TablesUpdate<'tasks'> = {};
     if (edit.status) updates.status = edit.status;
     if ('assignee_notes' in edit) updates.assignee_notes = edit.assignee_notes ?? null;
     if (edit.assigned_to) updates.assigned_to = edit.assigned_to;

@@ -87,18 +87,18 @@ type ContactWithAssigned = Contact & { assigned?: { id: string; first_name: stri
 
 export default function ContactDetail() {
   const { id } = useParams();
-  const { contact: rawContact, isLoading, updateContact } = useContact(id);
+  const { contact: rawContact, isLoading, error: contactError, refresh: refreshContact, updateContact } = useContact(id);
   const contact = rawContact as ContactWithAssigned | null;
   const { profile } = useAuth();
   const { notes, error:notesError, createNote, refresh:refreshNotes } = useNotes({ contactId: id });
-  const { tasks, createTask, completeTask } = useTasks({ contactId: id });
+  const { tasks, createTask, completeTask, error: taskError, refresh: retryTasks } = useTasks({ contactId: id });
   const { toast } = useToast();
   const navigate = useNavigate();
   const [newNote, setNewNote] = useDraftState(`note-${profile?.id??'out'}-${id}`,'body','');
   const pickedRef = useRef<PickedMention[]>([]);
   const [ariBusy, setAriBusy] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useDraftState(`task-${profile?.id??'out'}-${id}`,'title','');
   const [team, setTeam] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
   const [showQuickDeal, setShowQuickDeal] = useState(false);
   const [relDeals, setRelDeals] = useState<RelDeal[]>([]);
@@ -166,6 +166,7 @@ export default function ContactDetail() {
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-full"><div className="w-8 h-8 border-4 border-ink-700 border-t-brand-500 rounded-full animate-spin" /></div>;
+  if (contactError && !contact) return <div role="alert" className="p-6 text-ink-300"><p>{contactError}</p><button onClick={()=>void refreshContact()} className="mt-3 rounded border border-ink-700 px-3 py-2">Retry customer</button></div>;
   if (!contact) return <div className="flex flex-col items-center justify-center h-full text-ink-500"><p className="text-lg">Customer not found</p><Link to="/customers" className="text-brand-400 text-sm mt-2 hover:underline">Back to Customers</Link></div>;
 
   const handleAddNote = async () => {
@@ -260,10 +261,11 @@ export default function ContactDetail() {
     task: { dot: 'bg-amber-400', label: 'text-amber-300' },
     text: { dot: 'bg-violet-400', label: 'text-violet-300' },
   };
-  const handleAddTask = async () => { if (!newTaskTitle.trim()) return; await createTask({ title: newTaskTitle, contact_id: contact.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' }); setNewTaskTitle(''); setShowTaskForm(false); };
+  const handleAddTask = async () => { if (!newTaskTitle.trim()) return; const saved=await createTask({ title: newTaskTitle, contact_id: contact.id, due_at: new Date(Date.now() + 24*60*60*1000).toISOString(), priority: 'Medium', status: 'Pending' },{relativeDue:true}); if(!saved)return; setNewTaskTitle(''); setShowTaskForm(false); };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {contactError&&<div role="alert" className="mb-3 rounded border border-amber-500/40 p-3 text-sm">{contactError} <button onClick={()=>void refreshContact()} className="underline">Retry customer</button></div>}
       <div className="flex items-center space-x-4">
         <Link to="/customers" className="p-2 hover:bg-ink-800 rounded-lg transition-colors"><ArrowLeft className="w-5 h-5 text-ink-400" /></Link>
         <div className="flex-1">
@@ -435,7 +437,8 @@ export default function ContactDetail() {
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4"><h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider">Tasks</h2><button onClick={() => setShowTaskForm(true)} className="text-sm text-brand-400 hover:text-brand-300 flex items-center"><Plus className="w-4 h-4 mr-1" /> Add Task</button></div>
             {showTaskForm && <div className="flex space-x-3 mb-4"><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTask()} placeholder="Task title..." className="flex-1 px-3 py-2 border border-ink-700 rounded-lg text-sm outline-none focus:border-brand-500" autoFocus /><button onClick={handleAddTask} className="px-3 py-2 bg-brand-500 text-white text-sm rounded-lg"><Save className="w-4 h-4" /></button><button onClick={() => setShowTaskForm(false)} className="px-3 py-2 text-ink-500 hover:text-ink-300"><X className="w-4 h-4" /></button></div>}
-            <div className="space-y-2">{tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No tasks yet</p> : tasks.map(t => <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800"><input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" /><span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-ink-500' : 'text-ink-100'}`}>{t.title}</span><span className="text-xs text-ink-500">{new Date(t.due_at).toLocaleDateString()}</span></div>)}</div>
+            <div className="space-y-2">{taskError && <p role="alert" className="mb-2 text-sm text-amber-600">{taskError} <button onClick={()=>void retryTasks()} className="underline">Retry loading tasks</button></p>}
+              {tasks.length === 0 ? <p className="text-sm text-ink-500 text-center py-4">No tasks yet</p> : tasks.map(t => <div key={t.id} className="flex items-center p-3 bg-ink-950 rounded-lg border border-ink-800"><input type="checkbox" checked={t.status === 'Completed'} onChange={() => t.status !== 'Completed' && completeTask(t.id)} className="w-4 h-4 rounded border-ink-600 text-brand-400 mr-3" /><span className={`flex-1 text-sm ${t.status === 'Completed' ? 'line-through text-ink-500' : 'text-ink-100'}`}>{t.title}</span><span className="text-xs text-ink-500">{new Date(t.due_at).toLocaleDateString()}</span></div>)}</div>
           </div>
 
           {/* The whole story in order — notes, deals, jobs, tasks, texts */}

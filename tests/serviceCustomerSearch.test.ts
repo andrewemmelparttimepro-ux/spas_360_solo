@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 
-const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+const read = async (relativePath: string) => {
+ const source = await readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
+ return relativePath === 'src/pages/Service.tsx' ? source + '\n' + await readFile(new URL('../src/components/CustomerCombobox.tsx', import.meta.url), 'utf8') : source;
+};
 
 describe('Schedule New Job customer search', () => {
   it('uses a searchable listbox backed by the complete paginated contact set', async () => {

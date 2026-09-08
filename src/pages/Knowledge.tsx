@@ -1,3 +1,5 @@
+import {knowledgeFreshness} from '@/lib/knowledgeFreshness';
+import KnowledgeSourceReview from '@/components/KnowledgeSourceReview';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BookOpen, ExternalLink, FileKey2, Files, FileText, Search, ShieldCheck, Trash2, Wrench } from 'lucide-react';
@@ -38,7 +40,7 @@ type KnowledgeDocument = {
   storage_path: string | null;
   verified_at: string | null;
   review_due_at: string | null;
-  status: string;
+  status: string;updated_at:string;review_owner_id:string|null;verified_by:string|null;expires_at:string|null;effective_at:string|null;review_required:boolean;
 };
 
 type PartsPdfResource = {
@@ -117,6 +119,9 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
   const [results, setResults] = useState<KnowledgeResult[]>([]);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [searching, setSearching] = useState(false);
+  const documentSequence=useRef(0);const searchSequence=useRef(0);
+  const activeAccount=useRef(profile?.id);activeAccount.current=profile?.id;
+  const [resultQuery,setResultQuery]=useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [partsPdfs, setPartsPdfs] = useState<PartsPdfResource[]>(() => initialPartsPdfResources(isPartsView));
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -127,19 +132,21 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
   const canDeletePartsFiles = isPartsView && profile?.role === 'owner_manager';
 
   const loadDocuments = useCallback(async () => {
-    if (!profile) return;
+    if (!profile||profile.id!==activeAccount.current) return;
+    const request=++documentSequence.current;
     const { data, error } = await supabase
       .from('knowledge_documents')
-      .select('id,title,doc_type,manufacturer,revision,access_scope,source_url,storage_bucket,storage_path,verified_at,review_due_at,status')
+      .select('id,title,doc_type,manufacturer,revision,access_scope,source_url,storage_bucket,storage_path,verified_at,review_due_at,status,updated_at,review_owner_id,verified_by,expires_at,effective_at,review_required')
       .eq('org_id', profile.org_id)
       .eq('status', 'active')
       .order('manufacturer', { ascending: true, nullsFirst: false })
-      .order('title');
-    if (error) setLoadError(error.message);
-    else setDocuments((data ?? []) as KnowledgeDocument[]);
-  }, [profile]);
+      .order('title').abortSignal(AbortSignal.timeout(15000));
+    if(request!==documentSequence.current||profile.id!==activeAccount.current)return;
+    if (error) setLoadError('Source metadata could not refresh. The last loaded list is shown.');
+    else {setLoadError(null);setDocuments((data ?? []) as KnowledgeDocument[]);}
+  }, [profile?.id,profile?.org_id]);
 
-  useEffect(() => { loadDocuments(); }, [loadDocuments]);
+  useEffect(() => {setDocuments([]);setResults([]);void loadDocuments();return()=>{documentSequence.current++;searchSequence.current++;};}, [loadDocuments]);
 
   useEffect(() => {
     if (!isPartsView) {
@@ -183,7 +190,8 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
   }, [isPartsView, profile]);
 
   const search = useCallback(async (needle: string, selectedType: string) => {
-    if (!profile || needle.trim().length < 2) { setResults([]); return; }
+    const request=++searchSequence.current;
+    if (!profile || needle.trim().length < 2) { setResults([]);setSearching(false); return; }
     setSearching(true);
     setLoadError(null);
     const { data, error } = await supabase.rpc('search_knowledge_v2', {
@@ -192,9 +200,10 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
       p_doc_types: selectedType === 'all' ? null : [selectedType],
       p_limit: 25,
       p_access_scope: 'staff',
-    });
+    }).abortSignal(AbortSignal.timeout(15000));
+    if(request!==searchSequence.current||profile.id!==activeAccount.current)return;
     if (error) { setLoadError(error.message); setResults([]); }
-    else setResults((data ?? []) as KnowledgeResult[]);
+    else {setResults((data ?? []) as KnowledgeResult[]);setResultQuery(needle.trim());}
     setSearching(false);
   }, [profile]);
 
@@ -286,16 +295,16 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-brand-500">{isDocumentsView ? 'Dealership document library' : 'Ari verified source library'}</p>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-brand-500">{isDocumentsView ? 'Dealership document library' : 'Ari source library'}</p>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-ink-100">
             {isDocumentsView ? <Files className="h-6 w-6 text-brand-500" /> : <BookOpen className="h-6 w-6 text-brand-500" />}
             {isPartsView ? 'Parts' : pageTitle}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search verified parts literature by part number, model, and year.' : isDocumentsView ? 'Open and search the dealership’s verified manuals, warranties, technical bulletins, and other staff documents.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
+          <p className="mt-1 max-w-2xl text-sm text-ink-500">{isPartsView ? 'Open private manufacturer catalogs or search parts literature with visible review status by part number, model, and year.' : isDocumentsView ? 'Open and search the dealership’s manuals, warranties, technical bulletins, and other staff documents.' : 'Search exact part numbers, service procedures, model details, warranties, and manufacturer manuals. Results retain their source and page.'}</p>
         </div>
         {/* Reassurance, not decoration — these read as quiet footnotes, not controls */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium text-ink-500">
-          <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" />Verified sources</span>
+          <span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" />Source review status</span>
           <span className="inline-flex items-center gap-1"><FileKey2 className="h-3.5 w-3.5" />Staff documents stay private</span>
         </div>
       </header>
@@ -378,12 +387,12 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
       {query.trim().length >= 2 ? (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">{searching ? 'Searching…' : `${results.length} verified match${results.length === 1 ? '' : 'es'}`}</h2>
+            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">{searching ? 'Searching…' : `${results.length} source match${results.length === 1 ? '' : 'es'} · ${resultQuery}`}</h2>
           </div>
-          {!searching && results.length === 0 ? (
+          {!searching && results.length === 0 && !loadError ? (
             <div className="rounded-2xl border border-dashed border-ink-700 bg-ink-900/50 py-14 text-center">
               <Wrench className="mx-auto mb-3 h-8 w-8 text-ink-600" />
-              <p className="font-semibold text-ink-300">No verified answer found</p>
+              <p className="font-semibold text-ink-300">No matching source found</p>
               <p className="mt-1 text-xs text-ink-500">Try the exact part number, a broader model name, or remove the source filter.</p>
             </div>
           ) : results.map(result => (
@@ -402,6 +411,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                   <button onClick={() => openSource(result)} className="rounded-lg border border-ink-700 px-2.5 py-1.5 text-xs font-semibold text-ink-300 hover:border-brand-500 hover:text-brand-400">Open source <ExternalLink className="ml-1 inline h-3 w-3" /></button>
                 )}
               </div>
+              <p className="mt-2 text-sm font-semibold text-amber-600">{knowledgeFreshness(documents.find(d=>d.id===result.document_id)).label}</p>
               <p className="mt-3 line-clamp-6 whitespace-pre-wrap text-xs leading-relaxed text-ink-400">{result.content}</p>
               {result.models && result.models.length > 0 && <p className="mt-3 text-[11px] text-ink-500">Indexed models: {result.models.slice(0, 10).join(' · ')}</p>}
             </article>
@@ -419,16 +429,18 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
               <h3 className="mb-3 text-sm font-bold text-ink-200">{manufacturer}</h3>
               <div className="grid gap-2 lg:grid-cols-2">
                 {docs.map(document => (
-                  <div key={document.id} className="flex items-stretch gap-2">
+                  <div key={document.id} className="flex flex-wrap items-stretch gap-2">
                     <button onClick={() => openSource(document)} disabled={!document.source_url && !document.storage_path} className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-ink-800 bg-ink-950/60 p-3 text-left transition-colors enabled:hover:border-brand-500 disabled:cursor-default">
                       <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-xs font-semibold text-ink-200">{document.title}</span>
+                        <span className="mt-1 block text-sm text-amber-600">{knowledgeFreshness(document).label}{document.review_due_at?` · Review by ${new Date(document.review_due_at).toLocaleDateString()}`:''}</span>
                         {/* revision "0" is import filler, not information */}
                         <span className="mt-1 block text-[10px] uppercase tracking-wider text-ink-500">{document.doc_type.replaceAll('_', ' ')}{document.revision && document.revision !== '0' ? ` · ${document.revision}` : ''}</span>
                       </span>
                       <span className={cn('rounded px-1.5 py-0.5 text-[9px] font-bold uppercase', document.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{document.access_scope}</span>
                     </button>
+                    <KnowledgeSourceReview source={document} onSaved={loadDocuments}/>
                     {canDeletePartsFiles && document.storage_bucket === 'ari-knowledge-sources' && document.storage_path && (
                       <button
                         type="button"

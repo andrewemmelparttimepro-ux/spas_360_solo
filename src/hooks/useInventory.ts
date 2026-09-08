@@ -17,6 +17,7 @@ export function useInventory(enabled = true) {
   const { profile, activeLocationId } = useAuth();
   const [items, setItems] = useState<InventoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState<string|null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const latestFetchId = useRef(0);
 
@@ -28,6 +29,7 @@ export function useInventory(enabled = true) {
     }
     const fetchId = ++latestFetchId.current;
 
+    try {
     let query = supabase
       .from('inventory_items')
       .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type), job:job_id(id, status)')
@@ -45,21 +47,16 @@ export function useInventory(enabled = true) {
     }
 
     const [inventoryResult, assignmentResult] = await Promise.all([
-      query,
+      query.abortSignal(AbortSignal.timeout(15000)),
       supabase
         .from('deals')
         .select('id, inventory_item_id, contact:contact_id(id, first_name, last_name, phone, customer_type)')
         .eq('org_id', profile.org_id)
-        .not('inventory_item_id', 'is', null),
+        .not('inventory_item_id', 'is', null).abortSignal(AbortSignal.timeout(15000)),
     ]);
 
     if (inventoryResult.error || assignmentResult.error) {
-      console.error(
-        'Error fetching inventory assignments:',
-        inventoryResult.error ?? assignmentResult.error,
-      );
-      if (fetchId === latestFetchId.current) setIsLoading(false);
-      return;
+      throw inventoryResult.error ?? assignmentResult.error;
     }
 
     // Search and realtime refreshes keep the page mounted so the search input
@@ -70,10 +67,13 @@ export function useInventory(enabled = true) {
       (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
       (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
     ));
-    setIsLoading(false);
-  }, [profile, activeLocationId, searchQuery, enabled]);
+    setError(null);
+    }catch{if(fetchId===latestFetchId.current)setError('Inventory could not refresh. Results may be from the previous search. Retry before relying on these figures.');}
+    finally{if(fetchId===latestFetchId.current)setIsLoading(false);}
+  }, [profile?.id,profile?.org_id, activeLocationId, searchQuery, enabled]);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  useEffect(()=>{setItems([]);setError(null);setIsLoading(true);return()=>{latestFetchId.current++;};},[profile?.id,profile?.org_id,activeLocationId,enabled]);
+  useEffect(() => { void fetchItems();return()=>{latestFetchId.current++;}; }, [fetchItems]);
 
   // Inventory fields and Deal Detail reservations both feed this table.
   useEffect(() => {
@@ -151,6 +151,7 @@ export function useInventory(enabled = true) {
 
   return {
     items,
+    error,
     isLoading,
     searchQuery,
     setSearchQuery,

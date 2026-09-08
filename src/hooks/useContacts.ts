@@ -132,42 +132,34 @@ export function useContacts(enabled = true) {
 }
 
 export function useContact(id: string | undefined) {
+  const {profile}=useAuth();
   const [contact, setContact] = useState<Contact | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [error,setError]=useState<string|null>(null);
+  const sequence=useRef(0);
   const fetchContact = useCallback(async () => {
-    if (!id) return;
-    setIsLoading(true);
-    const { data, error } = await supabase.from('contacts').select('*, assigned:assigned_to(id, first_name, last_name)').eq('id', id).single();
-    if (error) console.error('Error fetching contact:', error);
-    setContact(data);
-    setIsLoading(false);
-  }, [id]);
-
-  useEffect(() => { fetchContact(); }, [fetchContact]);
-
-  // Real-time: re-fetch when this contact changes
-  useEffect(() => {
-    if (!id) return;
-    const channel = supabase
-      .channel(`contact-detail-${id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'contacts',
-        filter: `id=eq.${id}`,
-      }, () => fetchContact())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [id, fetchContact]);
-
-  const updateContact = useCallback(async (updates: Partial<Contact>) => {
-    if (!id) return false;
-    const { error } = await supabase.from('contacts').update(updates).eq('id', id);
-    if (error) { console.error('Error updating contact:', error); return false; }
-    await fetchContact();
-    return true;
-  }, [id, fetchContact]);
-
-  return { contact, isLoading, updateContact };
+    const request=++sequence.current;
+    if(!id||!profile){setContact(null);setIsLoading(false);return;}
+    try{
+      const {data,error}=await supabase.from('contacts').select('*, assigned:assigned_to(id, first_name, last_name)').eq('org_id',profile.org_id).eq('id',id).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
+      if(request!==sequence.current)return;
+      if(error)throw error;
+      setContact(data as Contact|null);setError(null);
+    }catch{if(request===sequence.current)setError('Customer details could not refresh. The last loaded details remain visible. Retry before relying on them.');}
+    finally{if(request===sequence.current)setIsLoading(false);}
+  },[id,profile?.id,profile?.org_id]);
+  useEffect(()=>{setContact(null);setError(null);setIsLoading(true);void fetchContact();return()=>{sequence.current++;};},[fetchContact]);
+  useEffect(()=>{
+    if(!id||!profile)return;
+    const channel=supabase.channel(`contact-detail-${id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'contacts',filter:`id=eq.${id}`},()=>void fetchContact()).subscribe();
+    return()=>{supabase.removeChannel(channel);};
+  },[id,profile?.id,fetchContact]);
+  const updateContact=useCallback(async(updates:Partial<Contact>)=>{
+    if(!id||!profile)return false;
+    try{const{data,error}=await supabase.from('contacts').update(updates).eq('org_id',profile.org_id).eq('id',id).select('id').abortSignal(AbortSignal.timeout(15000));
+      if(error||!data?.length)return false;
+      await fetchContact();return true;
+    }catch{return false;}
+  },[id,profile?.id,profile?.org_id,fetchContact]);
+  return {contact,isLoading,error,refresh:fetchContact,updateContact};
 }

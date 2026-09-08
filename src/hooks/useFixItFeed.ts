@@ -453,7 +453,7 @@ export function useFixItFeed(enabled = true): UseFixItFeedResult {
   }, [fetchPosts, orgId, uploadAttachment, userId]);
 
   const updatePostStatus = useCallback(async (postId: string, changes: FixItPostStatusPatch) => {
-    const patch: Record<string, string | number | null> = { updated_at: new Date().toISOString() };
+    const patch: import('@/types/supabase.generated').TablesUpdate<'fix_it_posts'> = { updated_at: new Date().toISOString() };
     if (changes.status !== undefined) patch.status = changes.status;
     if (changes.claimedBy !== undefined) patch.claimed_by = changes.claimedBy;
     if (changes.agentTestedBy !== undefined) patch.agent_tested_by = changes.agentTestedBy;

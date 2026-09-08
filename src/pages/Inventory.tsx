@@ -435,12 +435,13 @@ function OnHandCell({
 
 // =============== Main page component ===============
 export default function Inventory() {
-  const { items, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, removeItem, isCompletedSale } = useInventory();
+  const { items, error: inventoryError, refresh: refreshInventory, isLoading, searchQuery, setSearchQuery, totalInStock, awaitingDelivery, onOrder, lowStockAlerts, createItem, updateItem, removeItem, isCompletedSale } = useInventory();
   const { locations, activeLocationId, profile } = useAuth();
   // With every store on screen, each row must say which floor it's on
   const showStore = !activeLocationId;
   const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
   const [columnPreset,setColumnPreset] = useState(() => {try {return localStorage.getItem(`spas:inventory-columns:${profile?.id}`) || 'all';} catch{return 'all';}});
+  useEffect(()=>{try{const saved=localStorage.getItem(`spas:inventory-columns:${profile?.id}`);setColumnPreset(saved&&['all','floor','delivery'].includes(saved)?saved:'all');}catch{setColumnPreset('all');}},[profile?.id]);
   const columnSets: Record<string,string[]> = {all:['model','color','serial','flooring','age','customer','status','order','received','delivery','onhand'],floor:['model','serial','flooring','age','status','onhand'],delivery:['model','serial','customer','status','delivery','onhand']};
   const shown = new Set(columnSets[columnPreset] || columnSets.all);
   // Editor drawer: null = closed, 'new' = create, item = edit
@@ -484,6 +485,7 @@ export default function Inventory() {
         </div>
       </div>
 
+      {inventoryError&&<div role="alert" className="mb-3 rounded border border-amber-500/40 p-3 text-sm">{inventoryError} <button onClick={()=>void refreshInventory()} className="underline">Retry inventory</button></div>}
       {editorTarget !== null && (
         <InventoryEditor
           item={editorTarget === 'new' ? null : editorTarget}
@@ -516,7 +518,7 @@ export default function Inventory() {
         </div>
         {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
         <div className="overflow-x-auto">
-          <table data-density="compact" className="w-full min-w-[1460px] text-left border-collapse">
+          <table data-density="compact" className={cn("w-full text-left border-collapse",columnPreset==='all'?'min-w-[1460px]':'min-w-[760px]')}>
             <thead>
               <tr className="border-b border-ink-700 bg-ink-900 sticky top-0 z-10">
                 <th className={INVENTORY_HEADER_CELL_CLASS}>Model</th>

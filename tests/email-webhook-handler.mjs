@@ -1,0 +1,13 @@
+import{build}from'esbuild';import{createServer}from'node:http';import{createHmac}from'node:crypto';import assert from'node:assert/strict';
+process.env.RESEND_WEBHOOK_SECRET='whsec_plJ3nmyCDGBKInavdOK15jsl';process.env.VITE_SUPABASE_URL='https://fixture.invalid';process.env.SUPABASE_SERVICE_ROLE_KEY='fixture-only';
+globalThis.received=[];
+const result=await build({entryPoints:['api/owners/email-events.ts'],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'no-network-database',setup(b){b.onResolve({filter:/^@supabase\/supabase-js$/},()=>({path:'fake-db',namespace:'fake'}));b.onLoad({filter:/.*/,namespace:'fake'},()=>({contents:"export const createClient=()=>({rpc(name,args){globalThis.received.push({name,args});return{abortSignal:async()=>({error:null})};}});",loader:'js'}));}}]});
+const{default:handler}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].contents).toString('base64'));
+const server=createServer((req,res)=>{res.status=code=>{res.statusCode=code;return res;};res.json=value=>res.end(JSON.stringify(value));void handler(req,res);});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+try{const raw=' {"type":"email.delivered","created_at":"2026-09-08T18:00:00Z","data":{"email_id":"fixture-email"}}\n';const timestamp=String(Math.floor(Date.now()/1000));const id='fixture-message';const signature='v1,'+createHmac('sha256',Buffer.from(process.env.RESEND_WEBHOOK_SECRET.slice(6),'base64')).update(`${id}.${timestamp}.${raw}`).digest('base64');const headers={'content-type':'application/json','svix-id':id,'svix-timestamp':timestamp,'svix-signature':signature};const url=`http://127.0.0.1:${server.address().port}/events`;
+ assert.equal((await fetch(url,{method:'POST',headers,body:raw})).status,200);assert.equal(globalThis.received.length,1);assert.deepEqual(globalThis.received[0],{name:'record_morning_provider_event',args:{p_event:id,p_provider:'fixture-email',p_kind:'email.delivered',p_at:'2026-09-08T18:00:00Z'}});
+ assert.equal((await fetch(url,{method:'POST',headers,body:raw.trim()})).status,401);assert.equal(globalThis.received.length,1);
+ assert.equal((await fetch(url,{method:'POST',headers:{...headers,'svix-timestamp':'1'},body:raw})).status,401);
+ delete process.env.RESEND_WEBHOOK_SECRET;assert.equal((await fetch(url,{method:'POST',headers,body:raw})).status,503);
+ console.log(JSON.stringify({exactRawBytes:'verified through HTTP handler',changedBody:'rejected',replayWindow:'enforced',missingConfiguration:'503',databaseCalls:1,providerCalls:0,mode:'local fixture'}));
+}finally{await new Promise(r=>server.close(r));}

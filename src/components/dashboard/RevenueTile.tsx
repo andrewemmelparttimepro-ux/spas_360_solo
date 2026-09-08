@@ -101,16 +101,16 @@ function RevenueDetailsDialog({ onClose }: { onClose: () => void }) {
 
 export default function RevenueTile() {
   const [filters] = useState(defaultRevenueTileFilters);
-  const { report, comparison, isLoading, error } = useRevenueTile(filters, true);
+  const { report, comparison, isLoading, error, refresh } = useRevenueTile(filters, true);
   const [open, setOpen] = useState(false);
   return <>
-    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}
+    <button type="button" onClick={() => { if (error) void refresh(); else setOpen(true); }} aria-haspopup={error ? undefined : 'dialog'} aria-expanded={error ? undefined : open}
       className="dashboard-stat-card relative rounded-xl border border-ink-700 bg-ink-900 col-span-3 min-h-[90px] min-w-0 px-4 py-1.5 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:col-span-1">
       <ArrowUpRight aria-hidden="true" className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500" />
       <p className="pr-3 text-[11px] leading-[14px] font-semibold uppercase tracking-wider text-ink-500">Recorded Sales</p>
       <p className="text-[11px] leading-[14px] font-medium text-ink-400">This Month {comparison?.monthName} - Closed-Won</p>
       {isLoading ? <p role="status" className="text-sm text-ink-400">Loading revenue…</p>
-        : error ? <p className="text-xs text-red-400">Revenue couldn't load. Open details to retry.</p>
+        : error ? <p role="alert" className="text-xs text-red-400">Revenue couldn't load. {error} Click to retry.</p>
         : report && <div className="grid grid-cols-2 gap-x-4">
           {[...report.stores].sort((a, b) => revenueStoreLabel(a.name).localeCompare(revenueStoreLabel(b.name))).map(store => <div key={store.id} className="min-w-0">
             <p className="text-[11px] leading-[14px] font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>

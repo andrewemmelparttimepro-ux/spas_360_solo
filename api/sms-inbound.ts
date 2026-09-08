@@ -4,6 +4,7 @@ import { waitUntil } from '@vercel/functions';
 import { sendText } from './sms.js';
 import {
   askAriAsStaff,
+  smsOperationId,
   findStaffByPhone,
   makeClients,
   mintStaffAccessToken,
@@ -68,14 +69,22 @@ async function staffForNumber(from: string): Promise<StaffProfile | null> {
 
 const STAFF_FALLBACK = "Ari couldn't finish that one from a text. Try again in a minute, or open SPAS 360.";
 
-async function handleStaffText(staff: StaffProfile, from: string, body: string): Promise<void> {
+async function handleStaffText(staff: StaffProfile, from: string, body: string, providerId:string): Promise<void> {
   let reply = STAFF_FALLBACK;
   try {
     if (!SUPABASE_ANON) throw new Error('Anon key missing');
     const { service, anon } = makeClients(SUPABASE_URL!, SUPABASE_ANON, SERVICE_KEY!);
     const token = await mintStaffAccessToken(service, anon, staff.email);
-    reply = smsReplyText(await askAriAsStaff(APP_ORIGIN, token, body));
+    const retry=body.match(/^retry\s+([0-9a-f-]{36})$/i);
+    let command=body;let operationId=smsOperationId(providerId);let threadId:string|null=null;
+    if(retry) {
+      const {data:prior,error}=await service.from('agent_operations').select('id,request_message,request_thread_id').eq('user_id',staff.id).eq('id',retry[1]).eq('client_channel','sms').maybeSingle();
+      if(error || !prior?.request_message) throw new Error('That saved text command was not found. Open SPAS 360 to review your command history.');
+      operationId=prior.id;command=prior.request_message.replace(/^\[Text message from my phone\] /,'');threadId=prior.request_thread_id;
+    }
+    reply = smsReplyText(await askAriAsStaff(APP_ORIGIN, token, command,operationId,threadId));
   } catch (error) {
+    if(error instanceof Error && /Reply RETRY|saved text command was not found/.test(error.message)) reply=error.message;
     console.error('staff sms → Ari failed', { staff: staff.id, detail: error instanceof Error ? error.message : String(error) });
   }
   const sent = await sendText(from, reply);
@@ -100,7 +109,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (staff) {
     res.setHeader('Content-Type', 'text/xml');
     res.status(200).send('<Response/>');
-    waitUntil(handleStaffText(staff, from, body));
+    if(!params.MessageSid) return;
+    waitUntil(handleStaffText(staff, from, body,params.MessageSid));
     return;
   }
 

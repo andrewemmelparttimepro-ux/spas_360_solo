@@ -1017,7 +1017,7 @@ export function getOpenAITools(tools: ToolDefinition[]) {
   }));
 }
 
-export async function executeToolFrom(tools: ToolDefinition[], name: string, args: Record<string, string>) {
+export async function executeToolFrom(tools: ToolDefinition[], name: string, args: Record<string, string>, options: {throwErrors?:boolean} = {}) {
   if (AGENT_FORBIDDEN_TOOL_NAMES.has(name)) {
     return { error: HUMAN_FIX_IT_GUIDANCE };
   }
@@ -1026,6 +1026,7 @@ export async function executeToolFrom(tools: ToolDefinition[], name: string, arg
   try {
     return await tool.execute(args);
   } catch (err) {
+    if(options.throwErrors) throw err;
     return { error: `Tool ${name} failed: ${(err as Error).message}` };
   }
 }

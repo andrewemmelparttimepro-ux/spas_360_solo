@@ -100,7 +100,7 @@ describe('Brandon composite UI contract', () => {
     assert.match(dashboard, /key: 'overdueTaskCount'/);
     assert.match(dashboard, /link: '\/dashboard\?tasks=past-due'/);
     assert.match(customers, /useState<CustomerSort>\('recent'\)/);
-    assert.match(customers, /localStorage\.getItem\(VIEW_KEY\) === 'cards' \? 'cards' : 'list'/);
+    assert.match(customers, /localStorage\.getItem\(VIEW_KEY\)\s*===\s*'cards'\s*\?\s*'cards'\s*:\s*'list'/);
     assert.match(salesBoard, /label: 'Active Deals'/);
     assert.match(salesBoard, /label: 'Overdue Sales Tasks'/);
     assert.match(deals, /value=\{activeDeals\.length\}/);

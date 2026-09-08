@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { findStaffByPhone, last10Digits, smsReplyText, staffPhoneMatches } from '../api/_lib/staff-sms.ts';
+import { askAriAsStaff, smsOperationId, findStaffByPhone, last10Digits, smsReplyText, staffPhoneMatches } from '../api/_lib/staff-sms.ts';
 import { centralInstant, matchTeammate } from '../src/agent/toolFactory.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
@@ -53,7 +53,7 @@ describe('staff text → Ari', () => {
     ]);
     assert.match(inbound, /validSignature\(params, signature\)/);
     assert.ok(inbound.indexOf('staffForNumber(from)') < inbound.indexOf('Match (or create) the contact'));
-    assert.match(inbound, /waitUntil\(handleStaffText\(staff, from, body\)\)/);
+    assert.match(inbound, /waitUntil\(handleStaffText\(staff, from, body,params\.MessageSid\)\)/);
     assert.match(inbound, /mintStaffAccessToken\(service, anon, staff\.email\)/);
     assert.match(inbound, /sendText\(from, reply\)/);
     assert.match(factory, /name: 'delegate_task'/);
@@ -78,4 +78,18 @@ describe('staff text → Ari', () => {
     const factory = await read('src/agent/toolFactory.ts');
     assert.match(factory, /const localInstant = \(s: string\) => centralInstant\(s\) \?\?/);
   });
+});
+
+it('provider redelivery keeps one operation identity and an explicit retry preserves its request', async () => {
+ const id=smsOperationId('SM-test-repeated');
+ assert.equal(smsOperationId('SM-test-repeated'),id);
+ assert.notEqual(smsOperationId('SM-other'),id);
+ assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/);
+ const original=globalThis.fetch;const bodies:Record<string,unknown>[]=[];
+ globalThis.fetch=async (_input,init)=>{bodies.push(JSON.parse(String(init?.body)));return new Response(JSON.stringify({message:{content:'Saved'}}),{status:200});};
+ try {
+  await askAriAsStaff('https://example.test','test-only','Prepare paperwork',id,'thread-a');
+  await askAriAsStaff('https://example.test','test-only','Prepare paperwork',id,'thread-a');
+  assert.deepEqual(bodies[0],bodies[1]);assert.equal(bodies[0].operation_id,id);assert.equal(bodies[0].client_channel,'sms');
+ } finally {globalThis.fetch=original;}
 });

@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -68,14 +69,18 @@ export function makeClients(supabaseUrl: string, anonKey: string, serviceKey: st
   };
 }
 
-export async function askAriAsStaff(origin: string, accessToken: string, message: string): Promise<string> {
+export function smsOperationId(providerId:string):string {
+  const hex=createHash('sha256').update(`spas360:sms:${providerId}`).digest('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-8${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
+}
+export async function askAriAsStaff(origin: string, accessToken: string, message: string, operationId?:string, threadId?:string|null): Promise<string> {
   const response = await fetch(`${origin}/api/agent/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ message: `[Text message from my phone] ${message}`, client_channel: 'sms' }),
+    body: JSON.stringify({ message: `[Text message from my phone] ${message}`, client_channel: 'sms', ...(operationId?{operation_id:operationId}:{}), ...(threadId?{thread_id:threadId}:{}) }),
     signal: AbortSignal.timeout(120_000),
   });
   const payload = await response.json().catch(() => null) as { message?: { content?: string }; error?: string } | null;
-  if (!response.ok) throw new Error(payload?.error ?? `Ari returned HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Ari could not finish. Reply RETRY ${operationId ?? ''} to resume the same command. Saved changes will not repeat.`);
   return payload?.message?.content ?? '';
 }

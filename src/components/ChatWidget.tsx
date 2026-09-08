@@ -378,7 +378,13 @@ export default function ChatWidget() {
           {view === 'chat' && isAri && (
             <>
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 bg-ink-950/50">
-                {agent.messages.length === 0 && !agent.isSending && (
+                {agent.readError && <div role="alert" className="rounded-xl border border-amber-500/40 p-3 text-xs text-ink-200">{agent.readError} <button className="underline" onClick={()=>void agent.retryRead()}>Retry loading</button></div>}
+                {agent.pendingCommand && !agent.isSending && <div role="status" className="rounded-xl border border-amber-500/40 bg-ink-900 p-3 text-xs text-ink-200">
+                  <p>{agent.sendError || 'A saved command is awaiting confirmation. You can resume it without repeating saved changes.'}</p>
+                  <p className="mt-1 text-ink-400">{agent.pendingCommand.content}</p>
+                  <button onClick={()=>void agent.retryPending()} className="mt-2 rounded bg-brand-500 px-3 py-2 font-semibold text-white">Retry saved command</button>
+                </div>}
+                {agent.messages.length === 0 && !agent.isSending && !agent.pendingCommand && (
                   <div className="text-center py-12">
                     <AriAvatar size="lg" className="mx-auto mb-3" />
                     <p className="text-sm font-medium text-ink-300">What are we closing today?</p>

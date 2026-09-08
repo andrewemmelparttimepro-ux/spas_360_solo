@@ -18,7 +18,7 @@ F01 in progress: compatible assets, safe update notification, draft protection, 
 
 Safety batch implemented: 63 checksum-verified prior assets restored during each build; cache MIME validation; optional update prompt; no automatic reload; customer/deal/job session drafts; bounded profile/session load and explicit retry. Isolated browser test kept an old tab open across a server switch, traversed Customers/Deals/Service/Inventory, fetched every retained script, refused an update with a form open, and recovered a customer draft after reload. No browser page errors. All remote traffic was mocked. Service-worker cache behavior is separately exercised with five behavioral tests. Live at `dpl_7wWeRMj21jVRsV9SWZHchx4CVkft`, source `7f46fd8e7d157834bc8c2a40615730cea9592675`, promoted September 8 at approximately 15:52 UTC. A signed-in old tab crossed promotion and opened Deals and Schedule; a fresh signed-in session loaded Manager Dashboard. No new app_error_events were recorded after 15:50 UTC through the 15:55:26 UTC check. This is a bounded observation, not a guarantee of zero future errors.
 
-F02-F29 pending. Complete register: the approved 2026-09-08 report. Each implementation batch will record source SHA, migration, tests, deployment identity, live acceptance and remaining decisions here.
+F02-F29 tracked individually below; no blanket completion claim. Complete register: the approved 2026-09-08 report. Each implementation batch will record source SHA, migration, tests, deployment identity, live acceptance and remaining decisions here.
 
 ## Baseline
 
@@ -50,3 +50,24 @@ Migrations 170000/171000/171500/172000 applied at 16:42:38 UTC. Equipment is rec
 F07 correction: successful historical cron runs were empty runs, not proof of recovery. An eligible overdue fixture reproduced the guard failure. The applied narrow server transition allows only escalated_at marking; row locks make notification and escalation atomic. Four rollback checks proved one eligible escalation, no duplicates, and denied staff execution. No fixture notifications were committed.
 
 Integrated Fix-It intake and revenue changes supplied by the separately authorized Fix-It owner. Migration 173000 applied at 16:46:23 UTC: optional expected close date; retained atomic customer/deal/task behavior; explicit America/Chicago 09:00 follow-up. Authenticated salesperson rollback verified null close date and one correctly timed task. Canonical main reconciliation and deployed UI acceptance remain release gates.
+
+
+## Active-tab and Customers release
+
+Service/handoff release b45b7f1744855f0ba3de6ef481afd6050367fdff passed 411 checks and all 213 retained assets. The signed-in original 8a28434 tab remained usable across the release. The optional update UI was corrected in 03315d9 to use an inline blocked-form message rather than browser confirmation dialogs.
+
+Customers release 7c9c7f687bf1897dcdb7a5c72fad9988fd18018e is live at dpl_FTYWjEk1Ux2hoDERfdJ5RCXcoEfo (17:26:44 UTC build). All 314 retained assets passed checksum and byte checks before promotion. Customers now renders 50 or 100 matching rows while searching the complete loaded list. Failed reads retain the last complete snapshot; background refresh no longer unmounts open intake. A real standard-wizard submission exposed 09:00 UTC instead of Central; corrected with summer/winter tests. The independent Fix-It owner is completing final signed-in acceptance and owns all its fixtures/proofs. It reported 30 focused tests passing in Pacific/Honolulu.
+
+Native installed-app acceptance at 17:29 UTC: the owner overview loaded 45 items; selecting Matt in Activity loaded exactly 5 of 5 matching records in the 7-day view. Evidence: native-matt-activity.png/txt. Keychain access is no longer blocking this installed build. Broader native file/voice/permission/reconnect acceptance remains open.
+
+## Interrupted command release (staged next)
+
+F28: caller-scoped operation IDs, leases, frozen reads/model results and transactional database receipts. Web keeps one pending command per user in session storage; native keeps one per user locally; SMS derives identity from provider MessageSid and supports an explicit same-operation RETRY. Business mutations continue under the caller's existing RLS. Unsupported mutation shapes fail before writing. Read/model retries reuse saved steps; uploaded files reuse a deterministic path. No automatic repeat of business commands.
+
+Migration 20260908180000 applied at 17:30:30 UTC after 10 authenticated-role transactional rollback checks passed: concurrent runner exclusion, lost-reply reuse, payload mismatch denial, completed-result replay, staff job denial, note/thread/message receipts, and cross-user isolation. No test tasks, messages or notifications were committed. The shared-runtime test reproduced a task committed before a lost response and proved the retry returns its original ID with one effect. SMS request identity was tested with a mocked transport, not a real text.
+
+F29 adds account/thread sequence guards, bounded reads and stale-data warnings to Ari conversations. F21 reports caller-scoped latest/last-completed commands separately from configuration and displays native per-lane last-success times. These are not active provider probes. Web suite 418/419 initially passed; one remaining source-contract test expected exact whitespace in Customers. Its whitespace-tolerant correction passed 9/9; full final gates are retained separately. Native status/retry source passes five tests and awaits its next signed release.
+
+## Outstanding acceptance and business decisions
+
+F01 route/device coverage; F02 each-role navigation proof; F03 four-channel attribution; F04 empty/reconnect cases; F05 source reconciliation and future-close guard; F06 assignment history and workbook definitions; F07 missed-interval reconciliation/health alerts; F08 cross-org/concurrent checklist fixture; F09 four owner decisions; F10 collection-responsibility decision; F11 multi-equipment edit/history proof; F12 explicit work phases/dormant review; F13 service hold confirmation/dispatch review; F14 overview deep-link coverage; F15 actual owner Ari questions; F16 requested-output journeys; F17 alert delivery/seen/expiry and physical devices; F18 workflow enrollment; F19 multi-viewer scope; F20 provider authentication/delivery events; F21 injected-lane failures; F22 latest signed build and full native journeys; F23 small-screen/200-percent review; F24 real role/phone/accessibility matrix; F25 source mapping; F26 document ownership/freshness/evaluations; F27 schema typing/advisor cleanup; F28 installed-client interruption proof; F29 team/other data-hook recovery. Each remains open until its own evidence exists.

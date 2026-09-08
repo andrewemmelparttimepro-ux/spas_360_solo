@@ -10,9 +10,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? req.headers.authorization[0]
     : req.headers.authorization;
   if (!authHeader || !supabaseUrl || !anonKey) return res.status(401).json({ error: 'Missing authorization' });
-  const auth = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: anonKey, Authorization: authHeader }, signal: AbortSignal.timeout(8_000),
-  });
+  let auth: Response;
+  try {
+    auth=await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers:{apikey:anonKey,Authorization:authHeader},signal:AbortSignal.timeout(8_000),
+    });
+  }catch{return res.status(503).json({error:'Session verification is temporarily unavailable. Retry.'});}
   if (!auth.ok) return res.status(401).json({ error: 'Invalid or expired session' });
 
   // The org's agent_config row overrides env — same resolution chat.ts uses,
@@ -63,6 +66,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     thrawn: Boolean(envValue(process.env.THRAWN_GATEWAY_URL) && envValue(process.env.THRAWN_GATEWAY_KEY)),
   };
 
+  // Caller-scoped observed outcomes; this never sends a synthetic model request.
+  let command_health: {state:string;last_attempt:unknown;last_completed:unknown} = {state:'unavailable',last_attempt:null,last_completed:null};
+  try {
+    const read=async (filter:string)=>{
+      const r=await fetch(`${supabaseUrl}/rest/v1/agent_operations?select=id,status,client_channel,updated_at&order=updated_at.desc&limit=1${filter}`,{headers:{apikey:anonKey,Authorization:authHeader},signal:AbortSignal.timeout(8_000)});
+      if(!r.ok)throw Error('Command history unavailable');
+      return (await r.json())[0]??null;
+    };
+    const [last_attempt,last_completed]=await Promise.all([read(''),read('&status=eq.complete')]);
+    command_health={state:last_attempt?'observed':'no_recorded_commands',last_attempt,last_completed};
+  }catch{/* Configuration can still be read when outcome history is unavailable. */}
+
   return res.status(200).json({
     ok: true,
     enabled: configured.enabled !== false,
@@ -70,7 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     model,
     config_source: configured.provider || configured.model ? 'org-config' : 'env',
     providers_available,
-    model_reachability: 'not_checked',
+    model_reachability: 'not_probed',
+    command_health,
     health_note: 'Configuration and key presence only. A completed command is required to establish model execution.',
     release: process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL || 'development',
     capabilities: ['tools', 'threads', 'citadel', 'sms_approval', 'service_holds'],

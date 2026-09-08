@@ -1,6 +1,7 @@
 import { textDeliverableState } from '../_lib/deliverableState.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { randomUUID } from 'node:crypto';
+import { AgentOperation } from '../_lib/agentOperation.js';
+import { createHash, randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   createAgentTools,
@@ -42,10 +43,10 @@ function bearer(req: VercelRequest): string | null {
   return match?.[1]?.trim() || null;
 }
 
-function clientFor(token: string, channel: string = 'web'): SupabaseClient {
+function clientFor(token: string, channel: string = 'web', operationId?: string): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_ANON, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${token}`, 'x-spas-client': channel } },
+    global: { headers: { Authorization: `Bearer ${token}`, 'x-spas-client': channel, ...(operationId ? {'x-spas-operation':operationId} : {}) } },
   });
 }
 
@@ -101,8 +102,7 @@ async function queueSmsWith(
     .select('id')
     .single();
   if (error || !row?.id) {
-    if (deliverable?.id) await client.from('agent_deliverables').delete().eq('id', deliverable.id);
-    return { error: error?.message ?? 'Could not queue the text.' };
+    throw new Error(error?.message ?? 'Could not queue the text. Its draft remains available for reconciliation.');
   }
 
   await client.from('notifications').insert({
@@ -144,7 +144,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = bearer(req);
   if (!token) return res.status(401).json({ error: 'Missing authorization' });
 
-  const client = clientFor(token, ['native', 'sms'].includes(req.body?.client_channel) ? req.body.client_channel : 'web');
+  const suppliedOperation = req.body?.operation_id;
+  if (suppliedOperation !== undefined && (typeof suppliedOperation !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedOperation))) return res.status(400).json({error:'Invalid command identity'});
+  const operationId = suppliedOperation || randomUUID();
+  const channel = ['native','sms'].includes(req.body?.client_channel) ? req.body.client_channel : 'web';
+  const rawClient = clientFor(token, channel, operationId);
+  let client = rawClient;
+  let operation: AgentOperation | undefined;
+  let actualThreadId: string | null = null;
+  res.setHeader('X-Operation-ID', operationId);
   const { data: userData, error: userError } = await client.auth.getUser(token);
   const userId = userData.user?.id;
   if (userError || !userId) return res.status(401).json({ error: 'Invalid or expired session' });
@@ -164,6 +172,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const artifactIntent = detectArtifactIntent(message);
 
   try {
+    const digest=createHash('sha256').update(JSON.stringify({message,thread_id:requestedThreadId})).digest('hex');
+    const {data:claim,error:claimError}=await rawClient.rpc('claim_agent_operation',{p_id:operationId,p_hash:digest,p_runner:requestId,p_channel:channel,p_message:message,p_thread:requestedThreadId});
+    if(claimError) throw new Error(claimError.message);
+    if(claim.status==='complete') return res.status(200).json({...claim.response,operation_id:operationId,replayed:true});
+    if(claim.status==='running') return res.status(409).json({error:'This command is still running. Wait before retrying this same command.',operation_id:operationId,retry_after_seconds:claim.retry_after_seconds});
+    operation=new AgentOperation(rawClient,operationId,requestId,claim.steps??{},claim.created_at);
+    client=operation.client('setup');
     let threadId = requestedThreadId;
     if (threadId) {
       const { data: owned } = await client
@@ -173,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('user_id', userId)
         .eq('thread_type', 'agent')
         .maybeSingle();
-      if (!owned) return res.status(404).json({ error: 'Thread not found' });
+      if (!owned) throw new Error('Thread not found');
     } else {
       const { data: created, error } = await client
         .from('agent_threads')
@@ -184,6 +199,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       threadId = created.id as string;
     }
 
+    actualThreadId = threadId;
     const { data: priorRows } = await client
       .from('agent_messages')
       .select('role, content, created_at')
@@ -214,7 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     const descriptions = getOpenAITools(tools);
 
-    let assistant = await callAri(token, conversation, descriptions);
+    let assistant = await operation.saved('model:0',()=>callAri(token, conversation, descriptions));
     let rounds = 0;
     let calls = 0;
     while ((assistant.tool_calls?.length ?? 0) > 0 && rounds < 6) {
@@ -222,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       calls += assistant.tool_calls!.length;
       if (calls > 16) throw new Error('Ari requested too many actions in one turn. Split the request into smaller commands.');
 
-      await client.from('agent_messages').insert({
+      await operation.client(`round-log:${rounds}`).from('agent_messages').insert({
         thread_id: threadId,
         role: 'assistant',
         content: assistant.content ?? '',
@@ -230,21 +246,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       conversation.push(assistant);
 
-      for (const toolCall of assistant.tool_calls!) {
+      for (const [toolIndex, toolCall] of assistant.tool_calls!.entries()) {
         let args: Record<string, string> = {};
         try { args = JSON.parse(toolCall.function.arguments || '{}') as Record<string, string>; } catch { /* tool gets empty args */ }
-        const result = await executeToolFrom(tools, toolCall.function.name, args);
+        const toolScope=`tool:${rounds}:${toolIndex}`;
+        const toolClient=operation.client(toolScope);
+        const scopedTools=createAgentTools(toolClient,async()=>userId,input=>queueSmsWith(toolClient,userId,orgId,input));
+        const result = await operation.saved(`result:${toolScope}`,()=>executeToolFrom(scopedTools, toolCall.function.name, args, {throwErrors:true}));
         const content = JSON.stringify(result);
         const toolMessage: ApiMessage = { role: 'tool', content, tool_call_id: toolCall.id };
         conversation.push(toolMessage);
-        await client.from('agent_messages').insert({
+        await operation.client(`tool-log:${rounds}:${toolIndex}`).from('agent_messages').insert({
           thread_id: threadId,
           role: 'tool',
           content,
           tool_name: toolCall.function.name,
         });
       }
-      assistant = await callAri(token, conversation, descriptions);
+      assistant = await operation.saved(`model:${rounds}`,()=>callAri(token, conversation, descriptions));
     }
 
     const answer = assistant.content?.trim();
@@ -253,6 +272,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let responseContent = answer;
     let artifact: Record<string, unknown> | null = null;
 
+    client=operation.client('artifact');
     if (artifactIntent) {
       const context = await loadArtifactContext(client, orgId, message, answer);
       const blocked = context.missing.length > 0;
@@ -298,7 +318,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               cacheControl: '3600',
               upsert: false,
             });
-          if (uploadError) throw new Error(uploadError.message);
+          let storedSize=rendered.bytes.byteLength;
+          if (uploadError) {
+            // A previous attempt may have uploaded the deterministic path before
+            // losing its reply. Reuse that file; never overwrite a saved artifact.
+            const existing=await service.storage.from('ari-deliverables').download(storagePath);
+            if(existing.error || !existing.data) throw new Error(uploadError.message);
+            storedSize=existing.data.size;
+          }
 
           const { data: ready, error: readyError } = await client
             .from('agent_deliverables')
@@ -308,7 +335,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               storage_path: storagePath,
               mime_type: 'application/pdf',
               file_name: rendered.fileName,
-              file_size_bytes: rendered.bytes.byteLength,
+              file_size_bytes: storedSize,
               missing_fields: [],
               updated_at: new Date().toISOString(),
             })
@@ -319,13 +346,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           artifact = ready as Record<string, unknown>;
           responseContent = `Your PDF is ready and saved in Citadel. Preview, download, or share it from the artifact card below.`;
         } catch (artifactError) {
-          const reason = artifactError instanceof Error ? artifactError.message : String(artifactError);
-          await client
-            .from('agent_deliverables')
-            .update({ status: 'failed', missing_fields: [{ field: 'Rendering', reason }], updated_at: new Date().toISOString() })
-            .eq('id', deliverable.id);
-          artifact = { ...deliverable, status: 'failed', missing_fields: [{ field: 'Rendering', reason }] };
-          responseContent = 'I saved the draft in Citadel, but the PDF renderer could not finish the file. Nothing was sent. Try rebuilding it once the connection is stable.';
+          // Do not turn an ambiguous ready-write response into a failed record.
+          // The same command resumes the deterministic upload and write receipt.
+          throw artifactError;
         }
       }
     } else if (textDeliverableState(message, answer)) {
@@ -346,6 +369,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (archiveError) throw new Error(archiveError.message);
     }
 
+    client=operation.client('final');
     const { data: saved, error: savedError } = await client.from('agent_messages').insert({
       thread_id: threadId,
       role: 'assistant',
@@ -356,7 +380,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await client.from('agent_threads').update({ last_message_at: new Date().toISOString() }).eq('id', threadId);
 
-    return res.status(200).json({
+    const response = {
+      operation_id:operationId,
       thread_id: threadId,
       message: {
         id: saved?.id,
@@ -367,25 +392,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       artifact,
       tool_rounds: rounds,
-    });
+    };
+    await operation.checkpoint('__response',response);
+    return res.status(200).json(response);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error('agent/run failed', { requestId, userId, requestedThreadId, detail });
-    if (/too many actions/i.test(detail)) {
-      return res.status(422).json({ error: 'That command is too broad for one run. Split it into smaller commands and try again.', request_id: requestId });
-    }
-    if (/content policy/i.test(detail)) {
-      return res.status(422).json({
-        error: 'Ari could not process that exact wording. Rephrase it in plain business terms and try again.',
-        request_id: requestId,
-      });
-    }
-    if (/timeout|timed out|abort/i.test(detail)) {
-      return res.status(504).json({ error: 'Ari took too long to finish. Review Approvals before retrying the command.', request_id: requestId });
-    }
-    return res.status(500).json({
-      error: 'Ari hit a temporary runtime problem. Your command history is safe; review Approvals before retrying.',
-      request_id: requestId,
+    if(operation) await operation.checkpoint('__error',detail).catch(()=>undefined);
+    const {data:receipts}=operation?await rawClient.from('agent_write_receipts').select('step,input,result').eq('operation_id',operationId).limit(80):{data:[]};
+    const completedActions=(receipts??[]).filter(row=>!String(row.input?.table??'').startsWith('agent_')).map(row=>({
+      step:row.step, table:row.input?.table??'contacts',
+      record_ids:Array.isArray(row.result)?row.result.map((item:Record<string,unknown>)=>item.id).filter(Boolean):[],
+    }));
+    const message=/too many actions/i.test(detail)?'This command needs fewer actions. Review the saved results before starting a smaller command.':
+      /content policy/i.test(detail)?'Ari could not process that wording. Review saved results before starting a rephrased command.':
+      'Ari could not finish this command. Retry this same operation to continue from its saved steps. Saved changes will not be repeated.';
+    return res.status(/timeout|timed out|abort/i.test(detail)?504:500).json({
+      error:message,request_id:requestId,operation_id:operationId,thread_id:actualThreadId,
+      completed_actions:completedActions,
     });
   }
 }

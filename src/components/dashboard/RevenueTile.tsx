@@ -118,7 +118,7 @@ export default function RevenueTile() {
               <span className="break-all">{money(store.total)}</span><CompactCompleteness missing={store.missingAmounts} />
             </p>
             {comparison && store.previousYear && <p className="flex flex-wrap items-baseline gap-x-1 text-[11px] leading-[14px] tabular-nums text-ink-400">
-              <span><span className="sr-only">Last year’s </span>{comparison.previousYearLabel}: <span className="break-all">{money(store.previousYear.total)}</span></span>
+              <span>Last year’s {comparison.previousYearLabel}: <span className="break-all">{money(store.previousYear.total)}</span></span>
               <CompactCompleteness missing={store.previousYear.missingAmounts} period="Last year" />
             </p>}
           </div>)}

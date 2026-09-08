@@ -101,20 +101,24 @@ function RevenueDetailsDialog({ onClose }: { onClose: () => void }) {
 
 export default function RevenueTile() {
   const [filters] = useState(defaultRevenueTileFilters);
-  const { report, isLoading, error } = useRevenueTile(filters);
+  const { report, comparison, isLoading, error } = useRevenueTile(filters, true);
   const [open, setOpen] = useState(false);
   return <>
     <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}
       className="dashboard-stat-card relative rounded-xl border border-ink-700 bg-ink-900 p-4 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:p-5">
       <ArrowUpRight aria-hidden="true" className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500" />
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Recorded Sales</p>
-      <p className="mb-3 text-xs font-medium text-ink-400">This Month · Closed-Won</p>
+      <p className="mb-3 text-xs font-medium text-ink-400">This Month {comparison?.monthName} - Closed-Won</p>
       {isLoading ? <p role="status" className="text-sm text-ink-400">Loading revenue…</p>
         : error ? <p className="text-xs text-red-400">Revenue couldn't load. Open details to retry.</p>
         : report && <div className="grid grid-cols-1 gap-3 sm:grid-cols-1">
           {report.stores.map(store => <div key={store.id} className="min-w-0">
             <p className="text-xs font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>
             <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-ink-100">{money(store.total)}</p><Completeness missing={store.missingAmounts} />
+            {comparison && store.previousYear && <div className="mt-1">
+              <p className="text-xs tabular-nums text-ink-400">Last year’s {comparison.previousYearLabel}: {money(store.previousYear.total)}</p>
+              <Completeness missing={store.previousYear.missingAmounts} period="Last year" />
+            </div>}
           </div>)}
         </div>}
     </button>
@@ -122,6 +126,6 @@ export default function RevenueTile() {
   </>;
 }
 
-function Completeness({ missing }: { missing: number | null }) {
-  return missing === 0 ? null : <p className="mt-1 text-xs font-medium text-amber-600">{missing === null ? 'Amount completeness has not been verified.' : `Incomplete: ${missing} closed sale${missing === 1 ? '' : 's'} missing an amount.`}</p>;
+function Completeness({ missing, period }: { missing: number | null; period?: string }) {
+  return missing === 0 ? null : <p className="mt-1 text-xs font-medium text-amber-600">{period ? `${period}: ` : ''}{missing === null ? 'Amount completeness has not been verified.' : `Incomplete: ${missing} closed sale${missing === 1 ? '' : 's'} missing an amount.`}</p>;
 }

@@ -16,7 +16,7 @@ export interface RevenueTileRange extends DashboardDateRange {
 export interface RevenueTileReport {
   total: number;
   missingAmounts: number | null;
-  stores: { id: string; name: string; total: number; missingAmounts: number | null }[];
+  stores: { id: string; name: string; total: number; missingAmounts: number | null; previousYear?: { total: number; missingAmounts: number | null } }[];
   ownerOptions: DashboardRevenueFilterOption[];
   storeOptions: DashboardRevenueFilterOption[];
 }
@@ -33,6 +33,18 @@ export function revenueMonthDates(now = new Date()) {
 
 export function defaultRevenueTileFilters(now = new Date()): RevenueTileFilters {
   return { period: 'month', assignedTo: null, locationId: null, ...revenueMonthDates(now) };
+}
+
+// Derive both labels and the comparison from the loaded Central calendar month,
+// never the browser's local month or a fixed 365-day subtraction.
+export function revenueTileMonthComparison(range: RevenueTileRange) {
+  const [year, month] = range.startDate.split('-').map(Number);
+  const previousYear = year - 1;
+  const monthName = new Date(`${range.startDate}T12:00:00Z`).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+  const startDate = `${previousYear}-${String(month).padStart(2, '0')}-01`;
+  const endDate = new Date(Date.UTC(previousYear, month, 0, 12)).toISOString().slice(0, 10);
+  const previousYearRange = revenueTileRange({ period: 'custom', assignedTo: null, locationId: null, startDate, endDate })!;
+  return { monthName, previousYearLabel: `${monthName} ${previousYear}`, previousYearRange };
 }
 
 export function revenueTileDateError(startDate: string, endDate: string): string | null {
@@ -96,6 +108,7 @@ function revenueOptions(data: unknown, key: string): DashboardRevenueFilterOptio
 export async function loadRevenueTileReport(
   params: RevenueTileRpcParams,
   request: (params: RevenueTileRpcParams) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  previousYearRange?: DashboardDateRange,
 ): Promise<RevenueTileReport> {
   const result = await request(params);
   if (result.error) throw new Error(result.error.message);
@@ -111,10 +124,18 @@ export async function loadRevenueTileReport(
   const stores = await Promise.all(storeOptions
     .filter(store => !params.p_location_id || store.id === params.p_location_id)
     .map(async store => {
-      if (params.p_location_id === store.id) return { ...store, total, missingAmounts: missingAmounts(result.data) };
-      const storeResult = await request({ ...params, p_location_id: store.id });
+      const storeResult = params.p_location_id === store.id ? result : await request({ ...params, p_location_id: store.id });
       if (storeResult.error) throw new Error(storeResult.error.message);
-      return { ...store, total: revenueTotal(storeResult.data), missingAmounts: missingAmounts(storeResult.data) };
+      const current = { ...store, total: revenueTotal(storeResult.data), missingAmounts: missingAmounts(storeResult.data) };
+      if (!previousYearRange) return current;
+      const previousResult = await request({
+        ...params,
+        p_location_id: store.id,
+        p_start: previousYearRange.start.toISOString(),
+        p_end: previousYearRange.end.toISOString().replace('.999Z', '.999999Z'),
+      });
+      if (previousResult.error) throw new Error(previousResult.error.message);
+      return { ...current, previousYear: { total: revenueTotal(previousResult.data), missingAmounts: missingAmounts(previousResult.data) } };
     }));
   return { total, stores, ownerOptions, storeOptions, missingAmounts: missingAmounts(result.data) };
 }

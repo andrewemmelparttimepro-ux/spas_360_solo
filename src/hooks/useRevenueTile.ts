@@ -2,16 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { debounceRefetch } from '@/lib/realtime';
-import { defaultRevenueTileFilters, loadRevenueTileReport, revenueTileRange, revenueTileRpcParams, type RevenueTileFilters, type RevenueTileReport } from '@/lib/dashboardRevenueTile';
+import { defaultRevenueTileFilters, loadRevenueTileReport, revenueTileMonthComparison, revenueTileRange, revenueTileRpcParams, type RevenueTileFilters, type RevenueTileReport } from '@/lib/dashboardRevenueTile';
 
-export function useRevenueTile(filters: RevenueTileFilters) {
+export function useRevenueTile(filters: RevenueTileFilters, comparePreviousYear = false) {
   const { profile } = useAuth();
   const orgId = profile?.org_id;
   const [now, setNow] = useState(() => new Date());
   const range = revenueTileRange(filters, now);
   const start = range?.start.toISOString();
   const end = range?.end.toISOString();
-  const key = JSON.stringify([orgId, start, end, filters.assignedTo, filters.locationId]);
+  const comparison = comparePreviousYear && filters.period === 'month' && range ? revenueTileMonthComparison(range) : null;
+  const previousStart = comparison?.previousYearRange.start.toISOString();
+  const previousEnd = comparison?.previousYearRange.end.toISOString();
+  const key = JSON.stringify([orgId, start, end, filters.assignedTo, filters.locationId, previousStart, previousEnd]);
   const [result, setResult] = useState<{ key: string; orgId: string; report: RevenueTileReport } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [isFetching, setIsFetching] = useState(true);
@@ -47,6 +50,7 @@ export function useRevenueTile(filters: RevenueTileFilters) {
       const report = await loadRevenueTileReport(
         revenueTileRpcParams({ start: new Date(start), end: new Date(end) }, filters),
         params => supabase.rpc('dashboard_revenue_summary', params),
+        previousStart && previousEnd ? { start: new Date(previousStart), end: new Date(previousEnd) } : undefined,
       );
       if (request !== sequence.current) return;
       setResult({ key, orgId, report });
@@ -56,7 +60,7 @@ export function useRevenueTile(filters: RevenueTileFilters) {
     } finally {
       if (request === sequence.current) setIsFetching(false);
     }
-  }, [orgId, start, end, filters.assignedTo, filters.locationId, key]);
+  }, [orgId, start, end, filters.assignedTo, filters.locationId, key, previousStart, previousEnd]);
 
   useEffect(() => {
     void refresh();
@@ -80,6 +84,7 @@ export function useRevenueTile(filters: RevenueTileFilters) {
   const error = !range ? 'Choose a valid date range.' : failure?.key === key ? failure.message : null;
   return {
     range,
+    comparison,
     report: result?.key === key ? result.report : null,
     options: result?.orgId === orgId ? result.report : null,
     isLoading: !error && (isFetching || result?.key !== key),

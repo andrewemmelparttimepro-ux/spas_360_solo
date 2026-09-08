@@ -105,20 +105,22 @@ export default function RevenueTile() {
   const [open, setOpen] = useState(false);
   return <>
     <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}
-      className="dashboard-stat-card relative rounded-xl border border-ink-700 bg-ink-900 p-4 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:p-5">
+      className="dashboard-stat-card relative rounded-xl border border-ink-700 bg-ink-900 col-span-3 min-h-[90px] min-w-0 px-4 py-1.5 text-left transition-all hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:col-span-1">
       <ArrowUpRight aria-hidden="true" className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500" />
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Recorded Sales</p>
-      <p className="mb-3 text-xs font-medium text-ink-400">This Month {comparison?.monthName} - Closed-Won</p>
+      <p className="pr-3 text-[11px] leading-[14px] font-semibold uppercase tracking-wider text-ink-500">Recorded Sales</p>
+      <p className="text-[11px] leading-[14px] font-medium text-ink-400">This Month {comparison?.monthName} - Closed-Won</p>
       {isLoading ? <p role="status" className="text-sm text-ink-400">Loading revenue…</p>
         : error ? <p className="text-xs text-red-400">Revenue couldn't load. Open details to retry.</p>
-        : report && <div className="grid grid-cols-1 gap-3 sm:grid-cols-1">
-          {report.stores.map(store => <div key={store.id} className="min-w-0">
-            <p className="text-xs font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>
-            <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-ink-100">{money(store.total)}</p><Completeness missing={store.missingAmounts} />
-            {comparison && store.previousYear && <div className="mt-1">
-              <p className="text-xs tabular-nums text-ink-400">Last year’s {comparison.previousYearLabel}: {money(store.previousYear.total)}</p>
-              <Completeness missing={store.previousYear.missingAmounts} period="Last year" />
-            </div>}
+        : report && <div className="grid grid-cols-2 gap-x-4">
+          {[...report.stores].sort((a, b) => revenueStoreLabel(a.name).localeCompare(revenueStoreLabel(b.name))).map(store => <div key={store.id} className="min-w-0">
+            <p className="text-[11px] leading-[14px] font-semibold text-ink-400">{revenueStoreLabel(store.name)}</p>
+            <p className="flex flex-wrap items-baseline gap-x-1 text-base leading-5 font-bold tabular-nums text-ink-100">
+              <span className="break-all">{money(store.total)}</span><CompactCompleteness missing={store.missingAmounts} />
+            </p>
+            {comparison && store.previousYear && <p className="flex flex-wrap items-baseline gap-x-1 text-[11px] leading-[14px] tabular-nums text-ink-400">
+              <span><span className="sr-only">Last year’s </span>{comparison.previousYearLabel}: <span className="break-all">{money(store.previousYear.total)}</span></span>
+              <CompactCompleteness missing={store.previousYear.missingAmounts} period="Last year" />
+            </p>}
           </div>)}
         </div>}
     </button>
@@ -128,4 +130,10 @@ export default function RevenueTile() {
 
 function Completeness({ missing, period }: { missing: number | null; period?: string }) {
   return missing === 0 ? null : <p className="mt-1 text-xs font-medium text-amber-600">{period ? `${period}: ` : ''}{missing === null ? 'Amount completeness has not been verified.' : `Incomplete: ${missing} closed sale${missing === 1 ? '' : 's'} missing an amount.`}</p>;
+}
+
+function CompactCompleteness({ missing, period }: { missing: number | null; period?: string }) {
+  if (missing === 0) return null;
+  const description = `${period ? `${period}: ` : ''}${missing === null ? 'Amount completeness has not been verified.' : `Incomplete: ${missing} closed sale${missing === 1 ? '' : 's'} missing an amount.`}`;
+  return <span title={description} aria-label={description} className="text-[10px] leading-[14px] font-medium text-amber-600">({missing === null ? 'unverified' : `${missing} missing`})</span>;
 }

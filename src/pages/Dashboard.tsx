@@ -145,19 +145,19 @@ export default function Dashboard() {
 
       <MorningSummaryPanel />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,2.75fr)_repeat(3,minmax(0,1fr))]">
         <RevenueTile />
         {statMeta.map((meta) => {
           const value = tileStats[meta.key];
           return (
-            <Link key={meta.key} to={meta.link} className="dashboard-stat-card relative bg-ink-900 rounded-xl border border-ink-700 p-4 sm:p-5 flex items-start justify-between gap-3 hover:border-brand-500/50 hover:bg-ink-850 transition-all group">
+            <Link key={meta.key} to={meta.link} className="dashboard-stat-card relative bg-ink-900 rounded-xl border border-ink-700 min-h-[90px] px-3 py-3 sm:px-4 flex items-center justify-between gap-2 hover:border-brand-500/50 hover:bg-ink-850 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 transition-all group">
               {/* Numbers are doors — Brandon clicks a stat expecting to land on those rows */}
               <ArrowUpRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-500 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 mb-1.5">{meta.title}</p>
+                <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-ink-500 mb-1.5">{meta.title}</p>
                 <h3 className="text-[22px] sm:text-[24px] leading-none font-bold text-ink-100 group-hover:text-brand-500 transition-colors">{meta.format(value)}</h3>
               </div>
-              <div className={`p-2.5 rounded-[10px] shrink-0 hidden sm:block ${meta.bg}`}>
+              <div className={`p-2 rounded-[10px] shrink-0 hidden xl:block ${meta.bg}`}>
                 <meta.icon className={`w-5 h-5 ${meta.color}`} />
               </div>
             </Link>

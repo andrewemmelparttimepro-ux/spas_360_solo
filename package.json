@@ -21,7 +21,8 @@
     "test:knowledge": "node --experimental-strip-types --test tests/knowledgeAndHardening.test.ts",
     "test:media": "node --experimental-strip-types --test tests/mediaLibrary.test.ts",
     "knowledge:dry-run": "node scripts/knowledge/ingest.mjs --dry-run",
-    "knowledge:ingest": "node scripts/knowledge/ingest.mjs"
+    "knowledge:ingest": "node scripts/knowledge/ingest.mjs",
+    "prebuild": "node scripts/release/compatible-assets.mjs"
   },
   "dependencies": {
     "@elevenlabs/react": "1.10.0",

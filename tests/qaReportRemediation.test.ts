@@ -41,7 +41,7 @@ function modalHarness(active = true) {
   const exports: any = {};
   const js = ts.transpileModule(source('src/hooks/useModal.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   let refs = 0;
-  vm.runInNewContext(js, { exports, document: doc, require: () => ({
+  vm.runInNewContext(js, { exports, document: doc, window: doc, require: () => ({
     useRef: (value: unknown) => ({ current: refs++ === 0 ? node : value }),
     useEffect: (fn: Function) => effects.push(fn),
   }) });

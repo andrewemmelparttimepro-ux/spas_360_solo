@@ -1,3 +1,4 @@
+import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
 import { Calendar as CalendarIcon, Check, ChevronDown, Clock, Plus, Search, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useMemo, type SetStateAction } from 'react';
@@ -418,7 +419,8 @@ export default function Service() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts]);
-  const [newJob, setNewJob] = useState({
+  const draftScope = `job:${profile?.id ?? 'signed-out'}`;
+  const [newJob, setNewJob] = useDraftState(draftScope, 'newJob', {
     title: '', contact_id: '', location_id: '',
     inventory_item_id: '', job_type: 'Service' as JobType,
     description: '', scheduled_date: '', scheduled_time: '', scheduled_end_date: '',
@@ -469,6 +471,7 @@ export default function Service() {
       if (noteError) console.error('Job note could not be saved:', noteError);
     }
     await refreshInventory();
+    clearDrafts(draftScope);
     toast('Job created', 'success');
     setShowInventorySelector(false);
     setShowCreate(false);

@@ -1,3 +1,4 @@
+import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
 import { useEffect, useMemo, useState } from 'react';
 import { X, Handshake, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -77,19 +78,20 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
   const [stage, setStage] = useState<string>(stageId ?? '');
   const [dealOwners, setDealOwners] = useState<DealOwner[]>([]);
   const [dealOwner, setDealOwner] = useState(UNSELECTED_OWNER);
-  const [interests, setInterests] = useState<string[]>([]);
-  const [interest, setInterest] = useState('');
-  const [notes, setNotes] = useState('');
+  const draftScope = `deal:${profile?.id ?? 'signed-out'}:${contactId ?? 'any'}`;
+  const [interests, setInterests] = useDraftState<string[]>(draftScope, 'interests', []);
+  const [interest, setInterest] = useDraftState(draftScope, 'interest', '');
+  const [notes, setNotes] = useDraftState(draftScope, 'notes', '');
   const shoppingInterests = useMemo(() => dealShoppingInterests(interests, interest), [interests, interest]);
-  const [leadSource, setLeadSource] = useState<DealLeadSourceChoice>('Walk-In');
-  const [title, setTitle] = useState('');
-  const [titleTouched, setTitleTouched] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [expectedCloseDate, setExpectedCloseDate] = useState('');
-  const [priority, setPriority] = useState<DealPriority>('Medium');
-  const [nextActivityDate, setNextActivityDate] = useState(nextLocalDate);
+  const [leadSource, setLeadSource] = useDraftState<DealLeadSourceChoice>(draftScope, 'leadSource', 'Walk-In');
+  const [title, setTitle] = useDraftState(draftScope, 'title', '');
+  const [titleTouched, setTitleTouched] = useDraftState(draftScope, 'titleTouched', false);
+  const [amount, setAmount] = useDraftState(draftScope, 'amount', '');
+  const [expectedCloseDate, setExpectedCloseDate] = useDraftState(draftScope, 'expectedCloseDate', '');
+  const [priority, setPriority] = useDraftState<DealPriority>(draftScope, 'priority', 'Medium');
+  const [nextActivityDate, setNextActivityDate] = useDraftState(draftScope, 'nextActivityDate', nextLocalDate);
   const [saving, setSaving] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useDraftState<string | null>(draftScope, 'selectedLocationId', null);
   const creationLocationId = resolveCreationStore({
     selectedLocationId,
     customerLocationId: contact?.location_id,
@@ -235,6 +237,7 @@ export default function QuickDealModal({ contactId, stageId, onClose, onCreated 
       if (!dealId) throw new Error('The saved deal could not be confirmed');
 
       toast(`Deal created for ${contact.first_name} — follow-up scheduled`, 'success');
+      clearDrafts(draftScope);
       onCreated?.(dealId);
       onClose();
     } catch (err) {

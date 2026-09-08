@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
+import { clearDrafts } from '@/hooks/useDraftState';
+import { captureError } from '@/lib/errorTelemetry';
 import { supabase } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Profile, Location } from '@/types/database';
@@ -10,6 +12,8 @@ interface AuthState {
   locations: Location[];
   activeLocationId: string | null;
   isLoading: boolean;
+  authError: string | null;
+  retryAuth: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, meta: { first_name: string; last_name: string; role?: string }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -49,48 +53,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [locations, setLocations] = useState<Location[]>(UI_PREVIEW ? PREVIEW_LOCATIONS : []);
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!UI_PREVIEW);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const currentUser = useRef<string | null>(null);
+  const loadedUser = useRef<string | null>(null);
+  const loadSequence = useRef(0);
 
   // Fetch profile + locations for authenticated user
   const fetchProfile = useCallback(async (userId: string) => {
+    const sequence = ++loadSequence.current;
+    try {
     const [profileRes, locRes] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      supabase.from('locations').select('*').order('name'),
+      supabase.from('profiles').select('*').eq('id', userId).abortSignal(AbortSignal.timeout(12_000)).single(),
+      supabase.from('locations').select('*').order('name').abortSignal(AbortSignal.timeout(12_000)),
     ]);
-
+    if (sequence !== loadSequence.current || currentUser.current !== userId) return;
+    if (profileRes.error || !profileRes.data || locRes.error) throw new Error(profileRes.error?.message || locRes.error?.message || 'Staff profile unavailable');
     if (profileRes.data) {
       setProfile(profileRes.data);
-      setActiveLocationId(profileRes.data.location_id);
+      if (loadedUser.current !== userId) setActiveLocationId(profileRes.data.location_id);
+      loadedUser.current = userId;
     }
     if (locRes.data) {
       setLocations(locRes.data);
     }
+    setAuthError(null);
+    } catch (error) {
+      if (sequence !== loadSequence.current || currentUser.current !== userId) return;
+      captureError(error, 'auth.profile');
+      setAuthError('Your staff access could not refresh. Check your connection and retry. Your open work has been kept.');
+    } finally {
+      if (sequence === loadSequence.current) setIsLoading(false);
+    }
   }, []);
+
+  const retryAuth = useCallback(async () => {
+    if (currentUser.current) await fetchProfile(currentUser.current);
+    else window.location.reload();
+  }, [fetchProfile]);
 
   useEffect(() => {
     if (UI_PREVIEW) return; // dev preview: keep the stubbed session
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    let disposed = false;
+    const timeout = setTimeout(() => {
+      if (!disposed) { setIsLoading(false); setAuthError('Sign-in is taking longer than expected. Reconnect and retry.'); }
+    }, 15_000);
+    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
+      if (disposed) return;
+      clearTimeout(timeout);
+      if (error) { setAuthError('Your session could not load. Reconnect and retry.'); setIsLoading(false); return; }
+      currentUser.current = s?.user.id ?? null;
       setSession(s);
       if (s?.user) {
         fetchProfile(s.user.id).finally(() => setIsLoading(false));
       } else {
         setIsLoading(false);
       }
-    });
+    }).catch(() => { if (!disposed) { clearTimeout(timeout); setIsLoading(false); setAuthError('Your session could not load. Reconnect and retry.'); } });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      currentUser.current = s?.user.id ?? null;
       setSession(s);
       if (s?.user) {
         fetchProfile(s.user.id);
       } else {
+        loadSequence.current += 1;
+        loadedUser.current = null;
+        clearDrafts();
         setProfile(null);
         setLocations([]);
         setActiveLocationId(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { disposed = true; clearTimeout(timeout); loadSequence.current += 1; subscription.unsubscribe(); };
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -112,12 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.rpc('record_app_activity', {
+    void Promise.resolve(supabase.rpc('record_app_activity', {
       p_event_type: 'session_ended',
       p_label: 'Signed out of SPAS 360',
       p_source: 'SPAS 360',
-    });
+    })).catch(() => undefined);
     await supabase.auth.signOut();
+    clearDrafts();
     setSession(null);
     setProfile(null);
   }, []);
@@ -134,6 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       locations,
       activeLocationId,
       isLoading,
+      authError,
+      retryAuth,
       signIn,
       signUp,
       signOut,

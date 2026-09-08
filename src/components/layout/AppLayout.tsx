@@ -9,6 +9,7 @@ import WidgetBoundary from '../ui/WidgetBoundary';
 import { CustomerDragProvider } from '@/contexts/CustomerDragContext';
 import ActivityTracker from '../ActivityTracker';
 import PushNudgeBanner from '../PushNudgeBanner';
+import UpdateNotice from '../UpdateNotice';
 import { useAuth } from '@/contexts/AuthContext';
 import { isServiceTechnician } from '@/lib/serviceTechAccess';
 
@@ -17,7 +18,7 @@ import { isServiceTechnician } from '@/lib/serviceTechAccess';
  *  from any page onto the Deals/Schedule pills in the topbar. */
 export default function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { profile } = useAuth();
+  const { profile, authError, retryAuth } = useAuth();
   const technician = isServiceTechnician(profile?.role);
 
   // Keep this device's push subscription fresh + owned by the signed-in user
@@ -30,6 +31,8 @@ export default function AppLayout() {
           bottom-anchored composers aren't stranded when browser chrome/keyboard moves */}
       <div className="flex flex-col h-[100dvh] bg-[var(--color-app-canvas)] text-ink-100 font-sans">
         <Header onMenuClick={technician ? undefined : () => setDrawerOpen(true)} />
+        <UpdateNotice />
+        {authError && <div role="alert" className="bg-amber-950 px-4 py-3 text-sm text-amber-100">{authError} <button className="ml-2 underline" onClick={() => void retryAuth()}>Retry connection</button></div>}
         {!technician && <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
         <div className="flex flex-1 overflow-hidden">
           <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">

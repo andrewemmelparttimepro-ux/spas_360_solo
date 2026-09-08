@@ -7,9 +7,11 @@ import './index.css';
 import {installClarity} from './lib/clarity';
 import {installErrorTelemetry} from './lib/errorTelemetry';
 import AppErrorBoundary from './components/ui/AppErrorBoundary';
+import { requestUpdateNotice } from './lib/releaseSafety';
 
 installClarity();
 installErrorTelemetry();
+window.addEventListener('vite:preloadError', requestUpdateNotice);
 
 // PWA: register the service worker (prod only — HMR and a SW don't mix)
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

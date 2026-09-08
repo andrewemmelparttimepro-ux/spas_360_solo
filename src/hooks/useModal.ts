@@ -58,7 +58,14 @@ export function useModal(onClose: () => void, active = true) {
     };
 
     document.addEventListener('keydown', onKeyDown, true);
+    const protectOpenForm = (event: BeforeUnloadEvent) => {
+      if (!node?.querySelector('input, textarea, select')) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectOpenForm);
     return () => {
+      window.removeEventListener('beforeunload', protectOpenForm);
       document.removeEventListener('keydown', onKeyDown, true);
       opener?.focus?.({ preventScroll: true });
     };

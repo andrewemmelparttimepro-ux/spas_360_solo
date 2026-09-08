@@ -1,3 +1,4 @@
+import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Check, UserCheck, ExternalLink } from 'lucide-react';
@@ -82,26 +83,27 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
   const { profile, user, activeLocationId, locations } = useAuth();
   const { toast } = useToast();
 
-  const [first, setFirst] = useState('');
-  const [last, setLast] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
+  const draftScope = `customer:${profile?.id ?? 'signed-out'}`;
+  const [first, setFirst] = useDraftState(draftScope, 'first', '');
+  const [last, setLast] = useDraftState(draftScope, 'last', '');
+  const [phone, setPhone] = useDraftState(draftScope, 'phone', '');
+  const [email, setEmail] = useDraftState(draftScope, 'email', '');
+  const [address, setAddress] = useDraftState(draftScope, 'address', '');
   const [matches, setMatches] = useState<DupeMatch[]>([]);
   const [existing, setExisting] = useState<DupeMatch | null>(null); // chosen existing customer
   const navigate = useNavigate();
-  const [source, setSource] = useState<string | null>(null);
-  const [interests, setInterests] = useState<string[]>([]);
-  const [amount, setAmount] = useState('');
-  const [priority, setPriority] = useState<string | null>(null);
-  const [expectedCloseDate, setExpectedCloseDate] = useState('');
-  const [followupDate, setFollowupDate] = useState(() => {
+  const [source, setSource] = useDraftState<string | null>(draftScope, 'source', null);
+  const [interests, setInterests] = useDraftState<string[]>(draftScope, 'interests', []);
+  const [amount, setAmount] = useDraftState(draftScope, 'amount', '');
+  const [priority, setPriority] = useDraftState<string | null>(draftScope, 'priority', null);
+  const [expectedCloseDate, setExpectedCloseDate] = useDraftState(draftScope, 'expectedCloseDate', '');
+  const [followupDate, setFollowupDate] = useDraftState(draftScope, 'followupDate', () => {
     const d = new Date(); d.setDate(d.getDate() + 2);
     return d.toISOString().split('T')[0];
   });
-  const [firstNote, setFirstNote] = useState('');
+  const [firstNote, setFirstNote] = useDraftState(draftScope, 'firstNote', '');
   const [saving, setSaving] = useState(false);
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useDraftState<string | null>(draftScope, 'selectedLocationId', null);
   const creationLocationId = resolveCreationStore({
     selectedLocationId,
     activeLocationId,
@@ -243,6 +245,7 @@ export default function NewCustomerWizard({ onClose, onCreated }: { onClose: () 
       toast(`${contactFirst} added — follow-up scheduled`, 'success');
       // The caller's post-create refresh is the handoff to customer search.
       // Wait for it so the wizard cannot disappear while the old list is still visible.
+      clearDrafts(draftScope);
       await onCreated?.(deal.id);
       onClose();
     } catch (err) {

@@ -37,7 +37,7 @@ test('customer New Deal shows the requested lead sources and stores the canonica
     { label: 'Walk-In', storedValue: 'Walk-In' },
     { label: 'Off-Site Show/Event', storedValue: 'Off-Site Show/Event' },
   ]);
-  assert.match(modal, /useState<DealLeadSourceChoice>\('Walk-In'\)/);
+  assert.match(modal, /useDraftState<DealLeadSourceChoice>\(draftScope, 'leadSource', 'Walk-In'\)/);
   assert.match(modal, /<label htmlFor="deal-lead-source"[^>]*>[\s\S]*Lead Source[\s\S]*<select[\s\S]*id="deal-lead-source"[\s\S]*required/);
   const leadSourceSelect = modal.match(/<select\b[^>]*id="deal-lead-source"[^>]*>[\s\S]*?<\/select>/)?.[0];
   assert.ok(leadSourceSelect, 'The Lead Source select exists');

@@ -71,7 +71,7 @@ function RoleRouteGuard() {
 }
 
 function AuthGate() {
-  const { session, isLoading } = useAuth();
+  const { session, profile, isLoading, authError, retryAuth, signOut } = useAuth();
 
   if (isLoading) {
     return (
@@ -84,6 +84,8 @@ function AuthGate() {
       </div>
     );
   }
+
+  if (authError && !profile) return <main className="min-h-screen bg-ink-950 text-ink-100 flex items-center justify-center p-6"><section role="alert" className="max-w-md space-y-4"><h1 className="text-xl font-bold">We could not load your staff access</h1><p>{authError}</p><button onClick={() => void retryAuth()} className="rounded-lg bg-brand-500 px-4 py-3">Retry connection</button>{session && <button onClick={() => void signOut()} className="ml-3 px-4 py-3">Sign out</button>}</section></main>;
 
   if (!session) {
     return (

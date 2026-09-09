@@ -5,7 +5,7 @@ import { sanitizeSearchTerm } from '@/lib/utils';
 import type { InventoryItem } from '@/types/database';
 import {
   isAvailableInventoryStock,
-  isCompletedDealSaleInventory,
+  isCompletedJobInventory,
   mergeInventoryDealAssignments,
   type InventoryDealAssignmentRow,
   type InventoryWithDealAssignment,
@@ -162,7 +162,7 @@ export function useInventory(enabled = true) {
     createItem,
     updateItem,
     removeItem,
-    isCompletedSale: isCompletedDealSaleInventory,
+    isCompletedSale: isCompletedJobInventory,
     refresh: fetchItems,
   };
 }

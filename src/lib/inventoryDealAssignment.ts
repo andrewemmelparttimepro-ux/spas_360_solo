@@ -68,11 +68,10 @@ export function isAvailableInventoryStock(item: InventoryWithDealAssignment) {
     && !hasManagedInventoryAssignment(item);
 }
 
-export function isCompletedDealSaleInventory(item: Pick<
+export function isCompletedJobInventory(item: Pick<
   InventoryWithDealAssignment,
-  'status' | 'dealAssignment' | 'job'
+  'job'
 >) {
-  return item.status === 'Sold'
-    && item.dealAssignment !== null
-    && item.job?.status === 'Completed';
+  // Direct job attachments do not require a deal or a particular stock status.
+  return item.job?.status === 'Completed';
 }

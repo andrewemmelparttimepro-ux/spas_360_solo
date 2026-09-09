@@ -25,6 +25,6 @@ describe('Inventory search focus contract', () => {
     assert.match(hook, /query = query\.eq\('location_id', activeLocationId\);/);
     assert.match(hook, /sku\.ilike\.%\$\{needle\}%,product\.ilike\.%\$\{needle\}%,category\.ilike\.%\$\{needle\}%/);
     assert.match(page, /value=\{searchQuery\} onChange=\{e => setSearchQuery\(e\.target\.value\)\}/);
-    assert.match(page, /items\.filter\(item => inventoryMatchesBrand\(item, brandFilter\)\)/);
+    assert.match(page, /items\.filter\(item =>\s*inventoryMatchesBrand\(item, brandFilter\)/);
   });
 });

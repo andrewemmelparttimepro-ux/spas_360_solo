@@ -440,6 +440,7 @@ export default function Inventory() {
   // With every store on screen, each row must say which floor it's on
   const showStore = !activeLocationId;
   const [brandFilter, setBrandFilter] = useState(ALL_INVENTORY_BRANDS);
+  const [showSoldInventory, setShowSoldInventory] = useState(false);
   const [columnPreset,setColumnPreset] = useState(() => {try {return localStorage.getItem(`spas:inventory-columns:${profile?.id}`) || 'all';} catch{return 'all';}});
   useEffect(()=>{try{const saved=localStorage.getItem(`spas:inventory-columns:${profile?.id}`);setColumnPreset(saved&&['all','floor','delivery'].includes(saved)?saved:'all');}catch{setColumnPreset('all');}},[profile?.id]);
   const columnSets: Record<string,string[]> = {all:['model','color','serial','flooring','age','customer','status','order','received','delivery','onhand'],floor:['model','serial','flooring','age','status','onhand'],delivery:['model','serial','customer','status','delivery','onhand']};
@@ -459,7 +460,9 @@ export default function Inventory() {
     { label: 'Low Stock', value: lowStockAlerts },
   ];
   const brandOptions = inventoryBrandOptions(items);
-  const visibleItems = items.filter(item => inventoryMatchesBrand(item, brandFilter));
+  const visibleItems = items.filter(item =>
+    inventoryMatchesBrand(item, brandFilter) && (showSoldInventory || !isCompletedSale(item)),
+  );
   const groupedItems = groupInventoryItems(visibleItems);
   const columnCount = shown.size + (showStore ? 1 : 0);
   if (isLoading) {
@@ -503,18 +506,29 @@ export default function Inventory() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
             <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search serial number, model, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
           </div>
-          <label className="ml-auto flex items-center gap-2 text-sm font-medium text-ink-400">
-            Brand
-            <select
-              value={brandFilter}
-              onChange={event => setBrandFilter(event.target.value)}
-              className="bg-ink-900 border border-ink-700 text-ink-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              aria-label="Filter inventory"
-            >
-              <option>{ALL_INVENTORY_BRANDS}</option>
-              {brandOptions.map(brand => <option key={brand}>{brand}</option>)}
-            </select>
-          </label>
+          <div className="ml-auto flex flex-col items-end gap-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink-400">
+              Brand
+              <select
+                value={brandFilter}
+                onChange={event => setBrandFilter(event.target.value)}
+                className="bg-ink-900 border border-ink-700 text-ink-300 rounded-lg px-3 py-2 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                aria-label="Filter inventory"
+              >
+                <option>{ALL_INVENTORY_BRANDS}</option>
+                {brandOptions.map(brand => <option key={brand}>{brand}</option>)}
+              </select>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-ink-300">
+              <input
+                type="checkbox"
+                checked={showSoldInventory}
+                onChange={event => setShowSoldInventory(event.target.checked)}
+                className="h-4 w-4 rounded accent-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+              />
+              Show Sold Inventory
+            </label>
+          </div>
         </div>
         {/* The app shell owns vertical scrolling; this region only handles a narrow viewport. */}
         <div className="overflow-x-auto">

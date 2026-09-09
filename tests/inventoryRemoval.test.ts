@@ -1,22 +1,26 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
-import { isCompletedDealSaleInventory } from '../src/lib/inventoryDealAssignment.ts';
+import { isCompletedJobInventory } from '../src/lib/inventoryDealAssignment.ts';
 
 const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
 describe('completed-sale inventory and owner removal', () => {
-  it('highlights only sold deal inventory whose linked schedule job is completed', () => {
-    const base = {
-      status: 'Sold' as const,
-      dealAssignment: { dealId: 'deal-1', customer: { id: 'contact-1', first_name: 'A', last_name: 'B', phone: '', customer_type: 'Customer' as const } },
-      job: { id: 'job-1', status: 'Completed' as const },
-    };
+  it('recognizes completed job attachments with and without a deal or Sold stock status', () => {
+    for (const status of ['Sold', 'Delivered', 'In Stock'] as const) {
+      for (const dealAssignment of [null, { dealId: 'deal-1', customer: { id: 'contact-1', first_name: 'A', last_name: 'B', phone: '', customer_type: 'Customer' as const } }]) {
+        const item = { status, dealAssignment, job: { id: 'job-1', status: 'Completed' as const } };
+        assert.equal(isCompletedJobInventory(item), true);
+      }
+    }
+  });
 
-    assert.equal(isCompletedDealSaleInventory(base), true);
-    assert.equal(isCompletedDealSaleInventory({ ...base, status: 'In Stock' }), false);
-    assert.equal(isCompletedDealSaleInventory({ ...base, dealAssignment: null }), false);
-    assert.equal(isCompletedDealSaleInventory({ ...base, job: { id: 'job-1', status: 'Delivery' } }), false);
+  it('keeps unattached, active, cancelled, and reopened jobs out of completed inventory', () => {
+    assert.equal(isCompletedJobInventory({ job: null }), false);
+    assert.equal(isCompletedJobInventory({}), false);
+    for (const status of ['Pending Confirm', 'Delivery', 'Parts on Order', 'Warranty', 'Ready for Pickup', 'In Progress', 'Cancelled'] as const) {
+      assert.equal(isCompletedJobInventory({ job: { id: 'job-1', status } }), false);
+    }
   });
 
   it('renders the live completion state in red and refreshes when jobs change', async () => {

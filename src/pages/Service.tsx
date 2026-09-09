@@ -1,3 +1,4 @@
+import JobCompletionDialog from '@/components/JobCompletionDialog';
 import CustomerCombobox from '@/components/CustomerCombobox';
 import { useDraftState, clearDrafts } from '@/hooks/useDraftState';
 import { Calendar as CalendarIcon, Check, ChevronDown, Clock, Plus, Search, X, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -161,7 +162,13 @@ export default function Service() {
     else setRegularTypeFilter(types);
   };
 
+  const [completionJob, setCompletionJob] = useState<ServiceJob | null>(null);
   const saveJobStatus = async (id: string, u: { status: JobStatus }) => {
+    if (u.status === 'Completed') {
+      const target = jobs.find(job => job.id === id);
+      if (target) setCompletionJob(target as ServiceJob);
+      return false;
+    }
     const ok = await updateJob(id, u);
     toast(ok ? `Status → ${u.status}` : 'Failed to update', ok ? 'success' : 'error');
     return ok;
@@ -353,6 +360,17 @@ export default function Service() {
 
   return (
     <div className="h-full flex flex-col max-w-[1600px] mx-auto">
+      {completionJob && <JobCompletionDialog
+        key={completionJob.id}
+        jobId={completionJob.id}
+        jobTitle={completionJob.title}
+        onClose={() => setCompletionJob(null)}
+        onCompleted={async result => {
+          setCompletionJob(null);
+          await refresh();
+          toast(result.new_visit_id ? 'Visit completed. Follow-up added to Unscheduled.' : 'Job marked completed', 'success');
+        }}
+      />}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4 shrink-0">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">Service</p>

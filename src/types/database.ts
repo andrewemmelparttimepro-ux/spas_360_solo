@@ -63,6 +63,7 @@ export interface Deal {
 }
 
 export interface Job {
+  completion_workflow_status?: JobStatus | null;
   equipment_id?: string | null;
   exception_owner_id?: string | null; exception_reason?: string | null;
   exception_next_action?: string | null; exception_due_at?: string | null; exception_reviewed_at?: string | null;
@@ -137,6 +138,7 @@ export interface Task {
 }
 
 export interface Note {
+  source_note_id?: string | null;
   id: string; contact_id: string | null; deal_id: string | null;
   job_id: string | null; body: string; created_by: string;
   created_at: string; edited_at?: string | null; edited_by?: string | null;

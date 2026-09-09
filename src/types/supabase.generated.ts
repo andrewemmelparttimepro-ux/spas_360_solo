@@ -1757,8 +1757,48 @@ export type Database = {
           },
         ]
       }
+      job_visit_copies: {
+        Row: {
+          source_job_id: string
+          new_job_id: string | null
+          org_id: string
+          source_status: string
+          job_snapshot: Json
+          inventory_snapshot: Json
+          parts_snapshot: Json
+          assignments_snapshot: Json
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          source_job_id: string
+          new_job_id: string | null
+          org_id: string
+          source_status: string
+          job_snapshot: Json
+          inventory_snapshot: Json
+          parts_snapshot: Json
+          assignments_snapshot: Json
+          created_by: string
+          created_at: string
+        }
+        Update: {
+          source_job_id?: string
+          new_job_id?: string | null
+          org_id?: string
+          source_status?: string
+          job_snapshot?: Json
+          inventory_snapshot?: Json
+          parts_snapshot?: Json
+          assignments_snapshot?: Json
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       job_photos: {
         Row: {
+          source_photo_id: string | null
           caption: string | null
           created_at: string
           created_by: string
@@ -1768,6 +1808,7 @@ export type Database = {
           storage_path: string
         }
         Insert: {
+          source_photo_id?: string | null
           caption?: string | null
           created_at?: string
           created_by: string
@@ -1777,6 +1818,7 @@ export type Database = {
           storage_path: string
         }
         Update: {
+          source_photo_id?: string | null
           caption?: string | null
           created_at?: string
           created_by?: string
@@ -1804,6 +1846,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          completion_workflow_status: string | null
           amount_to_collect: number | null
           contact_id: string
           created_at: string
@@ -1831,6 +1874,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          completion_workflow_status?: string | null
           amount_to_collect?: number | null
           contact_id: string
           created_at?: string
@@ -1858,6 +1902,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          completion_workflow_status?: string | null
           amount_to_collect?: number | null
           contact_id?: string
           created_at?: string
@@ -3001,6 +3046,7 @@ export type Database = {
       }
       notes: {
         Row: {
+          source_note_id: string | null
           body: string
           contact_id: string | null
           created_at: string
@@ -3012,6 +3058,7 @@ export type Database = {
           job_id: string | null
         }
         Insert: {
+          source_note_id?: string | null
           body: string
           contact_id?: string | null
           created_at?: string
@@ -3023,6 +3070,7 @@ export type Database = {
           job_id?: string | null
         }
         Update: {
+          source_note_id?: string | null
           body?: string
           contact_id?: string | null
           created_at?: string
@@ -4260,6 +4308,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_job_visit: { Args: { p_job_id: string; p_new_visit?: boolean }; Returns: Json }
       complete_service_job: { Args: { p_job_id: string }; Returns: string }
       consume_rate_limit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number }

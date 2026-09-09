@@ -58,6 +58,11 @@ describe('job detail schedule status', () => {
     assert.deepEqual(jobDetailStatusUpdates({ status: 'Parts on Order', job_type: 'Delivery' }, 'Completed'), { status: 'Completed' });
   });
 
+  it('restores the recorded active workflow when reopening a newly completed visit', () => {
+    const updates = jobDetailStatusUpdates({ status: 'Completed', job_type: 'Delivery', completion_workflow_status: 'Parts on Order' }, 'Unscheduled');
+    assert.equal(updates.status, 'Parts on Order');
+  });
+
   it('reopens terminal jobs with the same initial workflow used by New Job', () => {
     const cases: [JobType, JobStatus][] = [
       ['Service', 'In Progress'], ['Repair', 'In Progress'], ['Warranty', 'Warranty'],

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface JobPhoto {
+  source_photo_id?: string | null;
   id: string;
   job_id: string;
   storage_path: string;
@@ -112,6 +113,8 @@ export function useJobPhotos(jobId: string | undefined) {
   const deletePhoto = useCallback(async (photo: JobPhoto) => {
     const { error } = await supabase.from('job_photos').delete().eq('id', photo.id);
     if (!error) {
+      // The restrictive Storage policy prevents removal while another visit
+      // references these bytes, including when an older client makes this call.
       await supabase.storage.from(BUCKET).remove([photo.storage_path]);
       await fetchPhotos();
     }

@@ -49,10 +49,10 @@ export function jobDetailScheduledDate(job: Pick<Job, 'status' | 'scheduled_at'>
   }).format(new Date(job.scheduled_at!));
 }
 
-// Scheduling is independent of operational workflow. Only explicitly reopening
-// a terminal job needs an active workflow value; the previous value is not stored.
+// Scheduling is independent of operational workflow. Reopening uses the recorded
+// completion workflow when available, with a job-type fallback for legacy rows.
 export function jobDetailStatusUpdates(
-  job: Pick<Job, 'status' | 'job_type'>,
+  job: Pick<Job, 'status' | 'job_type' | 'completion_workflow_status'>,
   status: JobDetailStatus,
   schedule?: ScheduleFields,
 ): Partial<Job> {
@@ -68,7 +68,10 @@ export function jobDetailStatusUpdates(
       Service: 'In Progress', Warranty: 'Warranty', Delivery: 'Delivery',
       'On Order': 'Parts on Order', 'Customer Pick Up': 'Ready for Pickup', 'To Do': 'Pending Confirm',
     };
-    updates.status = initialStatus[scheduleJobType(job.job_type)];
+    const recorded = job.completion_workflow_status;
+    updates.status = job.status === 'Completed' && recorded && recorded !== 'Completed' && recorded !== 'Cancelled'
+      ? recorded
+      : initialStatus[scheduleJobType(job.job_type)];
   }
   return updates;
 }

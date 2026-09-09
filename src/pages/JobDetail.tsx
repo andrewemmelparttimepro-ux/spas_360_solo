@@ -1,3 +1,5 @@
+import JobCompletionDialog from '@/components/JobCompletionDialog';
+import JobPreviousVisit from '@/components/JobPreviousVisit';
 import { useDraftState } from '@/hooks/useDraftState';
 import CustomerEquipment from '@/components/CustomerEquipment';
 import CollectionRequests from '@/components/CollectionRequests';
@@ -142,7 +144,7 @@ function PhotoCard({ jobId, allowDelete = true }: { jobId: string; allowDelete?:
           <DialogKeys onClose={() => setViewer(null)} />
           <img src={viewer.url} alt={viewer.photo_type} className="max-w-full max-h-[80vh] rounded-lg object-contain" />
           <div className="flex items-center gap-4 mt-4" onClick={e => e.stopPropagation()}>
-            <span className="text-sm text-ink-300">{viewer.photo_type} · {new Date(viewer.created_at).toLocaleString()}</span>
+            <span className="text-sm text-ink-300">{viewer.source_photo_id ? 'From previous visit · ' : ''}{viewer.photo_type} · {new Date(viewer.created_at).toLocaleString()}</span>
             {allowDelete && (
               <button
                 onClick={async () => { const { error } = await deletePhoto(viewer); if (error) toast(error, 'error'); else { toast('Photo deleted', 'success'); setViewer(null); } }}
@@ -369,7 +371,7 @@ function JobStatusText({ job }: { job: Job }) {
   );
 }
 
-function EditableStatusBadge({ job, onSave }: { job: Job; onSave: (u: Partial<Job>) => Promise<boolean> }) {
+function EditableStatusBadge({ job, onSave, onComplete }: { job: Job; onSave: (u: Partial<Job>) => Promise<boolean>; onComplete: () => void }) {
   const [editing, setEditing] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -378,6 +380,7 @@ function EditableStatusBadge({ job, onSave }: { job: Job; onSave: (u: Partial<Jo
 
   const changeStatus = async (status: JobDetailStatus) => {
     setEditing(false);
+    if (status === 'Completed') { onComplete(); return; }
     if (status === 'Scheduled') {
       setShowSchedule(true);
       return;
@@ -450,7 +453,7 @@ export default function JobDetail() {
   const { profile } = useAuth();
   const technician = isServiceTechnician(profile?.role);
   const canEditJob = canEditServiceJob(profile?.role);
-  const { job, isLoading, error: jobError, refresh: refreshJob, updateJob, deleteJob, completeJob } = useJob(id);
+  const { job, isLoading, error: jobError, refresh: refreshJob, updateJob, deleteJob } = useJob(id);
   const {
     choices: inventoryChoices,
     selectedItems: attachedInventory,
@@ -470,7 +473,7 @@ export default function JobDetail() {
   const [deletingJob, setDeletingJob] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showInventoryEditor, setShowInventoryEditor] = useState(false);
-  const [completingJob, setCompletingJob] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   const saveJob = async (updates: Partial<Job>) => {
     const ok = await updateJob(updates);
@@ -528,13 +531,6 @@ export default function JobDetail() {
     setShowInventoryEditor(false);
   };
 
-  const handleCompleteJob = async () => {
-    if (completingJob || job.status === 'Completed') return;
-    setCompletingJob(true);
-    const result = await completeJob();
-    setCompletingJob(false);
-    toast(result.ok ? 'Job marked completed' : result.error, result.ok ? 'success' : 'error');
-  };
 
   const canDelete = !job.scheduled_at
     && (profile?.role === 'owner_manager' || profile?.role === 'service_manager');
@@ -578,7 +574,7 @@ export default function JobDetail() {
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Status</p>
             {canEditJob ? (
-              <EditableStatusBadge key={job.id} job={job} onSave={saveJob} />
+              <EditableStatusBadge key={job.id} job={job} onSave={saveJob} onComplete={() => setShowCompletion(true)} />
             ) : (
               <span className={JOB_DETAIL_STATUS_CLASS}><JobStatusText job={job} /></span>
             )}
@@ -586,15 +582,30 @@ export default function JobDetail() {
           {technician && job.status !== 'Completed' && (
             <button
               type="button"
-              onClick={() => void handleCompleteJob()}
-              disabled={completingJob || job.status === 'Cancelled'}
+              onClick={() => setShowCompletion(true)}
+              disabled={job.status === 'Cancelled'}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
-              <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
+              <CheckCircle2 className="h-4 w-4" />Mark Completed
             </button>
           )}
         </div>
       </div>
+
+      {showCompletion && <JobCompletionDialog
+        key={job.id}
+        jobId={job.id}
+        jobTitle={job.title}
+        onClose={() => setShowCompletion(false)}
+        onCompleted={async result => {
+          setShowCompletion(false);
+          await refreshJob();
+          toast(result.new_visit_id ? 'Visit completed. Follow-up added to Unscheduled.' : 'Job marked completed', 'success');
+          if (result.new_visit_id) navigate(technician ? '/service' : `/service/${result.new_visit_id}`);
+        }}
+      />}
+
+      <JobPreviousVisit key={`previous-${job.id}`} jobId={job.id} />
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
@@ -694,7 +705,7 @@ export default function JobDetail() {
                         <p className="text-sm text-ink-100 whitespace-pre-wrap">{n.body}</p>
                         <div className="mt-1 flex items-center justify-between gap-2">
                           <p className="text-xs text-ink-500">
-                            {n.author_name} · {new Date(n.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                            {n.source_note_id ? 'From previous visit · ' : ''}{n.author_name} · {new Date(n.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                             {n.edited_at ? ` · edited ${new Date(n.edited_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : ''}
                           </p>
                           {canEditNote && <button type="button" aria-label="Edit note" onClick={() => { setEditingNoteId(n.id); setEditingNoteBody(n.body); }} className="text-xs font-semibold text-brand-400 hover:text-brand-300">Edit</button>}

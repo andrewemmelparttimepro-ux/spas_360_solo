@@ -19,6 +19,7 @@ import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
 import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError, scheduleJobType, JOB_DETAIL_STATUS_OPTIONS, jobDetailStatus, jobDetailScheduledDate, jobDetailStatusUpdates, type JobDetailStatus } from '@/lib/jobSchedule';
 import JobContactDetails from '@/components/JobContactDetails';
+import JobCustomerInventory from '@/components/JobCustomerInventory';
 import { canEditServiceJob, isServiceTechnician } from '@/lib/serviceTechAccess';
 
 // ─── Time clock: big start/stop, built for gloved thumbs ───
@@ -554,6 +555,7 @@ export default function JobDetail() {
                 ? <p className="text-sm font-semibold text-brand-400">{contact.first_name} {contact.last_name}</p>
                 : <Link to={`/customers/${job.contact_id}`} className="text-sm text-brand-400 hover:text-brand-300">{contact.first_name} {contact.last_name}</Link>}
               <JobContactDetails contact={{ ...contact, mailing_address: property?.address ?? contact.mailing_address }} className="text-ink-300" />
+              <JobCustomerInventory key={`${profile?.id}-${job.contact_id}`} customerId={job.contact_id} />
             </>
           )}
         </div>

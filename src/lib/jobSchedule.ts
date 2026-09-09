@@ -34,6 +34,45 @@ export function calendarJobTitleClass(status: JobStatus): string | undefined {
   return status === 'Completed' ? 'line-through decoration-solid decoration-2' : undefined;
 }
 
+export const JOB_DETAIL_STATUS_OPTIONS = ['Unscheduled', 'Scheduled', 'Completed'] as const;
+export type JobDetailStatus = typeof JOB_DETAIL_STATUS_OPTIONS[number];
+
+export function jobDetailStatus(job: Pick<Job, 'status' | 'scheduled_at'>): JobDetailStatus {
+  if (job.status === 'Completed') return 'Completed';
+  return job.scheduled_at && storedScheduleCalendarDate(job.scheduled_at) ? 'Scheduled' : 'Unscheduled';
+}
+
+export function jobDetailScheduledDate(job: Pick<Job, 'status' | 'scheduled_at'>): string | null {
+  if (jobDetailStatus(job) !== 'Scheduled') return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: SCHEDULE_TIME_ZONE, month: 'short', day: 'numeric', year: 'numeric',
+  }).format(new Date(job.scheduled_at!));
+}
+
+// Scheduling is independent of operational workflow. Only explicitly reopening
+// a terminal job needs an active workflow value; the previous value is not stored.
+export function jobDetailStatusUpdates(
+  job: Pick<Job, 'status' | 'job_type'>,
+  status: JobDetailStatus,
+  schedule?: ScheduleFields,
+): Partial<Job> {
+  if (status === 'Completed') return { status: 'Completed' };
+  if (status === 'Scheduled' && (!schedule?.scheduled_at || !storedScheduleCalendarDate(schedule.scheduled_at))) {
+    throw new Error('Choose a start date to schedule this job.');
+  }
+  const updates: Partial<Job> = status === 'Unscheduled'
+    ? { scheduled_at: null, scheduled_all_day: false, scheduled_end_date: null }
+    : { ...schedule };
+  if (job.status === 'Completed' || job.status === 'Cancelled') {
+    const initialStatus: Record<ScheduleJobType, JobStatus> = {
+      Service: 'In Progress', Warranty: 'Warranty', Delivery: 'Delivery',
+      'On Order': 'Parts on Order', 'Customer Pick Up': 'Ready for Pickup', 'To Do': 'Pending Confirm',
+    };
+    updates.status = initialStatus[scheduleJobType(job.job_type)];
+  }
+  return updates;
+}
+
 const CALENDAR_DAY_MS = 24 * 60 * 60 * 1000;
 const SCHEDULE_TIME_ZONE = 'America/Chicago';
 

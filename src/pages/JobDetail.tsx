@@ -4,20 +4,20 @@ import CollectionRequests from '@/components/CollectionRequests';
 import ServiceExceptionReview from '@/components/ServiceExceptionReview';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Wrench, Plus, Save, X, Pencil, DollarSign, Play, Square, Camera, Trash2, Boxes, CheckCircle2, CalendarDays, Clock3 } from 'lucide-react';
-import { useJob, useJobInventory, statusColors, jobTypeChipColors, JOB_STATUS_OPTIONS, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
+import { useJob, useJobInventory, jobTypeChipColors, JOB_TYPE_OPTIONS } from '@/hooks/useServiceJobs';
 import { useNotes } from '@/hooks/useNotes';
 import { useTasks } from '@/hooks/useTasks';
 import { useTimeClock, formatDuration } from '@/hooks/useTimeClock';
 import { useJobPhotos, PHOTO_TYPES, type JobPhoto } from '@/hooks/useJobPhotos';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import type { JobStatus, JobType, Job } from '@/types/database';
+import type { JobType, Job } from '@/types/database';
 import { useToast } from '@/components/ui/Toast';
 import DialogKeys from '@/components/ui/DialogKeys';
 import { useAuth } from '@/contexts/AuthContext';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { inventoryUnitLabel } from '@/lib/dealInventory';
-import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError, scheduleJobType } from '@/lib/jobSchedule';
+import { jobScheduleDraft, jobScheduleUpdatesFromDraft, scheduleDateRangeError, scheduleJobType, JOB_DETAIL_STATUS_OPTIONS, jobDetailStatus, jobDetailScheduledDate, jobDetailStatusUpdates, type JobDetailStatus } from '@/lib/jobSchedule';
 import JobContactDetails from '@/components/JobContactDetails';
 import { canEditServiceJob, isServiceTechnician } from '@/lib/serviceTechAccess';
 
@@ -236,9 +236,15 @@ function EditableField({
 function ScheduleDateRangeEditor({
   job,
   onSave,
+  requireStartDate = false,
+  idPrefix = 'job',
+  onSavingChange,
 }: {
   job: Pick<Job, 'scheduled_at' | 'scheduled_all_day' | 'scheduled_end_date'>;
-  onSave: (updates: Partial<Job>) => Promise<boolean>;
+  onSave: (updates: Pick<Job, 'scheduled_at' | 'scheduled_all_day' | 'scheduled_end_date'>) => Promise<boolean>;
+  requireStartDate?: boolean;
+  idPrefix?: string;
+  onSavingChange?: (saving: boolean) => void;
 }) {
   const stored = jobScheduleDraft(job);
   const [startDate, setStartDate] = useState(stored.startDate);
@@ -250,14 +256,18 @@ function ScheduleDateRangeEditor({
   useEffect(() => { setStartTime(stored.startTime); }, [stored.startTime]);
   useEffect(() => { setEndDate(stored.endDate); }, [stored.endDate]);
 
-  const validationError = scheduleDateRangeError(startDate, endDate, startTime);
+  const validationError = requireStartDate && !startDate
+    ? 'Choose a start date to schedule this job.'
+    : scheduleDateRangeError(startDate, endDate, startTime);
   const dirty = startDate !== stored.startDate || startTime !== stored.startTime || endDate !== stored.endDate;
 
   const save = async () => {
-    if (!dirty || validationError || saving) return;
+    if ((!dirty && !requireStartDate) || validationError || saving) return;
     setSaving(true);
+    onSavingChange?.(true);
     const ok = await onSave(jobScheduleUpdatesFromDraft(startDate, startTime, endDate));
     setSaving(false);
+    onSavingChange?.(false);
     if (!ok) {
       setStartDate(stored.startDate);
       setStartTime(stored.startTime);
@@ -266,13 +276,14 @@ function ScheduleDateRangeEditor({
   };
 
   return (
-    <fieldset className="rounded-lg border border-ink-700 p-3">
+    <fieldset disabled={saving} className="rounded-lg border border-ink-700 p-3">
       <legend className="px-1 text-xs font-semibold text-ink-400">Schedule dates</legend>
       <div className="space-y-3">
         <div>
-          <label htmlFor="job-scheduled-date" className="mb-1 block text-xs font-semibold text-ink-400">Start date</label>
+          <label htmlFor={`${idPrefix}-scheduled-date`} className="mb-1 block text-xs font-semibold text-ink-400">Start date</label>
           <input
-            id="job-scheduled-date"
+            id={`${idPrefix}-scheduled-date`}
+            autoFocus={requireStartDate}
             type="date"
             value={startDate}
             onChange={event => setStartDate(event.target.value)}
@@ -280,9 +291,9 @@ function ScheduleDateRangeEditor({
           />
         </div>
         <div>
-          <label htmlFor="job-scheduled-time" className="mb-1 block text-xs font-semibold text-ink-400">Time <span className="font-normal text-ink-500">(optional)</span></label>
+          <label htmlFor={`${idPrefix}-scheduled-time`} className="mb-1 block text-xs font-semibold text-ink-400">Time <span className="font-normal text-ink-500">(optional)</span></label>
           <input
-            id="job-scheduled-time"
+            id={`${idPrefix}-scheduled-time`}
             type="time"
             disabled={!startDate}
             value={startTime}
@@ -291,9 +302,9 @@ function ScheduleDateRangeEditor({
           />
         </div>
         <div>
-          <label htmlFor="job-scheduled-end-date" className="mb-1 block text-xs font-semibold text-ink-400">End date <span className="font-normal text-ink-500">(optional)</span></label>
+          <label htmlFor={`${idPrefix}-scheduled-end-date`} className="mb-1 block text-xs font-semibold text-ink-400">End date <span className="font-normal text-ink-500">(optional)</span></label>
           <input
-            id="job-scheduled-end-date"
+            id={`${idPrefix}-scheduled-end-date`}
             type="date"
             min={startDate || undefined}
             value={endDate}
@@ -306,7 +317,7 @@ function ScheduleDateRangeEditor({
           <button
             type="button"
             onClick={() => void save()}
-            disabled={!dirty || Boolean(validationError) || saving}
+            disabled={(!dirty && !requireStartDate) || Boolean(validationError) || saving}
             className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-40"
           >
             {saving ? 'Saving…' : 'Save dates'}
@@ -344,34 +355,91 @@ function ScheduleSummary({ job }: { job: Pick<Job, 'scheduled_at' | 'scheduled_a
   );
 }
 
-// --------------- Editable status badge ---------------
-function EditableStatusBadge({ value, onSave }: { value: JobStatus; onSave: (u: Partial<Job>) => Promise<boolean> }) {
+// Keep the header's schedule state separate from the operational workflow colors.
+const JOB_DETAIL_STATUS_CLASS = 'inline-flex rounded-lg bg-[#374151] px-3 py-1 text-sm font-bold text-white';
+
+function JobStatusText({ job }: { job: Job }) {
+  const date = jobDetailScheduledDate(job);
+  return (
+    <span className="flex flex-col items-start">
+      <span>{jobDetailStatus(job)}</span>
+      {date && <span className="text-[11px] font-normal leading-4">{date}</span>}
+    </span>
+  );
+}
+
+function EditableStatusBadge({ job, onSave }: { job: Job; onSave: (u: Partial<Job>) => Promise<boolean> }) {
   const [editing, setEditing] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLSelectElement>(null);
   useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
 
-  if (editing) {
-    return (
-      <select
-        ref={ref} value={value}
-        onChange={async e => { await onSave({ status: e.target.value as JobStatus }); setEditing(false); }}
-        onBlur={() => setEditing(false)}
-        className="px-2 py-1 border border-brand-500 rounded-lg text-sm outline-none bg-ink-900 focus:ring-2 focus:ring-brand-500/30"
-      >
-        {JOB_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    );
-  }
+  const changeStatus = async (status: JobDetailStatus) => {
+    setEditing(false);
+    if (status === 'Scheduled') {
+      setShowSchedule(true);
+      return;
+    }
+    setSaving(true);
+    await onSave(jobDetailStatusUpdates(job, status));
+    setSaving(false);
+  };
 
   return (
-    <span
-      tabIndex={0} role="button" onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(true); } }} onClick={() => setEditing(true)}
-      className={cn("px-3 py-1 rounded-lg text-sm font-bold border-l-4 cursor-pointer hover:ring-2 hover:ring-brand-500/30 transition-all group inline-flex items-center gap-1", statusColors[value] ?? 'bg-ink-950')}
-      title="Click to change status"
-    >
-      {value}
-      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-    </span>
+    <>
+      {editing ? (
+        <span className={cn(JOB_DETAIL_STATUS_CLASS, 'flex-col')}>
+          <select
+            ref={ref}
+            aria-label="Job status"
+            value={jobDetailStatus(job)}
+            onChange={event => void changeStatus(event.target.value as JobDetailStatus)}
+            onBlur={() => setEditing(false)}
+            onKeyDown={event => { if (event.key === 'Escape') setEditing(false); }}
+            className="bg-[#374151] text-sm font-bold text-white outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            {JOB_DETAIL_STATUS_OPTIONS.map(status => <option key={status} value={status} className="bg-[#374151] text-white">{status}</option>)}
+          </select>
+          {jobDetailScheduledDate(job) && <span className="text-[11px] font-normal leading-4">{jobDetailScheduledDate(job)}</span>}
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setEditing(true)}
+          className={cn(JOB_DETAIL_STATUS_CLASS, 'group items-center gap-1 text-left hover:ring-2 hover:ring-brand-500/30 disabled:opacity-50')}
+          title="Click to change status"
+          aria-label={`Job status: ${jobDetailStatus(job)}. Click to change status`}
+        >
+          <JobStatusText job={job} />
+          <Pencil className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60" />
+        </button>
+      )}
+      {showSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <section role="dialog" aria-modal="true" aria-labelledby="schedule-job-title" className="w-full max-w-md rounded-2xl border border-ink-700 bg-ink-900 p-6 shadow-2xl">
+            <DialogKeys onClose={() => { if (!saving) setShowSchedule(false); }} />
+            <h2 id="schedule-job-title" className="mb-3 text-lg font-bold text-ink-100">Schedule job</h2>
+            {(job.status === 'Completed' || job.status === 'Cancelled') && (
+              <p className="mb-3 text-sm text-ink-400">Saving dates will reopen this job.</p>
+            )}
+            <ScheduleDateRangeEditor
+              job={job}
+              idPrefix="status-job"
+              requireStartDate
+              onSavingChange={setSaving}
+              onSave={async schedule => {
+                const ok = await onSave(jobDetailStatusUpdates(job, 'Scheduled', schedule));
+                if (ok) setShowSchedule(false);
+                return ok;
+              }}
+            />
+            <button type="button" disabled={saving} onClick={() => setShowSchedule(false)} className="mt-3 rounded-lg border border-ink-700 px-3 py-2 text-sm text-ink-300 disabled:opacity-50">Cancel</button>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -508,28 +576,21 @@ export default function JobDetail() {
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Status</p>
             {canEditJob ? (
-              <EditableStatusBadge value={job.status as JobStatus} onSave={saveJob} />
-            ) : technician ? (
-              job.status === 'Completed' ? (
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-2 text-sm font-bold text-emerald-300">
-                  <CheckCircle2 className="h-4 w-4" />Completed
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleCompleteJob()}
-                  disabled={completingJob || job.status === 'Cancelled'}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
-                </button>
-              )
+              <EditableStatusBadge key={job.id} job={job} onSave={saveJob} />
             ) : (
-              <span className={cn('inline-flex rounded-lg border-l-4 px-3 py-1 text-sm font-bold', statusColors[job.status] ?? 'bg-ink-950')}>
-                {job.status}
-              </span>
+              <span className={JOB_DETAIL_STATUS_CLASS}><JobStatusText job={job} /></span>
             )}
           </div>
+          {technician && job.status !== 'Completed' && (
+            <button
+              type="button"
+              onClick={() => void handleCompleteJob()}
+              disabled={completingJob || job.status === 'Cancelled'}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />{completingJob ? 'Completing…' : 'Mark Completed'}
+            </button>
+          )}
         </div>
       </div>
 

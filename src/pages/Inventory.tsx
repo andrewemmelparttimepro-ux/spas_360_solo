@@ -504,7 +504,7 @@ export default function Inventory() {
           <label className="text-sm text-ink-400">Columns<select value={columnPreset} onChange={e=>{setColumnPreset(e.target.value);try{localStorage.setItem(`spas:inventory-columns:${profile?.id}`,e.target.value);}catch{/* Preference is optional. */}}} className="ml-2 rounded-lg border border-ink-700 bg-ink-900 p-2"><option value="all">All details</option><option value="floor">Floor review</option><option value="delivery">Delivery</option></select></label>
           <div className="relative flex-1 min-w-[220px] max-w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500" />
-            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search serial number, model, category..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} aria-label="Search inventory" placeholder="Search serial, model, category, customer..." className="w-full pl-9 pr-4 py-2 bg-ink-900 border border-ink-700 rounded-lg text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
           </div>
           <div className="ml-auto flex flex-col items-end gap-2">
             <label className="flex items-center gap-2 text-sm font-medium text-ink-400">

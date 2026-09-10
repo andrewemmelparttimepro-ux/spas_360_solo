@@ -7,7 +7,7 @@ const read = (relativePath: string) => readFile(new URL(`../${relativePath}`, im
 describe('Inventory search focus contract', () => {
   it('keeps the mounted search input while query requests are in flight', async () => {
     const hook = await read('src/hooks/useInventory.ts');
-    const fetchBody = hook.match(/const fetchItems = useCallback\(async \(\) => \{([\s\S]*?)\n  \}, \[profile\?\.id,\s*profile\?\.org_id, activeLocationId, searchQuery, enabled\]\);/)?.[1];
+    const fetchBody = hook.match(/const fetchItems = useCallback\(async \(\) => \{([\s\S]*?)\n  \}, \[profile\?\.id,\s*profile\?\.org_id, activeLocationId, enabled\]\);/)?.[1];
 
     assert.ok(fetchBody, 'inventory fetch callback should remain identifiable');
     assert.doesNotMatch(fetchBody, /setIsLoading\(true\)/);
@@ -23,7 +23,7 @@ describe('Inventory search focus contract', () => {
     ]);
 
     assert.match(hook, /query = query\.eq\('location_id', activeLocationId\);/);
-    assert.match(hook, /sku\.ilike\.%\$\{needle\}%,product\.ilike\.%\$\{needle\}%,category\.ilike\.%\$\{needle\}%/);
+    assert.match(hook, /inventoryMatchesSearch\(item, searchQuery\)/);
     assert.match(page, /value=\{searchQuery\} onChange=\{e => setSearchQuery\(e\.target\.value\)\}/);
     assert.match(page, /items\.filter\(item =>\s*inventoryMatchesBrand\(item, brandFilter\)/);
   });

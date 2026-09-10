@@ -6,7 +6,7 @@ import { BookOpen, ExternalLink, FileKey2, Files, FileText, Search, ShieldCheck,
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { filterKnowledgeDocuments } from '@/lib/knowledgeDocuments';
+import { filterKnowledgeDocuments, knowledgeSearchTitle } from '@/lib/knowledgeDocuments';
 import { confirmLibraryDeletion, requestLibraryDeletion, type LibraryDeleteKind } from '@/lib/libraryDeletion';
 
 type KnowledgeResult = {
@@ -404,7 +404,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
                     <span className={cn('rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', result.access_scope === 'staff' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300')}>{result.access_scope}</span>
                     {result.part_numbers?.slice(0, 6).map(part => <code key={part} className="rounded bg-ink-950 px-1.5 py-0.5 text-[11px] text-violet-300">{part}</code>)}
                   </div>
-                  <h3 className="text-sm font-bold text-ink-100">{result.heading ?? result.title}</h3>
+                  <h3 className="text-sm font-bold text-ink-100">{knowledgeSearchTitle(result)}</h3>
                   <p className="mt-0.5 text-xs text-ink-500">{result.citation_label ?? result.title}{pages(result) ? ` · ${pages(result)}` : ''}</p>
                 </div>
                 {(result.source_url || documents.some(doc => doc.id === result.document_id && doc.storage_path)) && (

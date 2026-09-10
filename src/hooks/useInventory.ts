@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { sanitizeSearchTerm } from '@/lib/utils';
+import { inventoryMatchesSearch, loadInventoryPages } from '@/lib/inventorySearch';
 import type { InventoryItem } from '@/types/database';
 import {
   isAvailableInventoryStock,
@@ -15,11 +15,12 @@ export type InventoryListItem = InventoryWithDealAssignment;
 
 export function useInventory(enabled = true) {
   const { profile, activeLocationId } = useAuth();
-  const [items, setItems] = useState<InventoryListItem[]>([]);
+  const [allItems, setItems] = useState<InventoryListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error,setError]=useState<string|null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const latestFetchId = useRef(0);
+  const items = useMemo(() => allItems.filter(item => inventoryMatchesSearch(item, searchQuery)), [allItems, searchQuery]);
 
   const fetchItems = useCallback(async () => {
     if (!profile || !enabled) {
@@ -30,47 +31,40 @@ export function useInventory(enabled = true) {
     const fetchId = ++latestFetchId.current;
 
     try {
-    let query = supabase
-      .from('inventory_items')
-      .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type), job:job_id(id, status)')
-      .eq('org_id', profile.org_id)
-      .is('removed_at', null)
-      .order('created_at', { ascending: false });
-
-    if (activeLocationId) {
-      query = query.eq('location_id', activeLocationId);
-    }
-
-    const needle = sanitizeSearchTerm(searchQuery);
-    if (needle) {
-      query = query.or(`sku.ilike.%${needle}%,product.ilike.%${needle}%,category.ilike.%${needle}%`);
-    }
-
-    const [inventoryResult, assignmentResult] = await Promise.all([
-      query.abortSignal(AbortSignal.timeout(15000)),
-      supabase
+    const signal = AbortSignal.timeout(15000);
+    const [inventoryRows, assignmentRows] = await Promise.all([
+      loadInventoryPages(async (from, to) => {
+        let query = supabase
+          .from('inventory_items')
+          .select('*, locations:location_id(name), customer:customer_id(id, first_name, last_name, phone, customer_type), job:job_id(id, status)')
+          .eq('org_id', profile.org_id)
+          .is('removed_at', null)
+          .order('created_at', { ascending: false })
+          .order('id');
+        if (activeLocationId) query = query.eq('location_id', activeLocationId);
+        return query.range(from, to).abortSignal(signal);
+      }),
+      loadInventoryPages(async (from, to) => supabase
         .from('deals')
         .select('id, inventory_item_id, contact:contact_id(id, first_name, last_name, phone, customer_type)')
         .eq('org_id', profile.org_id)
-        .not('inventory_item_id', 'is', null).abortSignal(AbortSignal.timeout(15000)),
+        .not('inventory_item_id', 'is', null)
+        .order('id')
+        .range(from, to).abortSignal(signal)),
     ]);
 
-    if (inventoryResult.error || assignmentResult.error) {
-      throw inventoryResult.error ?? assignmentResult.error;
-    }
-
-    // Search and realtime refreshes keep the page mounted so the search input
-    // retains focus. Ignore slower responses for older keystrokes as well.
+    // Search is local to the complete joined list and keeps the input mounted.
+    // Ignore a refresh overtaken by another refresh or a store/account change.
     if (fetchId !== latestFetchId.current) return;
 
     setItems(mergeInventoryDealAssignments(
-      (inventoryResult.data ?? []) as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
-      (assignmentResult.data ?? []) as unknown as InventoryDealAssignmentRow[],
+      inventoryRows as unknown as Parameters<typeof mergeInventoryDealAssignments>[0],
+      assignmentRows as unknown as InventoryDealAssignmentRow[],
     ));
     setError(null);
     }catch{if(fetchId===latestFetchId.current)setError('Inventory could not refresh. Results may be from the previous search. Retry before relying on these figures.');}
     finally{if(fetchId===latestFetchId.current)setIsLoading(false);}
-  }, [profile?.id,profile?.org_id, activeLocationId, searchQuery, enabled]);
+  }, [profile?.id,profile?.org_id, activeLocationId, enabled]);
 
   useEffect(()=>{setItems([]);setError(null);setIsLoading(true);return()=>{latestFetchId.current++;};},[profile?.id,profile?.org_id,activeLocationId,enabled]);
   useEffect(() => { void fetchItems();return()=>{latestFetchId.current++;}; }, [fetchItems]);
@@ -93,6 +87,7 @@ export function useInventory(enabled = true) {
         table: 'deals',
         filter: orgFilter,
       }, fetchItems)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts', filter: orgFilter }, fetchItems)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

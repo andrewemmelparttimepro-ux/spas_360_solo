@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Workbook } from 'exceljs';
-import { Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Printer, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronDown, Copy, FileSpreadsheet, FolderOpen, GripVertical, LoaderCircle, PaintBucket, Pencil, Printer, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { printWorksheetDocument, worksheetPrintDocument } from '@/lib/workbookPrint';
 import { supabase } from '@/lib/supabase';
@@ -777,7 +777,7 @@ export function OwnerWorkbookLibrary() {
       {isLoading ? (
         <div className="mt-5 flex items-center gap-2 text-sm text-ink-500"><LoaderCircle className="h-4 w-4 animate-spin" />Loading workbooks…</div>
       ) : !active ? (
-        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="mt-5 grid items-start gap-4 lg:grid-cols-3">
           <WorkbookFolder
             title="Inventory Profits"
             description="The verified profitability workbook, kept editable with formulas and formatting intact."
@@ -1153,12 +1153,14 @@ function WorkbookFolder({
   onDelete?: (record: OwnerWorkbookRecord) => void;
 }) {
   return (
-    <article className="rounded-xl border border-ink-700 bg-ink-950/50 p-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><FolderOpen className="h-4 w-4" /></span>
-        <div><h3 className="font-bold text-ink-100">{title}</h3><p className="mt-1 text-xs leading-relaxed text-ink-500">{description}</p></div>
-      </div>
-      <div className="mt-4 space-y-2">
+    <details className="group min-w-0 rounded-xl border border-ink-700 bg-ink-950/50">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl p-4 hover:bg-ink-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><FolderOpen className="h-4 w-4" /></span>
+        <h3 className="min-w-0 flex-1 break-words font-bold text-ink-100">{title}</h3>
+        <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-2 px-4 pb-4">
+        <p className="pb-2 text-xs leading-relaxed text-ink-500">{description}</p>
         {records.map(record => {
           const recordBusy = busyId === record.id || busyId === `rename-${record.id}` || busyId === `duplicate-${record.id}` || busyId === `delete-${record.id}`;
           return (
@@ -1184,6 +1186,6 @@ function WorkbookFolder({
         {!records.length && <button type="button" onClick={onEmptyAction} disabled={busy} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-60">{busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}{emptyAction}</button>}
         {!!records.length && onUpload && <button type="button" onClick={onUpload} disabled={busy} className="inline-flex items-center gap-2 rounded-lg border border-ink-700 px-3 py-2 text-xs font-bold text-ink-300 hover:border-amber-500 disabled:opacity-60"><Upload className="h-3.5 w-3.5" />Add another workbook</button>}
       </div>
-    </article>
+    </details>
   );
 }

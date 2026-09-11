@@ -1844,6 +1844,121 @@ export type Database = {
           },
         ]
       }
+      jobber_history: {
+        Row: {
+          candidate_contact_ids: string[]
+          captured_at: string
+          client_name: string
+          contact_id: string | null
+          coverage: string
+          id: string
+          import_batch: string
+          imported_at: string
+          location_id: string
+          match_reason: string
+          match_status: string
+          occurred_at: string | null
+          org_id: string
+          raw: Json
+          record_kind: string
+          search_text: string
+          source_account_id: string | null
+          source_account_key: string
+          source_account_name: string
+          source_checksum: string
+          source_client_id: string | null
+          source_id: string
+          source_number: string | null
+          source_status: string | null
+          source_updated_at: string | null
+          source_url: string | null
+          summary: Json
+          title: string
+        }
+        Insert: {
+          candidate_contact_ids?: string[]
+          captured_at: string
+          client_name: string
+          contact_id?: string | null
+          coverage?: string
+          id?: string
+          import_batch: string
+          imported_at?: string
+          location_id: string
+          match_reason: string
+          match_status: string
+          occurred_at?: string | null
+          org_id: string
+          raw: Json
+          record_kind: string
+          search_text: string
+          source_account_id?: string | null
+          source_account_key: string
+          source_account_name: string
+          source_checksum: string
+          source_client_id?: string | null
+          source_id: string
+          source_number?: string | null
+          source_status?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
+          summary: Json
+          title: string
+        }
+        Update: {
+          candidate_contact_ids?: string[]
+          captured_at?: string
+          client_name?: string
+          contact_id?: string | null
+          coverage?: string
+          id?: string
+          import_batch?: string
+          imported_at?: string
+          location_id?: string
+          match_reason?: string
+          match_status?: string
+          occurred_at?: string | null
+          org_id?: string
+          raw?: Json
+          record_kind?: string
+          search_text?: string
+          source_account_id?: string | null
+          source_account_key?: string
+          source_account_name?: string
+          source_checksum?: string
+          source_client_id?: string | null
+          source_id?: string
+          source_number?: string | null
+          source_status?: string | null
+          source_updated_at?: string | null
+          source_url?: string | null
+          summary?: Json
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobber_history_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobber_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobber_history_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           completion_workflow_status: string | null

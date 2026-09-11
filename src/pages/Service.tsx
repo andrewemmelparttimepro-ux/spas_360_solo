@@ -379,6 +379,8 @@ export default function Service() {
             {technician ? 'Choose a store and tap a day to see its scheduled jobs' : 'Drag jobs from the queue onto a day — drag back to unschedule'}
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+        {!technician && <Link to="/jobber-history" className="text-sm text-brand-300 hover:underline">Jobber History</Link>}
         {canManageSchedule && <button
           onClick={() => {
             // Smart default: pre-pick the store you're already working in
@@ -390,6 +392,7 @@ export default function Service() {
         >
           <Plus className="w-4 h-4 mr-2" />New Job
         </button>}
+        </div>
       </div>
 
       <div className="mb-4 shrink-0 overflow-x-auto" aria-label="Schedule store selector">

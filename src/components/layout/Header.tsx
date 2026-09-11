@@ -33,6 +33,7 @@ export const SECONDARY_NAV_ITEMS: { name: string; path: string; icon: typeof Lay
   { name: 'Inbox', path: '/communication', icon: MessageSquare },
   { name: 'Citadel', path: '/citadel', icon: Building2 },
   { name: 'Knowledge', path: '/knowledge', icon: BookOpen },
+  { name: 'Jobber History', path: '/jobber-history', icon: BookOpen },
   { name: 'Reports', path: '/reports', icon: BarChart3 },
 ];
 

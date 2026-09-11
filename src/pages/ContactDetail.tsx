@@ -19,6 +19,7 @@ import { runAriMention } from '@/agent/ariTasks';
 import { friendlyAgentError } from '@/agent/run';
 import AriNoteCard from '@/components/AriNoteCard';
 import type { AriOutputFormat } from '@/lib/ariExport';
+import { JobberHistoryPanel } from './JobberHistory';
 
 // The full relationship behind the customer card: deals, service jobs, equipment
 type RelDeal = { id: string; title: string; amount: number | null; created_at: string; stage?: { name: string } | null };
@@ -393,6 +394,7 @@ export default function ContactDetail() {
           </div>
         </div>
         <div className="lg:col-span-2 space-y-6">
+          {id && <JobberHistoryPanel contactId={id} />}
           <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
             <h2 className="text-sm font-semibold text-ink-400 uppercase tracking-wider mb-4">Notes</h2>{notesError&&<p role="alert" className="text-sm text-amber-600">{notesError} <button className="underline" onClick={()=>void refreshNotes()}>Retry loading</button></p>}
             <div className="flex items-start space-x-3 mb-4">

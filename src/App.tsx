@@ -15,6 +15,7 @@ const Communication = lazy(() => import('./pages/Communication'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Customers = lazy(() => import('./pages/Customers'));
 const ContactDetail = lazy(() => import('./pages/ContactDetail'));
+const JobberHistory = lazy(() => import('./pages/JobberHistory'));
 const DealDetail = lazy(() => import('./pages/DealDetail'));
 const JobDetail = lazy(() => import('./pages/JobDetail'));
 const InventoryDetail = lazy(() => import('./pages/InventoryDetail'));
@@ -112,6 +113,8 @@ function AuthGate() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="customers" element={<Customers />} />
             <Route path="customers/:id" element={<ContactDetail />} />
+            <Route path="jobber-history" element={<JobberHistory />} />
+            <Route path="jobber-history/:id" element={<JobberHistory />} />
             {/* Legacy paths — old links and notifications keep working */}
             <Route path="contacts" element={<Navigate to="/customers" replace />} />
             <Route path="contacts/:id" element={<ContactDetail />} />

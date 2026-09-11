@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Phone, Mail, Users, Handshake, Wrench, Package, AlertTriangle, Snowflake, BadgeDollarSign, GripVertical, LayoutGrid, List } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn, formatPhone } from '@/lib/utils';
@@ -97,6 +97,8 @@ export default function Customers() {
             Drag any customer onto <span className="text-brand-300 font-medium">Deals</span> or <span className="text-emerald-300 font-medium">Schedule</span> up top to start work
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+        <Link to="/jobber-history" className="text-sm text-brand-300 hover:underline">Jobber History</Link>
         <button
           onClick={() => setShowWizard(true)}
           className="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"
@@ -104,6 +106,7 @@ export default function Customers() {
           <Plus className="w-4 h-4 mr-2" />
           New Customer
         </button>
+        </div>
       </div>
 
       {showWizard && <NewCustomerWizard onClose={() => setShowWizard(false)} onCreated={() => refresh()} />}

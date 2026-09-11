@@ -142,7 +142,7 @@ function HistoryDetail({ id }: { id: string }) {
       if (result.error || !result.data) { setMessage('This record could not be loaded. Return to Jobber History and try again.'); return; }
       const record = result.data as JobberHistoryRow;
       setRow(record);
-      if (record.candidate_contact_ids?.length) {
+      if (record.match_status === 'review' && record.candidate_contact_ids?.length) {
         const response = await supabase.from('contacts').select('id,first_name,last_name').eq('org_id', profile.org_id).in('id', record.candidate_contact_ids);
         if (current) setCandidates(response.data || []);
       }
@@ -207,6 +207,6 @@ export function JobberHistoryPanel({ contactId }: { contactId: string }) {
   return <section className="rounded-xl border border-ink-700 bg-ink-900 p-5">
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Jobber History {count ? `(${count})` : ''}</h2><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history?contact=${contactId}`}>View history</Link></div>
     <p className="mt-2 text-xs text-ink-400">Imported summaries. Full notes, visits and files pending.</p>
-    {error ? <p role="alert" className="mt-3 text-sm text-amber-300">History could not be loaded. Open View history to retry.</p> : <ul className="mt-3 divide-y divide-ink-800">{rows.map(row => <li key={row.id} className="py-2"><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history/${row.id}`}>{row.source_number ? `#${row.source_number} · ` : 'Customer · '}{row.title}</Link><p className="mt-0.5 text-xs text-ink-500 capitalize">{row.source_account_name} · {status(row.source_status)}</p></li>)}</ul>}
+    {error ? <p role="alert" className="mt-3 text-sm text-amber-300">History could not be loaded. Open View history to retry.</p> : <ul className="mt-3 divide-y divide-ink-800">{rows.map(row => <li key={row.id} className="py-2"><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history/${row.id}`}>{row.source_number ? `#${row.source_number} · ` : 'Customer · '}{row.title}</Link><p className="mt-0.5 text-xs text-ink-500 capitalize">{row.source_account_name} · {status(row.source_status)}</p>{row.summary.addresses?.length ? <p className="mt-1 text-xs text-ink-400">Service address: {row.summary.addresses.join(' • ')}</p> : null}</li>)}</ul>}
   </section>;
 }

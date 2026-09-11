@@ -141,6 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         loadSequence.current += 1;
         loadedUser.current = null;
+        // A null INITIAL_SESSION can arrive before getSession resolves. This
+        // event supersedes that result and clears its timeout, so it must also
+        // finish loading when currentUser was already null.
+        setIsLoading(false);
         // Expired sessions retain per-user drafts for reauthentication. The
         // explicit Sign out action below clears them on a shared computer.
         setProfile(null);

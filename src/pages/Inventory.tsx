@@ -454,7 +454,7 @@ export default function Inventory() {
   };
 
   const summaryCards = [
-    { label: 'In Stock', value: totalInStock },
+    { label: 'Available Stock', value: totalInStock },
     { label: 'Sold, Awaiting Delivery', value: awaitingDelivery },
     { label: 'On Order', value: onOrder },
     { label: 'Low Stock', value: lowStockAlerts },
@@ -487,6 +487,8 @@ export default function Inventory() {
           <button onClick={() => setEditorTarget('new')} className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm"><Plus className="w-4 h-4 mr-2" />Add Item</button>
         </div>
       </div>
+
+      <p className="mb-3 text-xs text-ink-400">Summary counts follow the store and search. Available stock excludes units assigned to a customer, deal or job.</p>
 
       {inventoryError&&<div role="alert" className="mb-3 rounded border border-amber-500/40 p-3 text-sm">{inventoryError} <button onClick={()=>void refreshInventory()} className="underline">Retry inventory</button></div>}
       {editorTarget !== null && (

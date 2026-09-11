@@ -122,6 +122,11 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
   const documentSequence=useRef(0);const searchSequence=useRef(0);
   const activeAccount=useRef(profile?.id);activeAccount.current=profile?.id;
   const [resultQuery,setResultQuery]=useState('');
+  const [resultScope, setResultScope] = useState('');
+  const searchScope = JSON.stringify([profile?.id, profile?.org_id, query.trim(), type]);
+  // The debounce window is pending too. Never present old results as the answer
+  // to a new query or document type, even before its request has started.
+  const searchPending = searching || resultScope !== searchScope;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [partsPdfs, setPartsPdfs] = useState<PartsPdfResource[]>(() => initialPartsPdfResources(isPartsView));
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -204,6 +209,7 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
     if(request!==searchSequence.current||profile.id!==activeAccount.current)return;
     if (error) { setLoadError(error.message); setResults([]); }
     else {setResults((data ?? []) as KnowledgeResult[]);setResultQuery(needle.trim());}
+    setResultScope(JSON.stringify([profile.id, profile.org_id, needle.trim(), selectedType]));
     setSearching(false);
   }, [profile]);
 
@@ -218,7 +224,12 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
       }, { replace: true });
       search(query, type);
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      // Invalidate the previous request as soon as input changes, before the
+      // replacement debounce fires.
+      searchSequence.current++;
+    };
   }, [query, type, search, setParams]);
 
   const visibleDocuments = useMemo(() => filterKnowledgeDocuments(documents, type), [documents, type]);
@@ -385,17 +396,17 @@ export default function Knowledge({ defaultType = 'all', pageTitle = 'Knowledge'
       {loadError && <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">Knowledge search could not complete: {loadError}</div>}
 
       {query.trim().length >= 2 ? (
-        <section className="space-y-3">
+        <section className="space-y-3" aria-busy={searchPending}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">{searching ? 'Searching…' : `${results.length} source match${results.length === 1 ? '' : 'es'} · ${resultQuery}`}</h2>
+            <h2 role="status" className="text-sm font-bold uppercase tracking-[0.16em] text-ink-400">{searchPending ? 'Searching…' : `${results.length} source match${results.length === 1 ? '' : 'es'} · ${resultQuery}`}</h2>
           </div>
-          {!searching && results.length === 0 && !loadError ? (
+          {!searchPending && results.length === 0 && !loadError ? (
             <div className="rounded-2xl border border-dashed border-ink-700 bg-ink-900/50 py-14 text-center">
               <Wrench className="mx-auto mb-3 h-8 w-8 text-ink-600" />
               <p className="font-semibold text-ink-300">No matching source found</p>
               <p className="mt-1 text-xs text-ink-500">Try the exact part number, a broader model name, or remove the source filter.</p>
             </div>
-          ) : results.map(result => (
+          ) : (searchPending ? [] : results).map(result => (
             <article id={`knowledge-${result.chunk_id}`} key={result.chunk_id} className={cn('rounded-2xl border bg-ink-900 p-4 shadow-sm', selectedChunk === result.chunk_id ? 'border-brand-400 ring-2 ring-brand-500/20' : 'border-ink-700')}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">

@@ -31,7 +31,10 @@ export async function jobberClient(connectionId) {
         if (response.status === 429 || response.status >= 500) { await pause(Math.min(30000, 1000 * 2 ** attempt)); continue; }
         if (!response.ok) throw new Error(`Jobber extraction HTTP ${response.status}: ${(await response.text()).slice(0,500)}`);
         const result = await response.json();
-        if (result.errors?.some(e => /throttl/i.test(e.message))) { await pause(10000); continue; }
+        if (result.errors?.some(e => /throttl/i.test(e.message))) {
+          if (result.extensions?.cost?.requestedQueryCost > result.extensions?.cost?.throttleStatus?.maximumAvailable) return result;
+          await pause(10000); continue;
+        }
         return result;
       }
       throw new Error('Jobber query retry limit reached');

@@ -33,7 +33,8 @@ export type JobberHistoryRow = {
 };
 
 const FIELDS = 'id,contact_id,source_account_name,source_account_key,record_kind,source_id,source_client_id,source_number,source_url,title,client_name,source_status,occurred_at,source_updated_at,captured_at,summary,coverage,match_status,match_reason';
-const KINDS: Record<string, string> = { job: 'Jobs', client: 'Customers', visit: 'Visits', property: 'Properties', quote: 'Quotes', request: 'Requests', invoice: 'Invoices', payment: 'Payments', product: 'Products and services', expense: 'Expenses', timesheet: 'Timesheets', task: 'Tasks', user: 'Staff', account: 'Account information', tax_rate: 'Tax rates' };
+const KINDS: Record<string, string> = { job: 'Jobs', client: 'Customers', visit: 'Visits', property: 'Properties', quote: 'Quotes', request: 'Requests', invoice: 'Invoices', payment: 'Payments', product: 'Products and services', expense: 'Expenses', timesheet: 'Timesheets', task: 'Tasks', user: 'Staff', account: 'Account information', tax_rate: 'Tax rates', custom_field: 'Custom fields', vehicle: 'Vehicles', payout: 'Payouts', expense_document: 'Expense documents', expense_upload: 'Expense uploads', marketing_task: 'Marketing tasks', marketing_item: 'Marketing history', event: 'Calendar events', assessment: 'Assessments' };
+const OWNER_KINDS = new Set(['user', 'timesheet', 'account', 'payout', 'expense_document', 'expense_upload']);
 const PAGE_SIZE = 50;
 const control = 'rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-200';
 const date = (value?: string | null) => {
@@ -108,7 +109,7 @@ function HistoryList() {
       <select aria-label="History store" className={control} value={activeLocationId || ''} onChange={e => setActiveLocation(e.target.value || null)}>
         <option value="">Both stores</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
       </select>
-      <select aria-label="Record type" className={control} value={kind} onChange={e => update('kind', e.target.value)}>{Object.entries(KINDS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+      <select aria-label="Record type" className={control} value={kind} onChange={e => update('kind', e.target.value)}>{Object.entries(KINDS).filter(([value]) => profile?.role === 'owner_manager' || !OWNER_KINDS.has(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       <select aria-label="Customer matching" className={control} value={review ? '1' : ''} onChange={e => update('review', e.target.value || null)}><option value="">All records</option><option value="1">Customer match needs review</option></select>
       <label className="relative flex-1 min-w-52"><Search className="absolute left-3 top-2.5 h-4 w-4 text-ink-500" /><input aria-label="Search Jobber history" placeholder="Name, number, phone, address or note" value={search} onChange={e => setSearch(e.target.value)} className={`${control} w-full pl-9`} /></label>
     </div>

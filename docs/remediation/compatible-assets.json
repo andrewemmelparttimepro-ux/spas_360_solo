@@ -11,7 +11,7 @@
       "bytes": 232821
     },
     "vendor-supabase-CSIM0fnT.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/vendor-supabase-CSIM0fnT.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/vendor-supabase-CSIM0fnT.js",
       "sha256": "7cd014a5f14bebac8379d502933f1a077a745c75c2ecdf7797f357b3be4de9d8",
       "bytes": 219904
     },
@@ -116,7 +116,7 @@
       "bytes": 12099
     },
     "customerSearch-DyvcpkLz.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/customerSearch-DyvcpkLz.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/customerSearch-DyvcpkLz.js",
       "sha256": "181a86df78e60f1622943d4a9526efefd84db2efbd1f0446ccf91725a3d5425d",
       "bytes": 325
     },
@@ -141,7 +141,7 @@
       "bytes": 9618
     },
     "inventoryBrandFilter-BEzaanLC.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/inventoryBrandFilter-BEzaanLC.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/inventoryBrandFilter-BEzaanLC.js",
       "sha256": "103a6197daa5faa302407cefc6d57c0413ba568dd35194352f23d8bd59d64060",
       "bytes": 1112
     },
@@ -276,7 +276,7 @@
       "bytes": 15516
     },
     "libraryDeletion-DAI0Zw57.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/libraryDeletion-DAI0Zw57.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/libraryDeletion-DAI0Zw57.js",
       "sha256": "333fec79d0941f1471f94b3ddca4cacfda69c7d196dea3ecde6417bbc237cb26",
       "bytes": 674
     },
@@ -306,12 +306,12 @@
       "bytes": 159753
     },
     "html2canvas.esm-QH1iLAAe.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/html2canvas.esm-QH1iLAAe.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/html2canvas.esm-QH1iLAAe.js",
       "sha256": "061c08e50c0dc57b8d5e6531f0b8237a52a68b233260d49ab2f2c2906ad112c4",
       "bytes": 202379
     },
     "purify.es-DP5U8-sc.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/purify.es-DP5U8-sc.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/purify.es-DP5U8-sc.js",
       "sha256": "12a0d41e19e1a6ce9b60fb5e007fe8c34f2784093836bf30abaaec451d20c017",
       "bytes": 29167
     },
@@ -671,7 +671,7 @@
       "bytes": 9618
     },
     "inventoryAge-BO9mbaCA.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/inventoryAge-BO9mbaCA.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/inventoryAge-BO9mbaCA.js",
       "sha256": "edef090422c5fa32be7880bcaf8ed9d846aca9cbc80c1c8d2200735e10646223",
       "bytes": 4390
     },
@@ -2581,12 +2581,12 @@
       "bytes": 281443
     },
     "vendor-react-DNm8jyv5.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/vendor-react-DNm8jyv5.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/vendor-react-DNm8jyv5.js",
       "sha256": "fce2c5f3c56bced14075cbca6b8c8280897f08ac30ecc0edd92435d99e1a8eab",
       "bytes": 232821
     },
     "vendor-voice-scribe-BuQj-m8L.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/vendor-voice-scribe-BuQj-m8L.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/vendor-voice-scribe-BuQj-m8L.js",
       "sha256": "1e6bc6d40607489fac127c5356f4ba5d84331a4db101cb62243669786e536eef",
       "bytes": 18052
     },
@@ -2616,7 +2616,7 @@
       "bytes": 364228
     },
     "vendor-dnd-CdxlhGNN.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/vendor-dnd-CdxlhGNN.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/vendor-dnd-CdxlhGNN.js",
       "sha256": "c5c7ce7122f2bbe8cfc040b0561e5a9f2192402005de359ee6da1f1bfa317905",
       "bytes": 98185
     },
@@ -2841,7 +2841,7 @@
       "bytes": 390886
     },
     "exceljs.min-CDEqTrOR.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/exceljs.min-CDEqTrOR.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/exceljs.min-CDEqTrOR.js",
       "sha256": "8f95046d15e838c2b5bea70bba636367f3ba407ca4ca159c984443a0d4538122",
       "bytes": 940201
     },
@@ -3161,12 +3161,12 @@
       "bytes": 9892
     },
     "operationalSnapshots-C35q3ikt.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/operationalSnapshots-C35q3ikt.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/operationalSnapshots-C35q3ikt.js",
       "sha256": "d8470c419b65c35e211de09a05e3b336bec1674ec4f34095e98f62b270fa6c0f",
       "bytes": 2040
     },
     "morningSummary-wIyjIVpO.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/morningSummary-wIyjIVpO.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/morningSummary-wIyjIVpO.js",
       "sha256": "f808ce3e1b25e207493fb71cfcf74db9e1f34d7692d7a879e294a57e286e9a31",
       "bytes": 2043
     },
@@ -4691,7 +4691,7 @@
       "bytes": 9883
     },
     "inventoryDealAssignment-BdkUKKWK.js": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/inventoryDealAssignment-BdkUKKWK.js",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/inventoryDealAssignment-BdkUKKWK.js",
       "sha256": "9ade80ed201e569641ca650a396f7ed7e867919b1424d20d7f0cb3fdeaa5bbc7",
       "bytes": 552
     },
@@ -7176,7 +7176,7 @@
       "bytes": 284654
     },
     "index-Dedi8gjO.css": {
-      "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/index-Dedi8gjO.css",
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/index-Dedi8gjO.css",
       "sha256": "e2e60cfed037f4146548f1025c078eebea9b0732ca076cf299b4d724be48baa6",
       "bytes": 121565
     },
@@ -8194,12 +8194,267 @@
       "url": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/assets/index.es-_BJO76bN.js",
       "sha256": "2603e66c6875a5d3432e7d96e4056407975ac03fe8651887a07a8fb7b6445bf3",
       "bytes": 159753
+    },
+    "index-ri1ECV4F.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/index-ri1ECV4F.js",
+      "sha256": "b9c83f3a53e9350cbf0e031b9f965b5e6f859b540769a3a9408a8ea6181ebab7",
+      "bytes": 284654
+    },
+    "Login-BCorBnxe.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Login-BCorBnxe.js",
+      "sha256": "22b17a8f9e085521641a27af09e6764585ac1a72044edc45610bb43404b1252f",
+      "bytes": 5348
+    },
+    "ResetPassword-ZSmkSKe5.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/ResetPassword-ZSmkSKe5.js",
+      "sha256": "76018679660a55ed824c02b439b87d04a414408f8bf52c0f33593c9dfdb5d825",
+      "bytes": 3939
+    },
+    "Dashboard-5ipzzdsn.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Dashboard-5ipzzdsn.js",
+      "sha256": "361958c5477af5879f97a4bcb51943eab29bea1ebb87019bc360a3ae67ce1401",
+      "bytes": 62390
+    },
+    "dashboardPeriods-D0A2x95A.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/dashboardPeriods-D0A2x95A.js",
+      "sha256": "4606c942ce1727fe85603809e0a1a149e01a8c433bb37df29fbe595d1c04a998",
+      "bytes": 364228
+    },
+    "format-DK-_twmf.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/format-DK-_twmf.js",
+      "sha256": "2f0cdada94336d7fa773894d45b378a6ffc03ee1814f91e0a4e14086e0742384",
+      "bytes": 12953
+    },
+    "subMonths-CD6JlDNC.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/subMonths-CD6JlDNC.js",
+      "sha256": "0caf1f7491bb2dda2565981b5493dd076f7b5779a86a99bca07665ac008792d8",
+      "bytes": 1219
+    },
+    "DelegatedTasksPanel-gg7HriK-.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/DelegatedTasksPanel-gg7HriK-.js",
+      "sha256": "1b242358e9f34ca73c03362c0392c575f76b1c01ec921c48a4daa9954fa96868",
+      "bytes": 17796
+    },
+    "save-BkvMWzpQ.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/save-BkvMWzpQ.js",
+      "sha256": "554ffd48e8cadb8316349b5645a9bc6bfdecc26bb69c07c1cba3852e432d4485",
+      "bytes": 500
+    },
+    "pencil-Q-4xupwM.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/pencil-Q-4xupwM.js",
+      "sha256": "7bae727702588e7cc58596f33e9d6bc4ac271c22865c227f4935901fbdc086ac",
+      "bytes": 449
+    },
+    "useServiceJobs-DbnXghZo.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/useServiceJobs-DbnXghZo.js",
+      "sha256": "80765943531c60d4f35679e47a3e2da03f84aa7d61c679c6b777bcdabb4a434d",
+      "bytes": 9883
+    },
+    "Skeleton-Dzjr1Nt7.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Skeleton-Dzjr1Nt7.js",
+      "sha256": "596e937143cc61e29b3252aa511f7104cf75cbd92d65d1e288a113dbfcdc98b1",
+      "bytes": 1467
+    },
+    "Deals-Kc6_0hig.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Deals-Kc6_0hig.js",
+      "sha256": "3a95efc608cbb7dc4d337db215a7f42d6d2a5bcda5fc1930874345fb44bf08c7",
+      "bytes": 26499
+    },
+    "usePipeline-ByJuv5Ql.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/usePipeline-ByJuv5Ql.js",
+      "sha256": "ee9b9950ad64d37453c1004326ad500ad54af67283e04d74de55c166a142a292",
+      "bytes": 8211
+    },
+    "trending-up-D4iHB04c.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/trending-up-D4iHB04c.js",
+      "sha256": "756a41ac41ad011c6667a01102a2f2911dd3688b540bd4940ddd83d7a270b1cf",
+      "bytes": 348
+    },
+    "QuickDealModal-CWFdnMXN.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/QuickDealModal-CWFdnMXN.js",
+      "sha256": "c64047fbcf2d8e571d36d734cf302c83ff9f11ced0fd1209f650bb649ccd271e",
+      "bytes": 12759
+    },
+    "snowflake-Cd9yB614.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/snowflake-Cd9yB614.js",
+      "sha256": "f86e92a726f61413a5dc2ce07259adeeae6106e9bb8f9253855a3b6d20bb36ba",
+      "bytes": 1227
+    },
+    "Service-CHpk_jKc.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Service-CHpk_jKc.js",
+      "sha256": "d9c7087bdb5fd389132fd4a308beedd10a1e0f679e85daf198ca625e899e87d3",
+      "bytes": 29571
+    },
+    "JobContactDetails-u7R93KZw.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/JobContactDetails-u7R93KZw.js",
+      "sha256": "c0328ab8f27bfd1beafe5ca61554bbbc3580318d267ec99d0e25fdbde7bb14d0",
+      "bytes": 3470
+    },
+    "phone-BkJjt4Ou.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/phone-BkJjt4Ou.js",
+      "sha256": "c3d71c6f22b10eb3e89455977b269bc6b8587b48763bc7d268ce249de6253044",
+      "bytes": 495
+    },
+    "StoreSwitcher-DU-F1J1o.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/StoreSwitcher-DU-F1J1o.js",
+      "sha256": "64dc9939f13ee2a70bf317388b5301a3277f9893f9958c5a78f5e46eacefde09",
+      "bytes": 5127
+    },
+    "DealInventorySelector-Deq8P-cn.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/DealInventorySelector-Deq8P-cn.js",
+      "sha256": "2d762255c40e1c138f96bec5b697e4088988eed1ffa27bc87a09ba94da07a3df",
+      "bytes": 9576
+    },
+    "calendar-CvL7r1fF.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/calendar-CvL7r1fF.js",
+      "sha256": "cb2f91bd85a06e4ef629534c0e1e4ad58221351a195c440ec89e2fb3736dbf20",
+      "bytes": 430
+    },
+    "Inventory-D4DICUZ-.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Inventory-D4DICUZ-.js",
+      "sha256": "27174edfcd4bb0a4f9c604714c278c3826396d4d0b513216f4d0a66c1a3a5bbb",
+      "bytes": 29136
+    },
+    "image-plus-VCzn_OPO.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/image-plus-VCzn_OPO.js",
+      "sha256": "640f97ca935ba177a6007db31f489bcd0673a439242124e8507ebbc1ec4eac64",
+      "bytes": 536
+    },
+    "Communication-DZvxVZ8N.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Communication-DZvxVZ8N.js",
+      "sha256": "34a594cc3e8edbf2f6386b02245ff85c820dcec9f53d1ced825cb092e15a88e7",
+      "bytes": 24061
+    },
+    "Reports-cku1AHu1.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Reports-cku1AHu1.js",
+      "sha256": "a8918047594bef3159d01989c68c2fd28a382ec1501d020455648b176af37873",
+      "bytes": 13592
+    },
+    "dollar-sign-NAwmQOBg.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/dollar-sign-NAwmQOBg.js",
+      "sha256": "eed74bfaf1c3638d4f3f392719c9045c111d5d70b91eefe51cb4139a3d8c9a83",
+      "bytes": 392
+    },
+    "Customers-Dzo_K7NX.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Customers-Dzo_K7NX.js",
+      "sha256": "510f6a7c89a8f71208f58329c8f7d944fe129cec13412d1755ac6f178a950fbb",
+      "bytes": 23324
+    },
+    "grip-vertical-BNOvbc9T.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/grip-vertical-BNOvbc9T.js",
+      "sha256": "ea786cc84f32865aa1db58fa57e743fbcbbaf5c187bd6960352e2e2b3009c393",
+      "bytes": 539
+    },
+    "mail-CCG3H2ia.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/mail-CCG3H2ia.js",
+      "sha256": "9da678016b116afe515249cf5b99d94d1e5e09524850f9a2bcc8c6e6f0c5bd47",
+      "bytes": 896
+    },
+    "ContactDetail-N2pnWzmm.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/ContactDetail-N2pnWzmm.js",
+      "sha256": "8af49c73c4a093b9ff8ba5f41e57ea10e3578e07af6dd17ea440da4201af24ff",
+      "bytes": 20636
+    },
+    "CustomerEquipment-B71dHwe5.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/CustomerEquipment-B71dHwe5.js",
+      "sha256": "8a4014441c2f2dd2cceb6255ec8eebc89e7d76e4a51fcae580c4b4061b026811",
+      "bytes": 6551
+    },
+    "useTasks-Bu01IY5M.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/useTasks-Bu01IY5M.js",
+      "sha256": "a3562ff4cdfa0453d66c4104e45b66a37e354d8007001a8631e8593941757aac",
+      "bytes": 6201
+    },
+    "AriNoteCard-CfhpPEaH.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/AriNoteCard-CfhpPEaH.js",
+      "sha256": "8cb2a4d92a95c7f8d21bbabb457c5267c45d6d7aeb7c1d7ee6573b922b32a6f2",
+      "bytes": 12098
+    },
+    "copy-BWuHReLk.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/copy-BWuHReLk.js",
+      "sha256": "1f27d51864083c43494a9bbd81fc4824db8c8a453cb22a2515805e74ece2eed2",
+      "bytes": 404
+    },
+    "JobberHistory-CTXkGL6x.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/JobberHistory-CTXkGL6x.js",
+      "sha256": "c14c3d398019de5827a3b1b31c94e0e49815601bd5ad28f4b7cd3a9b19f3c010",
+      "bytes": 28477
+    },
+    "DealDetail-DECvtp2d.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/DealDetail-DECvtp2d.js",
+      "sha256": "e9e2220e98f4fa96f1f94c004ba33c2c26ea187d96e673810223cfaf8150df9b",
+      "bytes": 35060
+    },
+    "lock-keyhole-DSzKWvSq.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/lock-keyhole-DSzKWvSq.js",
+      "sha256": "52b05b0b5209c74685d1cf8681b2de471c500c565805d000b0452b10be9f59d3",
+      "bytes": 428
+    },
+    "JobDetail-DvIocd-y.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/JobDetail-DvIocd-y.js",
+      "sha256": "a22f77ca411f52550d751f24bc81b866a7ca6a554a95e6bcf9e0c97dbd22ace4",
+      "bytes": 45455
+    },
+    "calendar-days-BInybSci.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/calendar-days-BInybSci.js",
+      "sha256": "54f9ced81a5d8e6ac219903669db81cae70473e827b54700e944c69cd974cd53",
+      "bytes": 667
+    },
+    "InventoryDetail-B50xDs6f.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/InventoryDetail-B50xDs6f.js",
+      "sha256": "add85b214c049b68df0818c967cd55548424bd9dedddd393aa64ec48761ca2ae",
+      "bytes": 7398
+    },
+    "Settings-AJt1mTg5.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Settings-AJt1mTg5.js",
+      "sha256": "28c64ce5a806eace142af3565655b502dd30965018ce53f79fa135a105c88434",
+      "bytes": 31329
+    },
+    "shield-check-C1CNLKpA.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/shield-check-C1CNLKpA.js",
+      "sha256": "12a95b13fdc28e82391c8d87a47a8f445b806111f2fb06c9de16a68e95f8e9d5",
+      "bytes": 488
+    },
+    "rotate-ccw-Bp2hx1G2.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/rotate-ccw-Bp2hx1G2.js",
+      "sha256": "7b1c145d0cd21f4c2843a01942c3b0a1bd0050094fc624783e62b0d4cd0b2bef",
+      "bytes": 373
+    },
+    "Citadel-ng0D_BjG.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Citadel-ng0D_BjG.js",
+      "sha256": "616fb8d9fa8d10ecc2b4c08d2aa2c4d4f47366c8a1c97a4d98d7163b04447710",
+      "bytes": 4157
+    },
+    "Knowledge-DYqrv9tn.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Knowledge-DYqrv9tn.js",
+      "sha256": "aeefc15a1fb103c6a0d0ffd0e4a345e2a20d8d6a083ce6e5cc75964e91dcafb1",
+      "bytes": 20479
+    },
+    "Media-BpuaDwZA.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/Media-BpuaDwZA.js",
+      "sha256": "733cacbd9bfcefb1b7965fa8e294613d60656be1b66670dfb0d59189b4a13103",
+      "bytes": 11641
+    },
+    "OwnersCorner-CXOGXdNO.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/OwnersCorner-CXOGXdNO.js",
+      "sha256": "6b24f422475f7fbf19aa21e9abb4455f0e5590a5e67f435fa0fcf5127ee7575e",
+      "bytes": 147470
+    },
+    "jspdf.es.min-BBjSZHoK.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/jspdf.es.min-BBjSZHoK.js",
+      "sha256": "b314ef0ea07e8f986063b3e3a3ea3069a491a9cb9776ede8d7700a36259d70c0",
+      "bytes": 390886
+    },
+    "index.es-D0m1hihs.js": {
+      "url": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/assets/index.es-D0m1hihs.js",
+      "sha256": "a3758d085fda9c0ce8d4e26657bc2a08d5ae4a0ea9b5a2312399b695a394c862",
+      "bytes": 159753
     }
   },
-  "capturedAt": "2026-09-12T21:41:15.283Z",
-  "previousDeployment": "https://spas360solo-rbujyzlag-nd-ai.vercel.app/",
+  "capturedAt": "2026-09-12T22:58:12.849Z",
+  "previousDeployment": "https://spas360solo-dxnxffrb6-nd-ai.vercel.app/",
   "previousBuild": {
     "sourceCommit": null,
-    "builtAt": "2026-09-12T21:08:41.626Z"
+    "builtAt": "2026-09-12T21:45:53.801Z"
   }
 }

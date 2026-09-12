@@ -1,7 +1,8 @@
 import { useDraftState } from '@/hooks/useDraftState';
 import CustomerEquipment from '@/components/CustomerEquipment';
+import JobCustomerInventory from '@/components/JobCustomerInventory';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign, Handshake, Wrench, Package, Bot } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Plus, Save, X, Pencil, BadgeDollarSign, Handshake, Wrench, Bot } from 'lucide-react';
 import { useContact } from '@/hooks/useContacts';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +25,6 @@ import { JobberHistoryPanel } from './JobberHistory';
 // The full relationship behind the customer card: deals, service jobs, equipment
 type RelDeal = { id: string; title: string; amount: number | null; created_at: string; stage?: { name: string } | null };
 type RelJob = { id: string; title: string; status: string; scheduled_at: string | null; created_at: string };
-type RelEquip = { id: string; product: string; brand: string | null; sku: string; status: string };
 type RelText = { id: string; body: string; sender_type: string; created_at: string };
 
 // One chronological stream: everything that happened with this customer
@@ -104,7 +104,6 @@ export default function ContactDetail() {
   const [showQuickDeal, setShowQuickDeal] = useState(false);
   const [relDeals, setRelDeals] = useState<RelDeal[]>([]);
   const [relJobs, setRelJobs] = useState<RelJob[]>([]);
-  const [relEquip, setRelEquip] = useState<RelEquip[]>([]);
 
   const [relTexts, setRelTexts] = useState<RelText[]>([]);
 
@@ -115,13 +114,11 @@ export default function ContactDetail() {
     Promise.all([
       supabase.from('deals').select('id, title, amount, created_at, stage:stage_id(name)').eq('contact_id', id).order('updated_at', { ascending: false }),
       supabase.from('jobs').select('id, title, status, scheduled_at, created_at').eq('contact_id', id).order('created_at', { ascending: false }),
-      supabase.from('inventory_items').select('id, product, brand, sku, status').eq('customer_id', id),
       supabase.from('communication_threads').select('id').eq('contact_id', id),
-    ]).then(async ([d, j, inv, threads]) => {
+    ]).then(async ([d, j, threads]) => {
       if (!alive) return;
       setRelDeals((d.data as unknown as RelDeal[]) ?? []);
       setRelJobs((j.data as unknown as RelJob[]) ?? []);
-      setRelEquip((inv.data as unknown as RelEquip[]) ?? []);
       const threadIds = (threads.data ?? []).map(t => t.id);
       if (threadIds.length > 0) {
         const { data: msgs } = await supabase.from('messages')
@@ -361,21 +358,7 @@ export default function ContactDetail() {
           )}
         </div>
         <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-4">
-          <h2 className="text-xs font-semibold text-violet-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Package className="w-3.5 h-3.5" />Equipment Owned ({relEquip.length})
-          </h2>
-          {relEquip.length === 0 ? (
-            <p className="text-xs text-ink-500 py-2">Nothing on record yet</p>
-          ) : (
-            <div className="space-y-2">
-              {relEquip.slice(0, 5).map(i => (
-                <Link key={i.id} to={`/inventory/${i.id}`} className="block p-2.5 bg-ink-950 rounded-lg border border-ink-800 hover:border-violet-500/40 transition-colors">
-                  <span className="block text-sm text-ink-100 font-medium truncate">{i.brand ? `${i.brand} ` : ''}{i.product}</span>
-                  <span className="text-[10px] text-ink-500 font-mono">{i.sku} · {i.status}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <JobCustomerInventory customerId={contact.id} />
         </div>
       </div>
 

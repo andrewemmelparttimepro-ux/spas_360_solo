@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { errorMessage, errorStatus, recordMigrationEvent, requireOwner, type MigrationProvider } from '../_lib/migration-core.js';
+import { chooseMigrationConnection } from '../_lib/migration-selection.js';
 
 type StartAction = 'scan' | 'import' | 'rollback';
 
@@ -16,22 +17,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('org_id', ctx.orgId).eq('provider', provider).in('status', ['queued', 'running']).limit(1).maybeSingle();
     if (active?.id) return res.status(409).json({ error: 'This provider already has a migration running', run_id: active.id });
 
-    const { data: connection } = await ctx.service.from('migration_connections').select('id, status')
-      .eq('org_id', ctx.orgId).eq('provider', provider).maybeSingle();
+    const { data: connections, error: connectionError } = await ctx.service.from('migration_connections').select('id, status')
+      .eq('org_id', ctx.orgId).eq('provider', provider);
+    if (connectionError) throw connectionError;
+    const connection = chooseMigrationConnection(connections || [], req.body?.connection_id);
     if (action !== 'rollback' && (!connection || connection.status !== 'connected')) {
       return res.status(409).json({ error: `Connect ${provider === 'hubspot' ? 'HubSpot' : 'Jobber'} before starting` });
     }
 
     let sourceRunId: string | null = typeof req.body?.source_run_id === 'string' ? req.body.source_run_id : null;
     if (action === 'import') {
-      const { data: source } = await ctx.service.from('migration_runs').select('id, provider, status, run_type')
+      const { data: source } = await ctx.service.from('migration_runs').select('id, provider, status, run_type, connection_id')
         .eq('id', sourceRunId).eq('org_id', ctx.orgId).eq('provider', provider).eq('run_type', 'scan').maybeSingle();
       if (!source || source.status !== 'awaiting_review') return res.status(409).json({ error: 'Choose a completed scan preview before importing' });
+      if (source.connection_id !== connection?.id) return res.status(409).json({ error: 'The scan belongs to a different source account' });
     }
     if (action === 'rollback') {
       const { data: source } = await ctx.service.from('migration_runs').select('id, provider, status, run_type, connection_id')
         .eq('id', sourceRunId).eq('org_id', ctx.orgId).eq('provider', provider).eq('run_type', 'import').maybeSingle();
       if (!source || source.status !== 'completed') return res.status(409).json({ error: 'Only a completed import can be rolled back' });
+      if (source.connection_id !== connection?.id) return res.status(409).json({ error: 'The import belongs to a different source account' });
     }
 
     const { data: run, error } = await ctx.service.from('migration_runs').insert({

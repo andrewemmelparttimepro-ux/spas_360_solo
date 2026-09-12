@@ -50,7 +50,7 @@ export async function handleMigrationCallback(provider: MigrationProvider, req: 
       connected_by: stored.user_id,
       connected_at: new Date().toISOString(),
       last_error: null,
-    }, { onConflict: 'org_id,provider' }).select('id').single();
+    }, { onConflict: 'org_id,provider,external_account_id' }).select('id').single();
     if (connectionError || !connection?.id) throw new Error(connectionError?.message || 'Could not save the provider connection');
     await recordMigrationEvent(service, {
       orgId: stored.org_id,

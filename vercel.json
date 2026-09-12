@@ -1,5 +1,8 @@
 {
   "functions": {
+    "api/migrations/jobber-read.ts": {
+      "maxDuration": 60
+    },
     "api/owners/inventory-profits.ts": {
       "includeFiles": "api/_assets/Inventory Profits.xlsx"
     },

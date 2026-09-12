@@ -175,7 +175,11 @@ export default function MigrationCenter() {
     return () => { mounted.current = false; };
   }, [driveRun, loadStatus, profile?.role, toast]);
 
-  const connections = useMemo(() => Object.fromEntries((status?.connections || []).map(connection => [connection.provider, connection])) as Partial<Record<Provider, Connection>>, [status]);
+  const [selectedAccounts, setSelectedAccounts] = useState<Partial<Record<Provider, string>>>({});
+  const connections = useMemo(() => Object.fromEntries(PROVIDERS.map(provider => {
+    const accounts = (status?.connections || []).filter(connection => connection.provider === provider.id);
+    return [provider.id, accounts.find(account => account.id === selectedAccounts[provider.id]) || accounts[0]];
+  })) as Partial<Record<Provider, Connection>>, [status, selectedAccounts]);
 
   const connect = async (provider: Provider) => {
     setBusy(provider); setError(null);
@@ -196,7 +200,7 @@ export default function MigrationCenter() {
     setBusy(provider); setError(null);
     try {
       const result = await api<{ run: MigrationRun }>('/api/migrations/start', {
-        method: 'POST', body: JSON.stringify({ action, provider, source_run_id: sourceRunId }),
+        method: 'POST', body: JSON.stringify({ action, provider, source_run_id: sourceRunId, connection_id: connections[provider]?.id }),
       });
       setStatus(current => current ? { ...current, runs: [result.run, ...current.runs] } : current);
       await driveRun(result.run);
@@ -210,7 +214,7 @@ export default function MigrationCenter() {
     if (!window.confirm(`Disconnect ${provider === 'hubspot' ? 'HubSpot' : 'Jobber'}? Existing scan and import reports will be retained.`)) return;
     setBusy(provider);
     try {
-      await api('/api/migrations/disconnect', { method: 'POST', body: JSON.stringify({ provider }) });
+      await api('/api/migrations/disconnect', { method: 'POST', body: JSON.stringify({ provider, connection_id: connections[provider]?.id }) });
       await loadStatus();
       toast('Provider disconnected and stored tokens were removed', 'success');
     } catch (disconnectError) {
@@ -251,11 +255,11 @@ export default function MigrationCenter() {
         ) : (
           PROVIDERS.map(provider => {
             const connection = connections[provider.id];
-            const providerRuns = (status?.runs || []).filter(run => run.provider === provider.id);
+            const providerRuns = (status?.runs || []).filter(run => run.provider === provider.id && run.connection_id === connection?.id);
             const activeRun = providerRuns.find(run => run.status === 'queued' || run.status === 'running');
             const latestScan = providerRuns.find(run => run.run_type === 'scan' && run.status === 'awaiting_review');
             const latestImport = providerRuns.find(run => run.run_type === 'import' && run.status === 'completed');
-            const preview = previews[provider.id];
+            const preview = previews[provider.id]?.run.id === latestScan?.id ? previews[provider.id] : undefined;
             const configured = status?.providers[provider.id].configured ?? false;
             const connected = connection?.status === 'connected';
             const isBusy = busy === provider.id;
@@ -277,6 +281,19 @@ export default function MigrationCenter() {
                       ) : null}
                     </div>
                     <p className="mt-1 text-xs leading-relaxed text-ink-500">{provider.description}</p>
+                    {(status?.connections || []).filter(account => account.provider === provider.id).length > 1 && (
+                      <select aria-label={`${provider.name} source account`} value={connection?.id || ''}
+                        onChange={event => {
+                          const id = event.target.value;
+                          setSelectedAccounts(current => ({ ...current, [provider.id]: id }));
+                          const scan = status?.runs.find(run => run.connection_id === id && run.run_type === 'scan' && run.status === 'awaiting_review');
+                          if (scan) void loadPreview(provider.id, scan.id);
+                        }} className="mt-2 max-w-full rounded border border-ink-700 bg-ink-900 p-2 text-xs text-ink-200">
+                        {(status?.connections || []).filter(account => account.provider === provider.id).map(account => (
+                          <option key={account.id} value={account.id}>{account.external_account_name || provider.name} ({titleCase(account.status)})</option>
+                        ))}
+                      </select>
+                    )}
                     {connection && connected && (
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-500">
                         <span className="text-ink-300">{connection.external_account_name || `${provider.name} account`}</span>
@@ -285,6 +302,8 @@ export default function MigrationCenter() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 sm:justify-end">
+                    {connected && <button onClick={() => connect(provider.id)} disabled={isBusy}
+                      className="rounded-lg border border-ink-700 px-3 py-2 text-xs text-ink-300 disabled:opacity-50">Connect another {provider.name} account</button>}
                     {!connected ? (
                       <button
                         onClick={() => connect(provider.id)} disabled={!configured || isBusy}

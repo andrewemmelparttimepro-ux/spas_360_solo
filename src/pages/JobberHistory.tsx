@@ -42,7 +42,7 @@ const date = (value?: string | null) => {
   if (!value || Number.isNaN(Date.parse(value))) return 'Not captured';
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Chicago' }).format(new Date(value));
 };
-const status = (value?: string | null) => value ? value.replaceAll('_', ' ') : 'Not captured';
+const status = (value?: string | null) => value ? value.replaceAll('_', ' ') : 'Not applicable';
 
 function Coverage({ coverage }: { coverage?: string }) {
   return <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -189,7 +189,7 @@ function HistoryDetail({ id }: { id: string }) {
     </section>
     <section className="rounded-xl border border-ink-700 p-5 space-y-2 text-sm text-ink-400">
       <p>Captured {date(row.captured_at)} CT from {row.source_account_name}.</p>
-      {row.source_url && <a className="inline-flex items-center gap-2 text-brand-300 hover:underline" href={row.source_url} target="_blank" rel="noreferrer">Open original in Jobber<ExternalLink className="h-4 w-4" /></a>}
+      {row.source_url && <a className="inline-flex items-center gap-2 text-brand-300 hover:underline" href={row.source_url} target="_blank" rel="noreferrer">{row.record_kind === 'communication' ? 'Open communications report in Jobber' : 'Open original in Jobber'}<ExternalLink className="h-4 w-4" /></a>}
       <p className="text-xs">The original link requires access to this store in Jobber.</p>
     </section>
     <JobberRecordDetails raw={row.raw} title={recordTitle(row)} />

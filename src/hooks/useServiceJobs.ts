@@ -101,7 +101,7 @@ export function useServiceJobs({ allStores = false }: { allStores?: boolean } = 
       const data = await loadSchedulePages((offset, size) => {
         let query = supabase
           .from('jobs')
-          .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
+          .select('*, contacts:contact_id(first_name, last_name, phone, mailing_address), properties:property_id(address), job_assignments(user_id, profiles:user_id(first_name, last_name))')
           .eq('org_id', orgId)
           .order('scheduled_at', { ascending: true, nullsFirst: true })
           .order('id', { ascending: true })

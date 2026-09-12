@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { JobberRecordDetails } from '@/components/JobberRecordDetails';
 
 type HistorySummary = {
+  cutover?: { status: 'scheduled' | 'review'; cutoff_date: string; native_job_id?: string; reason: string; manager_dispatch?: string[] };
   addresses?: string[];
   phones?: { number: string; primary?: boolean }[];
   billing_address?: string | null;
@@ -46,7 +47,7 @@ const status = (value?: string | null) => value ? value.replaceAll('_', ' ') : '
 
 function Coverage({ coverage }: { coverage?: string }) {
   return <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-    {coverage === 'summary' ? 'This record currently contains a summary. Detailed history is being imported.' : 'Imported Jobber history. Daily scheduling remains in Schedule; open work and balances require reconciliation before cutover.'}
+    {coverage === 'summary' ? 'This record currently contains a summary. Detailed history is being imported.' : 'Imported Jobber history. Use Schedule for daily appointments. The carryover review preserves older unfinished work and billing questions.'}
   </p>;
 }
 
@@ -61,7 +62,8 @@ function HistoryList() {
   const contactId = params.get('contact');
   const sourceClient = params.get('source_client');
   const sourceAccount = params.get('account');
-  const kind = KINDS[params.get('kind') || ''] ? params.get('kind')! : 'job';
+  const carryover = params.get('cutover') === 'review';
+  const kind = KINDS[params.get('kind') || ''] ? params.get('kind')! : carryover ? 'all' : 'job';
   const review = params.get('review') === '1';
   const [search, setSearch] = useState(params.get('q') || '');
   const [query, setQuery] = useState(search);
@@ -72,15 +74,17 @@ function HistoryList() {
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => { const timer = setTimeout(() => setQuery(search.trim()), 250); return () => clearTimeout(timer); }, [search]);
-  useEffect(() => { setPage(0); }, [query, kind, review, contactId, sourceClient, sourceAccount, activeLocationId]);
+  useEffect(() => { setPage(0); }, [query, kind, review, carryover, contactId, sourceClient, sourceAccount, activeLocationId]);
   useEffect(() => {
     if (!profile) return;
     let current = true;
     setBusy(true); setError(null);
     let request = supabase.from('jobber_history').select(FIELDS, { count: 'exact' })
-      .eq('org_id', profile.org_id).eq('record_kind', kind)
+      .eq('org_id', profile.org_id)
       .order('occurred_at', { ascending: false, nullsFirst: false }).order('id')
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (kind !== 'all') request = request.eq('record_kind', kind);
+    if (carryover) request = request.eq('summary->cutover->>status', 'review');
     if (activeLocationId) request = request.eq('location_id', activeLocationId);
     if (contactId) request = request.eq('contact_id', contactId);
     if (sourceClient && sourceAccount) request = request.eq('source_client_id', sourceClient).eq('source_account_key', sourceAccount);
@@ -93,7 +97,7 @@ function HistoryList() {
       setBusy(false);
     });
     return () => { current = false; };
-  }, [profile, activeLocationId, contactId, sourceClient, sourceAccount, kind, review, query, page, retry]);
+  }, [profile, activeLocationId, contactId, sourceClient, sourceAccount, kind, review, carryover, query, page, retry]);
 
   const update = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
@@ -106,17 +110,22 @@ function HistoryList() {
       <Link className="text-sm text-brand-300 hover:underline" to={contactId ? `/customers/${contactId}` : '/customers'}>{contactId ? 'Back to customer' : 'Customers'}</Link>
     </div>
     <Coverage />
+    <div className="flex flex-wrap items-center gap-4 text-sm">
+      <Link className="text-brand-300 hover:underline" to="/service">Daily schedule</Link>
+      <Link className="text-brand-300 hover:underline" to={carryover ? '/jobber-history' : '/jobber-history?cutover=review'}>{carryover ? 'All history' : 'Carryover review'}</Link>
+    </div>
+    {carryover && <p className="text-sm text-amber-200">September 12 carryover: these older unfinished visits, tasks and billing questions need a manager's decision. They have not been assigned new appointment dates or balances.</p>}
     <div className="flex flex-wrap items-center gap-3">
       <select aria-label="History store" className={control} value={activeLocationId || ''} onChange={e => setActiveLocation(e.target.value || null)}>
         <option value="">Both stores</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
       </select>
-      <select aria-label="Record type" className={control} value={kind} onChange={e => update('kind', e.target.value)}>{Object.entries(KINDS).filter(([value]) => profile?.role === 'owner_manager' || !OWNER_KINDS.has(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+      <select aria-label="Record type" className={control} value={kind} onChange={e => update('kind', e.target.value === 'all' ? null : e.target.value)}>{carryover && <option value="all">All carryover records</option>}{Object.entries(KINDS).filter(([value]) => profile?.role === 'owner_manager' || !OWNER_KINDS.has(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       <select aria-label="Customer matching" className={control} value={review ? '1' : ''} onChange={e => update('review', e.target.value || null)}><option value="">All records</option><option value="1">Customer match needs review</option></select>
       <label className="relative flex-1 min-w-52"><Search className="absolute left-3 top-2.5 h-4 w-4 text-ink-500" /><input aria-label="Search Jobber history" placeholder="Name, number, phone, address or note" value={search} onChange={e => setSearch(e.target.value)} className={`${control} w-full pl-9`} /></label>
     </div>
     {contactId && <p className="text-sm text-ink-400">Showing history linked to this customer. <button className="text-brand-300 hover:underline" onClick={() => update('contact', null)}>Show all customers</button></p>}
     {sourceClient && sourceAccount && <p className="text-sm text-ink-400">Showing records for this Jobber customer. <Link className="text-brand-300 hover:underline" to="/jobber-history">Show all customers</Link></p>}
-    <div aria-live="polite" className="text-sm text-ink-400">{busy ? 'Loading history…' : `${count.toLocaleString()} ${KINDS[kind].toLowerCase()}${review ? ' needing a customer match' : ''}`}</div>
+    <div aria-live="polite" className="text-sm text-ink-400">{busy ? 'Loading history…' : `${count.toLocaleString()} ${(KINDS[kind] || 'carryover records').toLowerCase()}${review ? ' needing a customer match' : ''}`}</div>
     {error && <div role="alert" className="text-red-300">{error} <button className="underline" onClick={() => setRetry(n => n + 1)}>Retry</button></div>}
     {!busy && !error && rows.length === 0 && <p className="rounded-xl border border-ink-700 p-8 text-center text-ink-400">No captured records match these filters.</p>}
     <div className={`space-y-2 ${busy ? 'opacity-50' : ''}`}>
@@ -124,6 +133,7 @@ function HistoryList() {
         <div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold text-ink-100">{row.source_number && <span className="text-ink-400">#{row.source_number} · </span>}{recordTitle(row)}</h2><span className="text-xs text-ink-400">{row.source_account_name}</span></div>
         <p className="mt-1 text-sm text-ink-300">{kind === 'job' || kind === 'communication' ? `${row.client_name} · ` : ''}<span className="capitalize">{status(row.source_status)}</span></p>
         {row.summary.addresses?.length ? <p className="mt-1 text-sm text-ink-400">{row.summary.addresses.join(' • ')}</p> : null}
+        {row.summary.cutover && <p className="mt-2 text-xs text-amber-200">{row.summary.cutover.reason}</p>}
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-500">{row.occurred_at && <span>Date: {date(row.occurred_at)} CT</span>}<span className={row.match_status === 'review' ? 'text-amber-300' : 'text-emerald-400'}>{row.contact_id ? 'Linked to SPAS customer' : row.match_status === 'not_applicable' ? 'Store record' : 'Customer match needs review'}</span></div>
       </Link>)}
     </div>
@@ -163,6 +173,11 @@ function HistoryDetail({ id }: { id: string }) {
     <Link to="/jobber-history" className="inline-flex items-center gap-2 text-sm text-brand-300"><ArrowLeft className="h-4 w-4" />Jobber History</Link>
     <div><p className="text-sm text-ink-400">{row.source_account_name} · {KINDS[row.record_kind] || row.record_kind}{row.source_number ? ` #${row.source_number}` : ''}</p><h1 className="mt-1 text-2xl font-bold text-ink-100">{recordTitle(row)}</h1></div>
     <Coverage coverage={row.coverage} />
+    {row.summary.cutover && <section className="rounded-xl border border-brand-500/30 bg-brand-500/10 p-4 text-sm space-y-2">
+      <h2 className="font-semibold">September 12 carryover</h2><p>{row.summary.cutover.reason}</p>
+      {row.summary.cutover.native_job_id && <Link className="text-brand-300 hover:underline" to={`/service/${row.summary.cutover.native_job_id}`}>Open appointment in SPAS Schedule</Link>}
+      {!!row.summary.cutover.manager_dispatch?.length && <p>Manager dispatch for {row.summary.cutover.manager_dispatch.join(', ')}.</p>}
+    </section>}
     <section className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
       <h2 className="text-lg font-semibold">{row.client_name}</h2>
       {row.contact_id ? <Link className="text-brand-300 hover:underline" to={`/customers/${row.contact_id}`}>Open SPAS customer</Link> : row.match_status === 'not_applicable' ? <p className="text-ink-400">Store history record</p> : <p className="text-amber-300">Customer match needs review. This record is preserved here while the match is confirmed.</p>}

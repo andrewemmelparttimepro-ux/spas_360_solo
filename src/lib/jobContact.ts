@@ -8,6 +8,11 @@ export type JobContact = {
   mailing_address: string | null;
 };
 
+export function jobServiceContact(contact: JobContact | null | undefined, property?: { address: string } | null): JobContact | null {
+  if (!contact) return null;
+  return property?.address.trim() ? { ...contact, mailing_address: property.address } : contact;
+}
+
 export function jobContactPhone(contact: Pick<JobContact, 'phone'> | null | undefined): string | null {
   const phone = formatPhone(contact?.phone);
   return phone || null;

@@ -607,6 +607,14 @@ export default function JobDetail() {
 
       <JobPreviousVisit key={`previous-${job.id}`} jobId={job.id} />
 
+      {job.description && <section className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
+        <h2 className="font-semibold">Work instructions</h2>
+        <p className="whitespace-pre-wrap break-words text-sm text-ink-200">{job.description.replace(/^Jobber (?:job )?history: [0-9a-f-]{36}\n?/gm, '').trim()}</p>
+        {!technician && [...job.description.matchAll(/^Jobber (job )?history: ([0-9a-f-]{36})$/gm)].map(match =>
+          <Link key={match[2]} className="inline-block mr-4 text-sm text-brand-300 hover:underline" to={`/jobber-history/${match[2]}`}>{match[1] ? 'Original job notes and files' : 'Original visit details'}</Link>
+        )}
+      </section>}
+
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <section role="dialog" aria-modal="true" aria-labelledby="delete-job-title" className="w-full max-w-md rounded-2xl border border-red-500/30 bg-ink-900 p-6 shadow-2xl">

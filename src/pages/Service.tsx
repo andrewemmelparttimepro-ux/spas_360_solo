@@ -20,6 +20,7 @@ import DialogKeys from '@/components/ui/DialogKeys';
 import DealInventorySelector from '@/components/DealInventorySelector';
 import { canReplaceNewJobTitle, newJobTitleForCustomer } from '@/lib/newJobTitle';
 import JobContactDetails from '@/components/JobContactDetails';
+import { jobServiceContact } from '@/lib/jobContact';
 import StoreSwitcher from '@/components/StoreSwitcher';
 import { dashboardScheduleLink, dealershipDate, parseDashboardScheduleFilter, scheduleCalendarDate, type DashboardScheduleFilter } from '@/lib/dashboardSchedule';
 import DelegatedTasksPanel from '@/components/dashboard/DelegatedTasksPanel';
@@ -27,7 +28,7 @@ import { canManageServiceSchedule, isServiceTechnician } from '@/lib/serviceTech
 import { scheduleStoreDefault } from '@/lib/scheduleStoreDefault';
 
 type ViewMode = 'day' | 'week' | 'month';
-type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | null };
+type ServiceJob = Job & { contacts?: { first_name: string; last_name: string; phone: string | null; mailing_address: string | null } | null; properties?: { address: string } | null };
 
 const LEGEND_JOB_TYPES: ScheduleJobType[] = ['Service', 'Delivery', 'Warranty', 'Customer Pick Up', 'On Order', 'To Do'];
 
@@ -88,7 +89,7 @@ function EditableJobStatus({ value, jobId, onSave, light }: { value: JobStatus; 
 
 // --------------- Day/week job card ---------------
 function JobCard({ job, saveJobStatus, technician }: { job: ServiceJob; saveJobStatus: (id: string, u: { status: JobStatus }) => Promise<boolean>; technician?: boolean }) {
-  const contact = job.contacts;
+  const contact = jobServiceContact(job.contacts, job.properties);
   return (
     <div className={cn('block p-3.5 rounded-r-lg border border-ink-800 border-l-4 transition-all hover:brightness-110', jobTypeCardColors[scheduleJobType(job.job_type)] ?? 'bg-ink-950')}>
       <div className="flex items-center justify-between gap-2">
@@ -381,6 +382,7 @@ export default function Service() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
         {!technician && <Link to="/jobber-history" className="text-sm text-brand-300 hover:underline">Jobber History</Link>}
+        {!technician && <Link to="/jobber-history?cutover=review" className="text-sm text-amber-300 hover:underline">Carryover review</Link>}
         {canManageSchedule && <button
           onClick={() => {
             // Smart default: pre-pick the store you're already working in
@@ -748,7 +750,7 @@ export default function Service() {
                               <p className="mt-1 text-[10px] font-semibold opacity-90">
                                 {job.contacts.first_name} {job.contacts.last_name}
                               </p>
-                              <JobContactDetails contact={job.contacts} compact />
+                              <JobContactDetails contact={jobServiceContact(job.contacts, job.properties)} compact />
                             </>
                           )}
                           <p className="mt-1 text-[10px] font-medium opacity-80">

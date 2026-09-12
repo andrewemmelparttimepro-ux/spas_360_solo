@@ -48,7 +48,7 @@ describe('Schedule job contact details', () => {
     const queue = service.slice(service.indexOf('{/* ─── Unscheduled queue'));
 
     assert.match(jobCard, /contact && <JobContactDetails contact=\{contact\} compact \/>/);
-    assert.match(queue, /<JobContactDetails contact=\{job\.contacts\} compact \/>/);
+    assert.match(queue, /<JobContactDetails contact=\{jobServiceContact\(job\.contacts, job\.properties\)\} compact \/>/);
     assert.match(detail, /<JobContactDetails contact=\{\{ \.\.\.contact, mailing_address: property\?\.address \?\? contact\.mailing_address \}\} className="text-ink-300" \/>/);
     assert.match(component, /target="_blank"/);
     assert.match(component, /rel="noopener noreferrer"/);

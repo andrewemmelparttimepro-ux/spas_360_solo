@@ -345,7 +345,7 @@ export default function ContactDetail() {
             <Wrench className="w-3.5 h-3.5" />Service Jobs ({relJobs.length})
           </h2>
           {relJobs.length === 0 ? (
-            <p className="text-xs text-ink-500 py-2">No service history</p>
+            <p className="text-xs text-ink-500 py-2">No SPAS 360 service jobs yet.</p>
           ) : (
             <div className="space-y-2">
               {relJobs.slice(0, 5).map(j => (

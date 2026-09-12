@@ -33,8 +33,9 @@ export type JobberHistoryRow = {
 };
 
 const FIELDS = 'id,contact_id,source_account_name,source_account_key,record_kind,source_id,source_client_id,source_number,source_url,title,client_name,source_status,occurred_at,source_updated_at,captured_at,summary,coverage,match_status,match_reason';
-const KINDS: Record<string, string> = { job: 'Jobs', client: 'Customers', visit: 'Visits', property: 'Properties', quote: 'Quotes', request: 'Requests', invoice: 'Invoices', payment: 'Payments', product: 'Products and services', expense: 'Expenses', timesheet: 'Timesheets', task: 'Tasks', user: 'Staff', account: 'Account information', tax_rate: 'Tax rates', custom_field: 'Custom fields', vehicle: 'Vehicles', payout: 'Payouts', expense_document: 'Expense documents', expense_upload: 'Expense uploads', marketing_task: 'Marketing tasks', marketing_item: 'Marketing history', event: 'Calendar events', assessment: 'Assessments' };
-const OWNER_KINDS = new Set(['user', 'timesheet', 'account', 'payout', 'expense_document', 'expense_upload']);
+const KINDS: Record<string, string> = { job: 'Jobs', client: 'Customers', visit: 'Visits', property: 'Properties', quote: 'Quotes', request: 'Requests', invoice: 'Invoices', payment: 'Payments', product: 'Products and services', expense: 'Expenses', timesheet: 'Timesheets', task: 'Tasks', user: 'Staff', account: 'Account information', tax_rate: 'Tax rates', custom_field: 'Custom fields', vehicle: 'Vehicles', payout: 'Payouts', expense_document: 'Expense documents', expense_upload: 'Expense uploads', marketing_task: 'Marketing tasks', marketing_item: 'Marketing history', event: 'Calendar events', assessment: 'Assessments', communication: 'Communications' };
+const OWNER_KINDS = new Set(['user', 'timesheet', 'account', 'payout', 'expense_document', 'expense_upload', 'communication']);
+const recordTitle = (row: JobberHistoryRow) => row.record_kind === 'property' ? row.summary.addresses?.[0] || 'Property' : row.title;
 const PAGE_SIZE = 50;
 const control = 'rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-ink-200';
 const date = (value?: string | null) => {
@@ -120,8 +121,8 @@ function HistoryList() {
     {!busy && !error && rows.length === 0 && <p className="rounded-xl border border-ink-700 p-8 text-center text-ink-400">No captured records match these filters.</p>}
     <div className={`space-y-2 ${busy ? 'opacity-50' : ''}`}>
       {rows.map(row => <Link key={row.id} to={`/jobber-history/${row.id}`} className="block rounded-xl border border-ink-700 bg-ink-900 p-4 hover:border-brand-500">
-        <div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold text-ink-100">{row.source_number && <span className="text-ink-400">#{row.source_number} · </span>}{row.title}</h2><span className="text-xs text-ink-400">{row.source_account_name}</span></div>
-        <p className="mt-1 text-sm text-ink-300">{kind === 'job' ? `${row.client_name} · ` : ''}<span className="capitalize">{status(row.source_status)}</span></p>
+        <div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold text-ink-100">{row.source_number && <span className="text-ink-400">#{row.source_number} · </span>}{recordTitle(row)}</h2><span className="text-xs text-ink-400">{row.source_account_name}</span></div>
+        <p className="mt-1 text-sm text-ink-300">{kind === 'job' || kind === 'communication' ? `${row.client_name} · ` : ''}<span className="capitalize">{status(row.source_status)}</span></p>
         {row.summary.addresses?.length ? <p className="mt-1 text-sm text-ink-400">{row.summary.addresses.join(' • ')}</p> : null}
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-500">{row.occurred_at && <span>Date: {date(row.occurred_at)} CT</span>}<span className={row.match_status === 'review' ? 'text-amber-300' : 'text-emerald-400'}>{row.contact_id ? 'Linked to SPAS customer' : row.match_status === 'not_applicable' ? 'Store record' : 'Customer match needs review'}</span></div>
       </Link>)}
@@ -160,17 +161,17 @@ function HistoryDetail({ id }: { id: string }) {
   const customer = row.record_kind === 'client';
   return <div className="max-w-4xl mx-auto space-y-5 pb-8">
     <Link to="/jobber-history" className="inline-flex items-center gap-2 text-sm text-brand-300"><ArrowLeft className="h-4 w-4" />Jobber History</Link>
-    <div><p className="text-sm text-ink-400">{row.source_account_name} · {KINDS[row.record_kind] || row.record_kind}{row.source_number ? ` #${row.source_number}` : ''}</p><h1 className="mt-1 text-2xl font-bold text-ink-100">{row.title}</h1></div>
+    <div><p className="text-sm text-ink-400">{row.source_account_name} · {KINDS[row.record_kind] || row.record_kind}{row.source_number ? ` #${row.source_number}` : ''}</p><h1 className="mt-1 text-2xl font-bold text-ink-100">{recordTitle(row)}</h1></div>
     <Coverage coverage={row.coverage} />
     <section className="rounded-xl border border-ink-700 bg-ink-900 p-5 space-y-3">
       <h2 className="text-lg font-semibold">{row.client_name}</h2>
       {row.contact_id ? <Link className="text-brand-300 hover:underline" to={`/customers/${row.contact_id}`}>Open SPAS customer</Link> : row.match_status === 'not_applicable' ? <p className="text-ink-400">Store history record</p> : <p className="text-amber-300">Customer match needs review. This record is preserved here while the match is confirmed.</p>}
-      <p className="text-sm text-ink-400">{row.match_reason}</p>
+      <p className="text-sm text-ink-400">{row.match_status === 'created' ? 'Linked to a customer imported from Jobber.' : row.match_reason}</p>
       {candidates.length > 0 && <div className="text-sm"><p className="text-ink-400">Possible existing customers:</p><ul className="mt-1 space-y-1">{candidates.map(c => <li key={c.id}><Link className="text-brand-300 hover:underline" to={`/customers/${c.id}`}>{c.first_name} {c.last_name}</Link></li>)}</ul></div>}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-sm">
-        <div><dt className="text-ink-500">Jobber status</dt><dd className="mt-1 capitalize">{status(row.source_status)}</dd></div>
+        <div><dt className="text-ink-500">Jobber status</dt><dd className="mt-1 capitalize">{row.source_status ? status(row.source_status) : 'Not applicable'}</dd></div>
         {row.record_kind === 'job' && <div><dt className="text-ink-500">Job type</dt><dd className="mt-1">{row.summary.job_type === 'ONE_OFF' ? 'One-off' : row.summary.job_type === 'RECURRING' ? 'Recurring' : 'Not captured'}</dd></div>}
-        <div className="sm:col-span-2"><dt className="text-ink-500">Service / property address</dt><dd className="mt-1">{row.summary.addresses?.length ? row.summary.addresses.map((a, i) => <p key={i}>{a}</p>) : 'Not captured'}</dd></div>
+        {(customer || row.record_kind === 'job' || Boolean(row.summary.addresses?.length)) && <div className="sm:col-span-2"><dt className="text-ink-500">Service / property address</dt><dd className="mt-1">{row.summary.addresses?.length ? row.summary.addresses.map((a, i) => <p key={i}>{a}</p>) : 'Not captured'}</dd></div>}
         {customer ? <>
           <div><dt className="text-ink-500">Email</dt><dd className="mt-1">{row.summary.emails?.length ? row.summary.emails.map((e, i) => <p key={i}>{e.address}{e.primary ? ' (primary)' : ''}</p>) : 'Not captured'}</dd></div>
           <div><dt className="text-ink-500">Phone</dt><dd className="mt-1">{row.summary.phones?.length ? row.summary.phones.map((p, i) => <p key={i}>{p.number}{p.primary ? ' (primary)' : ''}</p>) : row.coverage === 'summary' ? 'Pending detailed export' : 'Not recorded'}</dd></div>
@@ -179,10 +180,10 @@ function HistoryDetail({ id }: { id: string }) {
           <div><dt className="text-ink-500">Properties listed in Jobber</dt><dd className="mt-1">{row.summary.property_count ?? 'Not captured'} · {row.summary.addresses?.length || 0} addresses captured</dd></div>
           <div><dt className="text-ink-500">Updated in Jobber</dt><dd className="mt-1">{date(row.source_updated_at)} CT</dd></div>
         </> : <>
-          <div><dt className="text-ink-500">Start (Central time)</dt><dd className="mt-1">{date(row.summary.start_at)}</dd></div>
-          <div><dt className="text-ink-500">Completed (Central time)</dt><dd className="mt-1">{date(row.summary.completed_at)}</dd></div>
-          <div><dt className="text-ink-500">Next visit shown in captured list</dt><dd className="mt-1">{date(row.summary.next_visit?.date)}</dd></div>
-          <div><dt className="text-ink-500">Recorded total</dt><dd className="mt-1">{row.summary.total == null ? 'Not captured' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.summary.total)}<p className="mt-1 text-xs text-ink-500">Historical amount; balance due has not been reconciled.</p></dd></div>
+          {row.summary.start_at && <div><dt className="text-ink-500">Start (Central time)</dt><dd className="mt-1">{date(row.summary.start_at)}</dd></div>}
+          {row.summary.completed_at && <div><dt className="text-ink-500">Completed (Central time)</dt><dd className="mt-1">{date(row.summary.completed_at)}</dd></div>}
+          {row.summary.next_visit?.date && <div><dt className="text-ink-500">Next visit shown in captured list</dt><dd className="mt-1">{date(row.summary.next_visit.date)}</dd></div>}
+          {row.summary.total != null && <div><dt className="text-ink-500">Recorded total</dt><dd className="mt-1">{row.summary.total == null ? 'Not captured' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.summary.total)}<p className="mt-1 text-xs text-ink-500">Historical amount; balance due has not been reconciled.</p></dd></div>}
         </>}
       </dl>
     </section>
@@ -191,7 +192,7 @@ function HistoryDetail({ id }: { id: string }) {
       {row.source_url && <a className="inline-flex items-center gap-2 text-brand-300 hover:underline" href={row.source_url} target="_blank" rel="noreferrer">Open original in Jobber<ExternalLink className="h-4 w-4" /></a>}
       <p className="text-xs">The original link requires access to this store in Jobber.</p>
     </section>
-    <JobberRecordDetails raw={row.raw} title={row.title} />
+    <JobberRecordDetails raw={row.raw} title={recordTitle(row)} />
     {customer && row.contact_id && <Link className="inline-block text-brand-300 hover:underline" to={`/jobber-history?contact=${row.contact_id}`}>View this customer's imported jobs</Link>}
     {!row.contact_id && customer && <Link className="inline-block text-brand-300 hover:underline" to={`/jobber-history?source_client=${encodeURIComponent(row.source_id)}&account=${row.source_account_key}`}>View this customer's captured jobs</Link>}
   </div>;
@@ -216,6 +217,6 @@ export function JobberHistoryPanel({ contactId }: { contactId: string }) {
   return <section className="rounded-xl border border-ink-700 bg-ink-900 p-5">
     <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Jobber History {count ? `(${count})` : ''}</h2><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history?contact=${contactId}`}>View history</Link></div>
     <p className="mt-2 text-xs text-ink-400">Imported Jobber records. Open a record to see its captured details and files.</p>
-    {error ? <p role="alert" className="mt-3 text-sm text-amber-300">History could not be loaded. Open View history to retry.</p> : <ul className="mt-3 divide-y divide-ink-800">{rows.map(row => <li key={row.id} className="py-2"><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history/${row.id}`}>{row.source_number ? `#${row.source_number} · ` : `${row.record_kind === 'client' ? 'Customer' : KINDS[row.record_kind] || row.record_kind} · `}{row.title}</Link><p className="mt-0.5 text-xs text-ink-500 capitalize">{row.source_account_name} · {status(row.source_status)}</p>{row.summary.addresses?.length ? <p className="mt-1 text-xs text-ink-400">Service address: {row.summary.addresses.join(' • ')}</p> : null}</li>)}</ul>}
+    {error ? <p role="alert" className="mt-3 text-sm text-amber-300">History could not be loaded. Open View history to retry.</p> : <ul className="mt-3 divide-y divide-ink-800">{rows.map(row => <li key={row.id} className="py-2"><Link className="text-sm text-brand-300 hover:underline" to={`/jobber-history/${row.id}`}>{row.source_number ? `#${row.source_number} · ` : `${row.record_kind === 'client' ? 'Customer' : KINDS[row.record_kind] || row.record_kind} · `}{recordTitle(row)}</Link><p className="mt-0.5 text-xs text-ink-500 capitalize">{row.source_account_name} · {status(row.source_status)}</p>{row.summary.addresses?.length ? <p className="mt-1 text-xs text-ink-400">Service address: {row.summary.addresses.join(' • ')}</p> : null}</li>)}</ul>}
   </section>;
 }

@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import type { InventoryItem, InventoryStatus } from '@/types/database';
+import { INVENTORY_FLOORING_DESIGNATIONS, inventoryFlooringDesignation, inventorySkuForFlooringDesignation, isInventoryFlooringDesignation } from '@/lib/inventoryFlooringReport';
+import { InventoryFlooringHistory } from '@/components/InventoryFlooringHistory';
 import { INVENTORY_BRAND_CHOICES } from '@/lib/inventoryBrandFilter';
 
 const STATUS_OPTIONS: InventoryStatus[] = ['In Stock', 'On Order', 'In Transit', 'Sold', 'Delivered', 'Returned'];
@@ -177,6 +179,7 @@ export default function InventoryDetail() {
   if (!item) return <div className="text-center text-ink-500"><p>Item not found</p><Link to="/inventory" className="text-brand-400 text-sm mt-2 hover:underline">Back</Link></div>;
 
   const loc = (item as unknown as Record<string, unknown>).locations as { name: string } | undefined;
+  const flooring = inventoryFlooringDesignation({ ...item, locations: loc });
   const brandOptions = item.brand && !INVENTORY_BRAND_CHOICES.some(brand => brand === item.brand)
     ? [item.brand, ...INVENTORY_BRAND_CHOICES]
     : [...INVENTORY_BRAND_CHOICES];
@@ -198,6 +201,13 @@ export default function InventoryDetail() {
           <span className="text-[10px] text-ink-500">Click any value to edit</span>
         </div>
         <div className="grid grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="inventory-detail-flooring" className="mb-1 block text-xs text-ink-500">Flooring designation</label>
+            <select id="inventory-detail-flooring" value={flooring} onChange={event => { if (isInventoryFlooringDesignation(event.target.value)) void handleSave(item.id, { sku: inventorySkuForFlooringDesignation(item.sku, event.target.value) }); }} className="w-full rounded-lg border border-ink-700 bg-ink-950 px-2 py-1.5 text-sm text-ink-100 focus:border-brand-500">
+              {!isInventoryFlooringDesignation(flooring) && <option value={flooring}>{flooring || 'Select flooring designation'}</option>}
+              {INVENTORY_FLOORING_DESIGNATIONS.map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </div>
           <EditableField label="Brand" value={item.brand} field="brand" itemId={item.id} onSave={handleSave} type="select" options={brandOptions} />
           <EditableField label="Model" value={item.model} field="model" itemId={item.id} onSave={handleSave} />
           <EditableField label="Color/Finish" value={item.color_finish} field="color_finish" itemId={item.id} onSave={handleSave} />
@@ -213,6 +223,8 @@ export default function InventoryDetail() {
           <EditableField label="Sale Price" value={item.sale_price} field="sale_price" itemId={item.id} onSave={handleSave} type="number" prefix="$" bold color="text-emerald-300" />
         </div>
       </div>
+
+      <InventoryFlooringHistory itemId={item.id} refreshKey={`${item.sku}|${item.notes}|${item.location_id}`} />
 
       <div className="bg-ink-900 rounded-xl border border-ink-700 shadow-sm p-6">
         <h2 className="text-sm font-semibold text-ink-300 uppercase tracking-wider mb-4">Additional Info</h2>

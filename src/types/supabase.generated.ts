@@ -1508,6 +1508,25 @@ export type Database = {
           },
         ]
       }
+      inventory_flooring_history: {
+        Row: {
+          id: string
+          inventory_item_id: string
+          org_id: string
+          event_type: string
+          occurred_at: string
+          actor_id: string | null
+          actor_name: string | null
+          before_designation: string | null
+          after_designation: string | null
+          source: string
+          source_audit_id: string | null
+          recorded_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       inventory_items: {
         Row: {
           brand: string | null
@@ -1515,6 +1534,7 @@ export type Database = {
           color_finish: string | null
           cost: number | null
           created_at: string
+          created_by: string | null
           customer_id: string | null
           date_delivered: string | null
           date_received: string | null
@@ -1547,6 +1567,7 @@ export type Database = {
           color_finish?: string | null
           cost?: number | null
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           date_delivered?: string | null
           date_received?: string | null
@@ -1579,6 +1600,7 @@ export type Database = {
           color_finish?: string | null
           cost?: number | null
           created_at?: string
+          created_by?: string | null
           customer_id?: string | null
           date_delivered?: string | null
           date_received?: string | null

@@ -62,6 +62,7 @@ const canonicalFlooringDesignation = (
   if (/^(?:mchl|magic\s+city\s+home\s+(?:leisure|ieisure)|owned\s+by\s+mchl)$/.test(normalized)) return 'Owned by MCHL';
   if (/^(?:spas\s+etc|owned\s+by\s+spas\s+etc)$/.test(normalized)) return 'Owned by Spas Etc';
   if (/^wells\s+fargo(?:\s+(?:minot|bismarck))?$/.test(normalized)) {
+    if (normalized.endsWith('minot')) return 'Wells Fargo Minot';
     if (normalized.endsWith('bismarck') || canonicalInventoryFlooringStore(storeName) === 'Bismarck') {
       return 'Wells Fargo Bismarck';
     }

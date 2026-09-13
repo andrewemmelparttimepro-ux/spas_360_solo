@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { FileSpreadsheet, LoaderCircle, Palette, RotateCcw, Trash2, X } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { ChevronDown, ChevronRight, FileSpreadsheet, LoaderCircle, Palette, RotateCcw, Trash2, X } from 'lucide-react';
 import DialogKeys from '@/components/ui/DialogKeys';
+import { InventoryFlooringHistory } from '@/components/InventoryFlooringHistory';
 import { useInventoryFlooringReport } from '@/hooks/useInventoryFlooringReport';
 import {
   INVENTORY_FLOORING_DESIGNATIONS,
@@ -42,6 +43,7 @@ export function InventoryFlooringStatusReport() {
   const [selectedStore, setSelectedStore] = useState<InventoryFlooringStore>('');
   const [serialSearch, setSerialSearch] = useState('');
   const [showRemoved, setShowRemoved] = useState(false);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [rowActionError, setRowActionError] = useState<string | null>(null);
   const [columnWidths, setColumnWidths] = useState<number[]>(() => [...INVENTORY_FLOORING_DEFAULT_COLUMN_WIDTHS]);
@@ -77,6 +79,7 @@ export function InventoryFlooringStatusReport() {
   }, [selectedRowId, visibleItems]);
 
   const closeReport = () => {
+    setExpandedItemId(null);
     setSelectedFlooring('');
     setSelectedStore('');
     setSerialSearch('');
@@ -363,8 +366,8 @@ export function InventoryFlooringStatusReport() {
                           const isRemoved = inventoryFlooringRowIsRemoved(item);
                           const rowHeight = rowHeights[item.id] ?? INVENTORY_FLOORING_DEFAULT_ROW_HEIGHT;
                           return (
+                            <Fragment key={item.id}>
                             <tr
-                              key={item.id}
                               className={`border-t border-ink-800 text-ink-300 ${isRemoved ? 'opacity-60' : ''}`}
                               style={{ backgroundColor: item.flooring_report.background_color ?? undefined, height: `${rowHeight}px` }}
                             >
@@ -391,7 +394,12 @@ export function InventoryFlooringStatusReport() {
                                   />
                                 </div>
                               </td>
-                              <td className="overflow-hidden px-3 py-1 font-medium text-ink-100"><div className="max-h-full overflow-hidden">{item.model || item.product}<span className="block truncate text-xs font-normal text-ink-500">{item.brand || item.product}</span></div></td>
+                              <td className="overflow-hidden px-3 py-1 font-medium text-ink-100">
+                                <button type="button" aria-expanded={expandedItemId === item.id} aria-controls={`flooring-history-${item.id}`} aria-label={`View history for ${item.model || item.product}`} onClick={() => setExpandedItemId(current => current === item.id ? null : item.id)} className="flex w-full items-center gap-2 text-left hover:text-amber-400">
+                                  {expandedItemId === item.id ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                                  <span className="min-w-0"><span className="block truncate">{item.model || item.product}</span><span className="block truncate text-xs font-normal text-ink-500">{item.brand || item.product}</span><span className="block text-[10px] font-normal text-amber-500">History</span></span>
+                                </button>
+                              </td>
                               <td className="overflow-hidden truncate px-3 py-1">{item.locations?.name || '—'}</td>
                               <td className="overflow-hidden truncate px-3 py-1">{serial || '—'}</td>
                               <td className="overflow-hidden px-2 py-1"><FlooringDesignationSelect item={item} onSave={report.updateDesignation} /></td>
@@ -408,6 +416,14 @@ export function InventoryFlooringStatusReport() {
                                 )}
                               </td>
                             </tr>
+                            {expandedItemId === item.id && (
+                              <tr id={`flooring-history-${item.id}`}>
+                                <td colSpan={8} className="border-t border-ink-800 bg-ink-950 px-4 py-3">
+                                  <InventoryFlooringHistory itemId={item.id} refreshKey={`${item.sku}|${item.notes}|${item.location_id}`} />
+                                </td>
+                              </tr>
+                            )}
+                            </Fragment>
                           );
                         })}
                         {!visibleItems.length && (

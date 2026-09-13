@@ -5,9 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useContacts } from '@/hooks/useContacts';
 import { useToast } from '@/components/ui/Toast';
 import type { InventoryItem } from '@/types/database';
-import { operationalStatusForNewStockState, type InventoryStockState } from '@/lib/inventoryFields';
+import { joinSerialAndFlooring, splitSerialAndFlooring, operationalStatusForNewStockState, type InventoryStockState } from '@/lib/inventoryFields';
 import { supabase } from '@/lib/supabase';
 import { useModal } from '@/hooks/useModal';
+import { INVENTORY_FLOORING_DESIGNATIONS, inventoryFlooringDesignation, inventorySkuForFlooringDesignation, isInventoryFlooringDesignation } from '@/lib/inventoryFlooringReport';
 import { INVENTORY_BRAND_CHOICES } from '@/lib/inventoryBrandFilter';
 
 /**
@@ -95,6 +96,10 @@ export default function InventoryEditor({ item, onClose, onSave, onRemove }: Pro
     primary_image_storage_path: item?.primary_image_storage_path ?? '',
     primary_image_mime_type: item?.primary_image_mime_type ?? '',
   });
+  const [serialDraft, setSerialDraft] = useState(() => splitSerialAndFlooring(item?.sku ?? '').serial);
+  const draftSku = serialDraft === splitSerialAndFlooring(v.sku).serial
+    ? v.sku
+    : joinSerialAndFlooring(serialDraft, splitSerialAndFlooring(v.sku).flooring);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -123,13 +128,15 @@ export default function InventoryEditor({ item, onClose, onSave, onRemove }: Pro
     toast('Approved product photo attached', 'success');
   };
 
+  const flooring = inventoryFlooringDesignation({ ...v, locations: locations.find(location => location.id === v.location_id) });
+
   const markSold = () => set({ status: 'Sold', date_sold: v.date_sold || today });
 
   const handleSave = async () => {
-    if (!v.sku.trim() || !v.product.trim() || !v.location_id) return;
+    if (!draftSku.trim() || (!isEdit && !serialDraft.trim()) || !v.product.trim() || !v.location_id) return;
     setSaving(true);
     const payload: Partial<InventoryItem> = {
-      sku: v.sku.trim(),
+      sku: draftSku.trim(),
       product: v.product.trim(),
       brand: v.brand.trim() || null,
       category: v.category,
@@ -190,7 +197,14 @@ export default function InventoryEditor({ item, onClose, onSave, onRemove }: Pro
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* Identity */}
-          <div><label className={labelClass}>Serial Number *</label><input value={v.sku} onChange={e => set({ sku: e.target.value })} className={inputClass} placeholder="101039194" /></div>
+          <div><label className={labelClass}>Serial Number *</label><input value={serialDraft} onChange={e => setSerialDraft(e.target.value)} className={inputClass} placeholder="101039194" /></div>
+          <div>
+            <label htmlFor="inventory-editor-flooring" className={labelClass}>Flooring designation</label>
+            <select id="inventory-editor-flooring" value={flooring} onChange={event => { if (isInventoryFlooringDesignation(event.target.value)) set({ sku: inventorySkuForFlooringDesignation(draftSku, event.target.value) }); }} className={inputClass}>
+              {!isInventoryFlooringDesignation(flooring) && <option value={flooring}>{flooring || 'Select flooring designation'}</option>}
+              {INVENTORY_FLOORING_DESIGNATIONS.map(option => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </div>
           <div><label className={labelClass}>Model *</label><input value={v.product} onChange={e => set({ product: e.target.value })} className={inputClass} placeholder="Nova 7L" /></div>
           <div><label className={labelClass}>Color / Finish</label><input value={v.color_finish} onChange={e => set({ color_finish: e.target.value })} className={inputClass} placeholder="Grey/Platinum" /></div>
 
@@ -294,7 +308,7 @@ export default function InventoryEditor({ item, onClose, onSave, onRemove }: Pro
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-ink-300 hover:bg-ink-800 rounded-lg transition-colors">Cancel</button>
             <button
               onClick={handleSave}
-              disabled={!v.sku.trim() || !v.product.trim() || !v.location_id || saving}
+              disabled={!draftSku.trim() || (!isEdit && !serialDraft.trim()) || !v.product.trim() || !v.location_id || saving}
               className="px-5 py-2 text-sm bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors"
             >
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Inventory'}

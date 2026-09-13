@@ -22,9 +22,31 @@ test('history distinguishes unknown historical actors from server operations and
   assert.equal(inventoryHistoryActor({ actor_name: 'Brandon Solem', actor_id: 'known-actor', source: 'server' }), 'Brandon Solem');
 });
 
-test('history does not invent an initial designation for legacy creation and shows both sides of a change', () => {
-  assert.equal(inventoryHistoryDescription({ event_type: 'created', before_designation: null, after_designation: null }), 'Inventory created');
-  assert.equal(inventoryHistoryDescription({ event_type: 'created', before_designation: null, after_designation: '' }), 'Inventory created · Not designated');
-  assert.equal(inventoryHistoryDescription({ event_type: 'flooring_changed', before_designation: 'MCHL TCCU', after_designation: 'Owned by MCHL' }), 'Flooring changed: MCHL TCCU → Owned by MCHL');
-  assert.equal(inventoryHistoryDescription({ event_type: 'flooring_changed', before_designation: null, after_designation: 'Wells Fargo Minot' }), 'Flooring changed: Not designated → Wells Fargo Minot');
+const recordedActor = { actor_name: 'Brandon Solem', actor_id: 'known-actor', source: 'server' as const };
+
+test('history does not invent an initial designation for legacy creation', () => {
+  const creation = { event_type: 'created' as const, before_designation: null, actor_name: null, actor_id: null, source: 'legacy_record' as const };
+  assert.equal(inventoryHistoryDescription({ ...creation, after_designation: null }), 'Inventory created');
+  assert.equal(inventoryHistoryDescription({ ...creation, after_designation: '' }), 'Inventory created · Not designated');
+});
+
+test('flooring changes name the full actor and both store designations in a sentence', () => {
+  const change = { ...recordedActor, event_type: 'flooring_changed' as const, before_designation: 'MCHL TCCU', after_designation: 'Wells Fargo Minot' };
+  assert.equal(inventoryHistoryDescription(change), 'User Brandon Solem changed the inventory flooring status from "Minot TCCU" to "Minot Wells Fargo".');
+  assert.equal(inventoryHistoryDescription({ ...change, before_designation: 'Spas Etc TCCU', after_designation: 'Wells Fargo Bismarck' }), 'User Brandon Solem changed the inventory flooring status from "Bismarck TCCU" to "Bismarck Wells Fargo".');
+  assert.equal(change.before_designation, 'MCHL TCCU');
+  assert.equal(change.after_designation, 'Wells Fargo Minot');
+});
+
+test('history preserves other designation labels and explains an unset old or new value', () => {
+  const change = { ...recordedActor, event_type: 'flooring_changed' as const };
+  assert.equal(inventoryHistoryDescription({ ...change, before_designation: null, after_designation: 'Owned by MCHL' }), 'User Brandon Solem changed the inventory flooring status from "Not designated" to "Owned by MCHL".');
+  assert.equal(inventoryHistoryDescription({ ...change, before_designation: 'Consignment from Jane', after_designation: '' }), 'User Brandon Solem changed the inventory flooring status from "Consignment from Jane" to "Not designated".');
+});
+
+test('change sentences preserve unattributed history and known actor IDs without inventing a user', () => {
+  const change = { event_type: 'flooring_changed' as const, before_designation: null, after_designation: null, actor_name: null, actor_id: null, source: 'audit_log' as const };
+  assert.equal(inventoryHistoryDescription(change), 'The inventory flooring status changed from "Not designated" to "Not designated". The actor was not recorded.');
+  assert.equal(inventoryHistoryDescription({ ...change, source: 'server' }), 'The inventory flooring status changed from "Not designated" to "Not designated". No signed-in user was recorded.');
+  assert.equal(inventoryHistoryDescription({ ...change, actor_name: ' ', actor_id: 'known-actor' }), 'User known-actor changed the inventory flooring status from "Not designated" to "Not designated".');
 });

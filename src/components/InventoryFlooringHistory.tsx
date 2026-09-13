@@ -54,7 +54,7 @@ export function InventoryFlooringHistory({ itemId, refreshKey }: { itemId: strin
           {entries.map(entry => (
             <li key={entry.id} className="border-l-2 border-amber-500/50 pl-3">
               <p className="font-medium text-ink-100">{inventoryHistoryDescription(entry)}</p>
-              <p className="mt-0.5 text-xs text-ink-300">{inventoryHistoryActor(entry)} · <time dateTime={entry.occurred_at}>{new Date(entry.occurred_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}</time></p>
+              <p className="mt-0.5 text-xs text-ink-300">{entry.event_type === 'created' && <>{inventoryHistoryActor(entry)} · </>}Date/time: <time dateTime={entry.occurred_at}>{new Date(entry.occurred_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' })}</time></p>
               {entry.source === 'legacy_record' && <p className="mt-1 text-xs text-ink-400">Original recorded creation time; the creator and initial flooring were not recorded.</p>}
               {entry.source === 'audit_log' && <p className="mt-1 text-xs text-ink-400">Recovered from recorded activity.</p>}
             </li>
